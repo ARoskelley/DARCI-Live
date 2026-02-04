@@ -1,3 +1,5 @@
+using Darci.Shared;
+
 namespace Darci.Memory;
 
 /// <summary>
@@ -24,19 +26,4 @@ public interface IMemoryStore
     /// Get count of memories needing consolidation
     /// </summary>
     Task<int> GetPendingConsolidationCount();
-}
-
-/// <summary>
-/// A single memory entry
-/// </summary>
-public class MemoryEntry
-{
-    public int Id { get; set; }
-    public string Content { get; set; } = "";
-    public string[] Tags { get; set; } = Array.Empty<string>();
-    public DateTime CreatedAt { get; set; }
-    public DateTime LastAccessedAt { get; set; }
-    public int AccessCount { get; set; }
-    public float Importance { get; set; } = 0.5f;
-    public float RelevanceScore { get; set; } // Set during recall
 }

@@ -1,4 +1,4 @@
-using Darci.Core.Models;
+using Darci.Shared;
 using Darci.Personality;
 using Microsoft.Extensions.Logging;
 
@@ -305,16 +305,4 @@ public class State
     
     private float Lerp(float current, float target, float rate)
         => current + (target - current) * rate;
-}
-
-public enum Mood
-{
-    Calm,
-    Alert,
-    Curious,
-    Content,
-    Satisfied,
-    Frustrated,
-    Reflective,
-    Playful
 }

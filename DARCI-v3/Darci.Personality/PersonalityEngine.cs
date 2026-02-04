@@ -1,5 +1,5 @@
 using Dapper;
-using Darci.Core;
+using Darci.Shared;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
 

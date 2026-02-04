@@ -14,6 +14,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Darci.Shared\Darci.Shared.csproj" />
     <ProjectReference Include="..\Darci.Memory\Darci.Memory.csproj" />
     <ProjectReference Include="..\Darci.Tools\Darci.Tools.csproj" />
     <ProjectReference Include="..\Darci.Goals\Darci.Goals.csproj" />

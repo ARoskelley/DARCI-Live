@@ -1,5 +1,4 @@
-using Darci.Core;
-using Darci.Core.Models;
+using Darci.Shared;
 
 namespace Darci.Tools;
 

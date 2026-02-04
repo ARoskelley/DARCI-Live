@@ -13,6 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Darci.Shared\Darci.Shared.csproj" />
     <ProjectReference Include="..\Darci.Memory\Darci.Memory.csproj" />
   </ItemGroup>
 

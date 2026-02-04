@@ -1,5 +1,5 @@
 using System.Threading.Channels;
-using Darci.Core.Models;
+using Darci.Shared;
 using Darci.Memory;
 using Darci.Goals;
 using Microsoft.Extensions.Logging;

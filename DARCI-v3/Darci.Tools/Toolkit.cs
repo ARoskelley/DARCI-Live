@@ -1,6 +1,5 @@
 using System.Threading.Channels;
-using Darci.Core;
-using Darci.Core.Models;
+using Darci.Shared;
 using Darci.Memory;
 using Darci.Tools.Ollama;
 using Microsoft.Extensions.Logging;
@@ -189,15 +188,4 @@ Respond naturally and helpfully. Keep your response concise unless the situation
 
 DARCI:";
     }
-}
-
-/// <summary>
-/// A message going out from DARCI to a user
-/// </summary>
-public class OutgoingMessage
-{
-    public string UserId { get; init; } = "";
-    public string Content { get; init; } = "";
-    public DateTime CreatedAt { get; init; }
-    public int? InResponseToMessageId { get; init; }
 }

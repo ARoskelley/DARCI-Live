@@ -1,4 +1,4 @@
-using Darci.Core.Models;
+using Darci.Shared;
 using Darci.Tools;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;

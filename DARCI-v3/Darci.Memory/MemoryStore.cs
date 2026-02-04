@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Dapper;
+using Darci.Shared;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
 

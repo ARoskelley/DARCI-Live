@@ -1,5 +1,5 @@
 using Darci.Core;
-using Darci.Core.Models;
+using Darci.Shared;
 using Darci.Goals;
 using Darci.Memory;
 using Darci.Personality;

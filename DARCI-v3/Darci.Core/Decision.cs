@@ -1,4 +1,4 @@
-using Darci.Core.Models;
+using Darci.Shared;
 using Darci.Tools;
 using Darci.Goals;
 using Microsoft.Extensions.Logging;
@@ -429,17 +429,4 @@ public class Decision
     
     private bool ContainsAny(string text, params string[] patterns)
         => patterns.Any(p => text.Contains(p));
-}
-
-/// <summary>
-/// Context for generating a reply
-/// </summary>
-public class ReplyContext
-{
-    public string UserMessage { get; init; } = "";
-    public string UserId { get; init; } = "";
-    public string DarciState { get; init; } = "";
-    public MessageIntent? Intent { get; init; }
-    public List<string> RelevantMemories { get; set; } = new();
-    public List<string> ActiveGoals { get; set; } = new();
 }
