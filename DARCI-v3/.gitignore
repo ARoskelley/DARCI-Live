@@ -1,0 +1,20 @@
+## .NET
+bin/
+obj/
+*.user
+*.userosscache
+*.sln.docstates
+
+## Rider/VS
+.idea/
+*.suo
+*.csproj.user
+*.vs/
+
+## Data
+Data/*.db
+Data/*.db-journal
+
+## OS
+.DS_Store
+Thumbs.db
