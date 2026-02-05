@@ -79,30 +79,31 @@ public class OllamaClient : IOllamaClient
     }
     
     public async Task<List<float>> GetEmbedding(string text)
+{
+    try
     {
-        try
+        var request = new
         {
-            var request = new
-            {
-                model = _embeddingModel,
-                prompt = text
-            };
-            
-            var json = JsonSerializer.Serialize(request);
-            var content = new StringContent(json, Encoding.UTF8, "application/json");
-            
-            var response = await _http.PostAsync("/api/embeddings", content);
-            response.EnsureSuccessStatusCode();
-            
-            var result = await response.Content.ReadFromJsonAsync<OllamaEmbeddingResponse>();
-            return result?.Embedding ?? new List<float>();
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Ollama embedding failed");
-            return new List<float>();
-        }
+            model = _embeddingModel,
+            input = text  // Changed from 'prompt' to 'input'
+        };
+        
+        var json = JsonSerializer.Serialize(request);
+        var content = new StringContent(json, Encoding.UTF8, "application/json");
+        
+        var response = await _http.PostAsync("/api/embed", content);  // Changed endpoint
+        response.EnsureSuccessStatusCode();
+        
+        var result = await response.Content.ReadFromJsonAsync<OllamaEmbedResponse>();
+        // New API returns embeddings as array of arrays
+        return result?.Embeddings?.FirstOrDefault() ?? new List<float>();
     }
+    catch (Exception ex)
+    {
+        _logger.LogError(ex, "Ollama embedding failed");
+        return new List<float>();
+    }
+}
     
     private class OllamaResponse
     {
@@ -110,8 +111,8 @@ public class OllamaClient : IOllamaClient
         public bool Done { get; set; }
     }
     
-    private class OllamaEmbeddingResponse
-    {
-        public List<float>? Embedding { get; set; }
-    }
+private class OllamaEmbedResponse
+{
+    public List<List<float>>? Embeddings { get; set; }
+}
 }
