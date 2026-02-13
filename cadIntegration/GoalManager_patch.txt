@@ -1,0 +1,48 @@
+// ===========================================================
+// PATCH: Darci.Goals/GoalManager.cs
+// 
+// In the CreateInitialSteps method, add a new case to the
+// switch statement, right before the default (_ =>) case:
+// ===========================================================
+//
+// Find this block in CreateInitialSteps():
+//
+//     GoalType.Reminder => new[]
+//     {
+//         (GoalStepType.Notify, creation.Description)
+//     },
+//     _ => new[]
+//
+// Add this BETWEEN the Reminder case and the default case:
+//
+//     GoalType.CAD => new[]
+//     {
+//         (GoalStepType.CAD, $"Generate 3D model: {creation.Description}"),
+//         (GoalStepType.Notify, "Deliver STL file to user")
+//     },
+//
+// The full switch should then read:
+//
+//     var steps = creation.Type switch
+//     {
+//         GoalType.Research => new[]
+//         {
+//             (GoalStepType.Research, $"Search for information about: {creation.Title}"),
+//             (GoalStepType.Generate, "Summarize findings"),
+//             (GoalStepType.Notify, "Share results with user")
+//         },
+//         GoalType.Reminder => new[]
+//         {
+//             (GoalStepType.Notify, creation.Description)
+//         },
+//         GoalType.CAD => new[]                                          // <-- NEW
+//         {                                                               // <-- NEW
+//             (GoalStepType.CAD, $"Generate 3D model: {creation.Description}"),  // <-- NEW
+//             (GoalStepType.Notify, "Deliver STL file to user")          // <-- NEW
+//         },                                                              // <-- NEW
+//         _ => new[]
+//         {
+//             (GoalStepType.Generate, $"Plan approach for: {creation.Title}"),
+//             (GoalStepType.Notify, "Update user on completion")
+//         }
+//     };
