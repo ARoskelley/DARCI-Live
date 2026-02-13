@@ -29,6 +29,9 @@ public enum ActionType
     ReadFile,
     WriteFile,
     
+    // CAD
+    GenerateCAD,
+    
     // Meta
     Rest,
     Observe,
@@ -91,6 +94,7 @@ public enum IntentType
     GoalUpdate,
     StatusCheck,
     Feedback,
+    CAD,
     Unknown
 }
 
@@ -206,7 +210,8 @@ public enum GoalType
     Research,
     Reminder,
     Project,
-    Learning
+    Learning,
+    CAD
 }
 
 public enum GoalPriority
@@ -239,7 +244,8 @@ public enum GoalStepType
     Generate,
     Notify,
     Wait,
-    Custom
+    Custom,
+    CAD
 }
 
 public enum GoalStepStatus
@@ -275,6 +281,13 @@ public class DarciAction
     public string? Reasoning { get; init; }
     public int? InResponseToMessageId { get; init; }
     public int? InResponseToGoalId { get; init; }
+    
+    // CAD-specific fields
+    public string? CadDescription { get; init; }
+    public float? CadLengthMm { get; init; }
+    public float? CadWidthMm { get; init; }
+    public float? CadHeightMm { get; init; }
+    public int CadMaxIterations { get; init; } = 3;
     
     public static DarciAction Rest(TimeSpan? duration = null, string? reason = null) => new()
     {
@@ -312,6 +325,27 @@ public class DarciAction
         Type = ActionType.WorkOnGoal,
         GoalId = goalId,
         Reasoning = reason
+    };
+    
+    public static DarciAction GenerateCad(
+        string description,
+        string? userId = null,
+        int? messageId = null,
+        int? forGoalId = null,
+        float? lengthMm = null,
+        float? widthMm = null,
+        float? heightMm = null,
+        string? reason = null) => new()
+    {
+        Type = ActionType.GenerateCAD,
+        CadDescription = description,
+        CadLengthMm = lengthMm,
+        CadWidthMm = widthMm,
+        CadHeightMm = heightMm,
+        RecipientId = userId,
+        InResponseToMessageId = messageId,
+        InResponseToGoalId = forGoalId,
+        Reasoning = reason ?? "Generating CAD model"
     };
 }
 

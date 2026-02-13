@@ -1,0 +1,1128 @@
+Using launch settings from C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v3\Darci.Api\Properties\launchSettings.json...
+Building...
+info: Darci.Memory.MemoryStore[0]
+      Memory database initialized
+info: Darci.Goals.GoalManager[0]
+      Goals database initialized
+info: Darci.Core.Darci[0]
+      
+╔═══════════════════════════════════════════════════════════════╗
+║                                                               ║
+║     ██████╗  █████╗ ██████╗  ██████╗██╗                      ║
+║     ██╔══██╗██╔══██╗██╔══██╗██╔════╝██║                      ║
+║     ██║  ██║███████║██████╔╝██║     ██║                      ║
+║     ██║  ██║██╔══██║██╔══██╗██║     ██║                      ║
+║     ██████╔╝██║  ██║██║  ██║╚██████╗██║                      ║
+║     ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝╚═╝                      ║
+║                                                               ║
+║     Dynamic Adaptive Reasoning & Contextual Intelligence      ║
+║                                                               ║
+║     Version 3.0 - Autonomous Consciousness                    ║
+║                                                               ║
+╚═══════════════════════════════════════════════════════════════╝
+
+info: Darci.Core.Darci[0]
+      DARCI is waking up...
+info: Darci.Personality.PersonalityEngine[0]
+      Loaded personality traits - Warmth: 60 %, Trust: 40 %
+info: Darci.Core.State[0]
+      DARCI state initialized. Mood: Alert, Energy: 67 %
+info: Darci.Core.Darci[0]
+      DARCI is alive.
+dbug: Darci.Core.Awareness[0]
+      Perception: 0 messages, 0 completions, 0 goal events
+dbug: Darci.Core.Decision[0]
+      Picking up goal: 1 - Research: I hope so too. I'd like to look into some possi...
+dbug: Darci.Core.State[0]
+      Started activity: Working on: Research: I hope so too. I'd like to look into some possi...
+info: Darci.Tools.Toolkit[0]
+      Progressing goal 1
+dbug: Darci.Core.Darci[0]
+      Action WorkOnGoal completed in 1ms: This goal needs attention and I have energy for it
+dbug: Darci.Core.Awareness[0]
+      Perception: 0 messages, 0 completions, 0 goal events
+dbug: Darci.Tools.Ollama.OllamaClient[0]
+      Generating with gemma2:9b, prompt length: 79
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:11434/api/generate
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[100]
+      Sending HTTP request POST http://localhost:11434/api/generate
+fail: Microsoft.Extensions.Hosting.Internal.Host[11]
+      Hosting failed to start
+      System.IO.IOException: Failed to bind to address http://127.0.0.1:5080: address already in use.
+       ---> Microsoft.AspNetCore.Connections.AddressInUseException: Only one usage of each socket address (protocol/network address/port) is normally permitted.
+       ---> System.Net.Sockets.SocketExceptiodbug: Darci.Tools.Cad.CadBridge[0]
+      Sending CadQuery script to CAD engine (65 chars)
+info: System.Net.Http.HttpClient.ICadBridge.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:8000/cad/generate
+info: System.Net.Http.HttpClient.ICadBridge.ClientHandler[100]
+      Sending HTTP request POST http://localhost:8000/cad/generate
+fail: Darci.Tools.Cad.CadBridge[0]
+      CAD engine generate call failed
+      System.Net.Http.HttpRequestException: No connection could be made because the target machine actively refused it. (localhost:8000)
+       ---> System.Net.Sockets.SocketException (10061): No connection could be made because the target machine actively refused it.
+         at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+         at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+         at System.Net.Sockets.Socket.<ConnectAsync>g__WaitForConnectWithCancellation|285_0(AwaitableSocketAsyncEventArgs saea, ValueTask connectTask, CancellationToken cancellationToken)
+         at System.Net.Http.HttpConnectionPool.ConnectToTcpHostAsync(String host, Int32 port, HttpRequestMessage initialRequest, Boolean async, CancellationToken cancellationToken)
+         --- End of inner exception stack trace ---
+         at System.Net.Http.HttpConnectionPool.ConnectToTcpHostAsync(String host, Int32 port, HttpRequestMessage initialRequest, Boolean async, CancellationToken cancellationToken)
+         at System.Net.Http.HttpConnectionPool.ConnectAsync(HttpRequestMessage request, Boolean async, CancellationToken cancellationToken)
+         at System.Net.Http.HttpConnectionPool.CreateHttp11ConnectionAsync(HttpRequestMessage request, Boolean async, CancellationToken cancellationToken)
+         at System.Net.Http.HttpConnectionPool.AddHttp11ConnectionAsync(QueueItem queueItem)
+         at System.Threading.Tasks.TaskCompletionSourceWithCancellation`1.WaitWithCancellationAsync(CancellationToken cancellationToken)
+         at System.Net.Http.HttpConnectionPool.SendWithVersionDetectionAndRetryAsync(HttpRequestMessage request, Boolean async, Boolean doRequestAuth, CancellationToken cancellationToken)
+         at System.Net.Http.DiagnosticsHandler.SendAsyncCore(HttpRequestMessage request, Boolean async, CancellationToken cancellationToken)
+         at System.Net.Http.RedirectHandler.SendAsync(HttpRequestMessage request, Boolean async, CancellationToken cancellationToken)
+         at Microsoft.Extensions.Http.Logging.LoggingHttpMessageHandler.<SendCoreAsync>g__Core|5_0(HttpRequestMessage request, Boolean useAsync, CancellationToken cancellationToken)
+         at Microsoft.Extensions.Http.Logging.LoggingScopeHttpMessageHandler.<SendCoreAsync>g__Core|5_0(HttpRequestMessage request, Boolean useAsync, CancellationToken cancellationToken)
+         at System.Net.Http.HttpClient.<SendAsync>g__Core|83_0(HttpRequestMessage request, HttpCompletionOption completionOption, CancellationTokenSource cts, Boolean disposeCts, CancellationTokenSource pendingRequestsCts, CancellationToken originalCancellationToken)
+         at Darci.Tools.Cad.CadBridge.Generate(CadGenerateRequest request) in C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v3\Darci.Tools\Cad\CadBridge.cs:line 53
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[101]
+      Received HTTP response headers after 87475.5127ms - 200
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[101]
+      End processing HTTP request after 87493.6749ms - 200
+dbug: Darci.Tools.Ollama.OllamaClient[0]
+      Generated 874 chars
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:11434/api/embed
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[100]
+      Sending HTTP request POST http://localhost:11434/api/embed
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[101]
+      Received HTTP response headers after 1325.323ms - 200
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[101]
+      End processing HTTP request after 1325.5115ms - 200
+dbug: Darci.Memory.MemoryStore[0]
+      Stored memory: I thought about '': Please provide me with the res...
+dbug: Darci.Core.Darci[0]
+      Thought about (null)
+dbug: Darci.Core.Darci[0]
+      Action Think completed in 88915ms: Generating content for goal
+dbug: Darci.Core.Awareness[0]
+      Perception: 0 messages, 0 completions, 0 goal events
+dbug: Darci.Tools.Ollama.OllamaClient[0]
+      Generating with gemma2:9b, prompt length: 79
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:11434/api/generate
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[100]
+      Sending HTTP request POST http://localhost:11434/api/generate
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[101]
+      Received HTTP response headers after 59855.1281ms - 200
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[101]
+      End processing HTTP request after 59855.3223ms - 200
+dbug: Darci.Tools.Ollama.OllamaClient[0]
+      Generated 664 chars
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:11434/api/embed
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[100]
+      Sending HTTP request POST http://localhost:11434/api/embed
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[101]
+      Received HTTP response headers after 568.145ms - 200
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[101]
+      End processing HTTP request after 568.2946ms - 200
+dbug: Darci.Memory.MemoryStore[0]
+      Stored memory: I thought about '': Please provide me with more co...
+dbug: Darci.Core.Darci[0]
+      Thought about (null)
+dbug: Darci.Core.Darci[0]
+      Action Think completed in 60438ms: Generating content for goal
+dbug: Darci.Core.Awareness[0]
+      Perception: 0 messages, 0 completions, 0 goal events
+dbug: Darci.Tools.Ollama.OllamaClient[0]
+      Generating with gemma2:9b, prompt length: 79
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:11434/api/generate
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[100]
+      Sending HTTP request POST http://localhost:11434/api/generate
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[101]
+      Received HTTP response headers after 87175.3929ms - 200
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[101]
+      End processing HTTP request after 87175.6205ms - 200
+dbug: Darci.Tools.Ollama.OllamaClient[0]
+      Generated 1112 chars
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:11434/api/embed
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[100]
+      Sending HTTP request POST http://localhost:11434/api/embed
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[101]
+      Received HTTP response headers after 728.9043ms - 200
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[101]
+      End processing HTTP request after 729.0192ms - 200
+dbug: Darci.Memory.MemoryStore[0]
+      Stored memory: I thought about '': Please provide me with more co...
+dbug: Darci.Core.Darci[0]
+      Thought about (null)
+dbug: Darci.Core.Darci[0]
+      Action Think completed in 87918ms: Generating content for goal
+dbug: Darci.Core.Awareness[0]
+      Perception: 0 messages, 0 completions, 0 goal events
+dbug: Darci.Tools.Ollama.OllamaClient[0]
+      Generating with gemma2:9b, prompt length: 79
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:11434/api/generate
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[100]
+      Sending HTTP request POST http://localhost:11434/api/generate
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[101]
+      Received HTTP response headers after 65698.0912ms - 200
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[101]
+      End processing HTTP request after 65698.4348ms - 200
+dbug: Darci.Tools.Ollama.OllamaClient[0]
+      Generated 812 chars
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:11434/api/embed
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[100]
+      Sending HTTP request POST http://localhost:11434/api/embed
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[101]
+      Received HTTP response headers after 559.3734ms - 200
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[101]
+      End processing HTTP request after 559.5539ms - 200
+dbug: Darci.Memory.MemoryStore[0]
+      Stored memory: I thought about '': Please provide me with more co...
+dbug: Darci.Core.Darci[0]
+      Thought about (null)
+dbug: Darci.Core.Darci[0]
+      Action Think completed in 66271ms: Generating content for goal
+dbug: Darci.Core.Awareness[0]
+      Perception: 0 messages, 0 completions, 0 goal events
+dbug: Darci.Tools.Ollama.OllamaClient[0]
+      Generating with gemma2:9b, prompt length: 79
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:11434/api/generate
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[100]
+      Sending HTTP request POST http://localhost:11434/api/generate
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[101]
+      Received HTTP response headers after 60444.3756ms - 200
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[101]
+      End processing HTTP request after 60444.5049ms - 200
+dbug: Darci.Tools.Ollama.OllamaClient[0]
+      Generated 734 chars
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:11434/api/embed
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[100]
+      Sending HTTP request POST http://localhost:11434/api/embed
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[101]
+      Received HTTP response headers after 509.3412ms - 200
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[101]
+      End processing HTTP request after 509.4974ms - 200
+dbug: Darci.Memory.MemoryStore[0]
+      Stored memory: I thought about '': Please provide me with the com...
+dbug: Darci.Core.Darci[0]
+      Thought about (null)
+dbug: Darci.Core.Darci[0]
+      Action Think completed in 60970ms: Generating content for goal
+dbug: Darci.Core.Awareness[0]
+      Perception: 0 messages, 0 completions, 0 goal events
+dbug: Darci.Tools.Ollama.OllamaClient[0]
+      Generating with gemma2:9b, prompt length: 79
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:11434/api/generate
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[100]
+      Sending HTTP request POST http://localhost:11434/api/generate
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[101]
+      Received HTTP response headers after 84636.1574ms - 200
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[101]
+      End processing HTTP request after 84636.3812ms - 200
+dbug: Darci.Tools.Ollama.OllamaClient[0]
+      Generated 1019 chars
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:11434/api/embed
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[100]
+      Sending HTTP request POST http://localhost:11434/api/embed
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[101]
+      Received HTTP response headers after 541.7986ms - 200
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[101]
+      End processing HTTP request after 541.9154ms - 200
+dbug: Darci.Memory.MemoryStore[0]
+      Stored memory: I thought about '': Please provide me with more co...
+dbug: Darci.Core.Darci[0]
+      Thought about (null)
+dbug: Darci.Core.Darci[0]
+      Action Think completed in 85193ms: Generating content for goal
+dbug: Darci.Core.Awareness[0]
+      Perception: 0 messages, 0 completions, 0 goal events
+dbug: Darci.Tools.Ollama.OllamaClient[0]
+      Generating with gemma2:9b, prompt length: 79
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:11434/api/generate
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[100]
+      Sending HTTP request POST http://localhost:11434/api/generate
+dbug: Darci.Tools.Cad.CadBridge[0]
+      Sending CadQuery script to CAD engine (65 chars)
+info: System.Net.Http.HttpClient.ICadBridge.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:8000/cad/generate
+info: System.Net.Http.HttpClient.ICadBridge.ClientHandler[100]
+      Sending HTTP request POST http://localhost:8000/cad/generate
+fail: Darci.Tools.Cad.CadBridge[0]
+      CAD engine generate call failed
+      System.Net.Http.HttpRequestException: No connection could be made because the target machine actively refused it. (localhost:8000)
+       ---> System.Net.Sockets.SocketException (10061): No connection could be made because the target machine actively refused it.
+         at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+         at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+         at System.Net.Sockets.Socket.<ConnectAsync>g__WaitForConnectWithCancellation|285_0(AwaitableSocketAsyncEventArgs saea, ValueTask connectTask, CancellationToken cancellationToken)
+         at System.Net.Http.HttpConnectionPool.ConnectToTcpHostAsync(String host, Int32 port, HttpRequestMessage initialRequest, Boolean async, CancellationToken cancellationToken)
+         --- End of inner exception stack trace ---
+         at System.Net.Http.HttpConnectionPool.ConnectToTcpHostAsync(String host, Int32 port, HttpRequestMessage initialRequest, Boolean async, CancellationToken cancellationToken)
+         at System.Net.Http.HttpConnectionPool.ConnectAsync(HttpRequestMessage request, Boolean async, CancellationToken cancellationToken)
+         at System.Net.Http.HttpConnectionPool.CreateHttp11ConnectionAsync(HttpRequestMessage request, Boolean async, CancellationToken cancellationToken)
+         at System.Net.Http.HttpConnectionPool.AddHttp11ConnectionAsync(QueueItem queueItem)
+         at System.Threading.Tasks.TaskCompletionSourceWithCancellation`1.WaitWithCancellationAsync(CancellationToken cancellationToken)
+         at System.Net.Http.HttpConnectionPool.SendWithVersionDetectionAndRetryAsync(HttpRequestMessage request, Boolean async, Boolean doRequestAuth, CancellationToken cancellationToken)
+         at System.Net.Http.DiagnosticsHandler.SendAsyncCore(HttpRequestMessage request, Boolean async, CancellationToken cancellationToken)
+         at System.Net.Http.RedirectHandler.SendAsync(HttpRequestMessage request, Boolean async, CancellationToken cancellationToken)
+         at Microsoft.Extensions.Http.Logging.LoggingHttpMessageHandler.<SendCoreAsync>g__Core|5_0(HttpRequestMessage request, Boolean useAsync, CancellationToken cancellationToken)
+         at Microsoft.Extensions.Http.Logging.LoggingScopeHttpMessageHandler.<SendCoreAsync>g__Core|5_0(HttpRequestMessage request, Boolean useAsync, CancellationToken cancellationToken)
+         at System.Net.Http.HttpClient.<SendAsync>g__Core|83_0(HttpRequestMessage request, HttpCompletionOption completionOption, CancellationTokenSource cts, Boolean disposeCts, CancellationTokenSource pendingRequestsCts, CancellationToken originalCancellationToken)
+         at Darci.Tools.Cad.CadBridge.Generate(CadGenerateRequest request) in C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v3\Darci.Tools\Cad\CadBridge.cs:line 53
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[101]
+      Received HTTP response headers after 65552.0104ms - 200
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[101]
+      End processing HTTP request after 65552.1485ms - 200
+dbug: Darci.Tools.Ollama.OllamaClient[0]
+      Generated 784 chars
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:11434/api/embed
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[100]
+      Sending HTTP request POST http://localhost:11434/api/embed
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[101]
+      Received HTTP response headers after 490.7848ms - 200
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[101]
+      End processing HTTP request after 490.8896ms - 200
+dbug: Darci.Memory.MemoryStore[0]
+      Stored memory: I thought about '': Please provide me with more co...
+dbug: Darci.Core.Darci[0]
+      Thought about (null)
+dbug: Darci.Core.Darci[0]
+      Action Think completed in 66063ms: Generating content for goal
+dbug: Darci.Core.Awareness[0]
+      Perception: 0 messages, 0 completions, 0 goal events
+dbug: Darci.Tools.Ollama.OllamaClient[0]
+      Generating with gemma2:9b, prompt length: 79
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:11434/api/generate
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[100]
+      Sending HTTP request POST http://localhost:11434/api/generate
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[101]
+      Received HTTP response headers after 96815.0682ms - 200
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[101]
+      End processing HTTP request after 96815.3756ms - 200
+dbug: Darci.Tools.Ollama.OllamaClient[0]
+      Generated 1078 chars
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:11434/api/embed
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[100]
+      Sending HTTP request POST http://localhost:11434/api/embed
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[101]
+      Received HTTP response headers after 785.4421ms - 200
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[101]
+      End processing HTTP request after 785.5549ms - 200
+dbug: Darci.Memory.MemoryStore[0]
+      Stored memory: I thought about '': Please provide me with more co...
+dbug: Darci.Core.Darci[0]
+      Thought about (null)
+dbug: Darci.Core.Darci[0]
+      Action Think completed in 97612ms: Generating content for goal
+dbug: Darci.Core.Awareness[0]
+      Perception: 0 messages, 0 completions, 0 goal events
+dbug: Darci.Tools.Ollama.OllamaClient[0]
+      Generating with gemma2:9b, prompt length: 79
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:11434/api/generate
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[100]
+      Sending HTTP request POST http://localhost:11434/api/generate
+dbug: Darci.Tools.Cad.CadBridge[0]
+      Sending CadQuery script to CAD engine (65 chars)
+info: System.Net.Http.HttpClient.ICadBridge.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:8000/cad/generate
+info: System.Net.Http.HttpClient.ICadBridge.ClientHandler[100]
+      Sending HTTP request POST http://localhost:8000/cad/generate
+info: System.Net.Http.HttpClient.ICadBridge.ClientHandler[101]
+      Received HTTP response headers after 2071.5555ms - 200
+info: System.Net.Http.HttpClient.ICadBridge.LogicalHandler[101]
+      End processing HTTP request after 2071.6966ms - 200
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[101]
+      Received HTTP response headers after 88433.8868ms - 200
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[101]
+      End processing HTTP request after 88433.9838ms - 200
+dbug: Darci.Tools.Ollama.OllamaClient[0]
+      Generated 946 chars
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:11434/api/embed
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[100]
+      Sending HTTP request POST http://localhost:11434/api/embed
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[101]
+      Received HTTP response headers after 780.9541ms - 200
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[101]
+      End processing HTTP request after 781.0226ms - 200
+dbug: Darci.Memory.MemoryStore[0]
+      Stored memory: I thought about '': Please provide me with more co...
+dbug: Darci.Core.Darci[0]
+      Thought about (null)
+dbug: Darci.Core.Darci[0]
+      Action Think completed in 89223ms: Generating content for goal
+dbug: Darci.Core.Awareness[0]
+      Perception: 0 messages, 0 completions, 0 goal events
+dbug: Darci.Tools.Ollama.OllamaClient[0]
+      Generating with gemma2:9b, prompt length: 79
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:11434/api/generate
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[100]
+      Sending HTTP request POST http://localhost:11434/api/generate
+dbug: Darci.Tools.Ollama.OllamaClient[0]
+      Generating with gemma2:9b, prompt length: 532
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:11434/api/generate
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[100]
+      Sending HTTP request POST http://localhost:11434/api/generate
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[101]
+      Received HTTP response headers after 69697.0995ms - 200
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[101]
+      End processing HTTP request after 69697.2562ms - 200
+dbug: Darci.Tools.Ollama.OllamaClient[0]
+      Generated 643 chars
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:11434/api/embed
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[100]
+      Sending HTTP request POST http://localhost:11434/api/embed
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[101]
+      Received HTTP response headers after 1634.4825ms - 200
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[101]
+      End processing HTTP request after 1634.5871ms - 200
+dbug: Darci.Memory.MemoryStore[0]
+      Stored memory: I thought about '': Please provide me with more co...
+dbug: Darci.Core.Darci[0]
+      Thought about (null)
+dbug: Darci.Core.Darci[0]
+      Action Think completed in 71346ms: Generating content for goal
+dbug: Darci.Core.Awareness[0]
+      Perception: 0 messages, 0 completions, 0 goal events
+dbug: Darci.Tools.Ollama.OllamaClient[0]
+      Generating with gemma2:9b, prompt length: 79
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:11434/api/generate
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[100]
+      Sending HTTP request POST http://localhost:11434/api/generate
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[101]
+      Received HTTP response headers after 93845.3588ms - 200
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[101]
+      End processing HTTP request after 93845.516ms - 200
+dbug: Darci.Tools.Ollama.OllamaClient[0]
+      Generated 80 chars
+info: Darci.Tools.Toolkit[0]
+      Generated initial CadQuery script (65 chars) for: A 10mm cube
+dbug: Darci.Tools.Cad.CadBridge[0]
+      Sending CadQuery script to CAD engine (65 chars)
+info: System.Net.Http.HttpClient.ICadBridge.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:8000/cad/generate
+info: System.Net.Http.HttpClient.ICadBridge.ClientHandler[100]
+      Sending HTTP request POST http://localhost:8000/cad/generate
+fail: Darci.Tools.Cad.CadBridge[0]
+      CAD engine generate call failed
+      System.Net.Http.HttpRequestException: No connection could be made because the target machine actively refused it. (localhost:8000)
+       ---> System.Net.Sockets.SocketException (10061): No connection could be made because the target machine actively refused it.
+         at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+         at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token)
+         at System.Net.Sockets.Socket.<ConnectAsync>g__WaitForConnectWithCancellation|285_0(AwaitableSocketAsyncEventArgs saea, ValueTask connectTask, CancellationToken cancellationToken)
+         at System.Net.Http.HttpConnectionPool.ConnectToTcpHostAsync(String host, Int32 port, HttpRequestMessage initialRequest, Boolean async, CancellationToken cancellationToken)
+         --- End of inner exception stack trace ---
+         at System.Net.Http.HttpConnectionPool.ConnectToTcpHostAsync(String host, Int32 port, HttpRequestMessage initialRequest, Boolean async, CancellationToken cancellationToken)
+         at System.Net.Http.HttpConnectionPool.ConnectAsync(HttpRequestMessage request, Boolean async, CancellationToken cancellationToken)
+         at System.Net.Http.HttpConnectionPool.CreateHttp11ConnectionAsync(HttpRequestMessage request, Boolean async, CancellationToken cancellationToken)
+         at System.Net.Http.HttpConnectionPool.AddHttp11ConnectionAsync(QueueItem queueItem)
+         at System.Threading.Tasks.TaskCompletionSourceWithCancellation`1.WaitWithCancellationAsync(CancellationToken cancellationToken)
+         at System.Net.Http.HttpConnectionPool.SendWithVersionDetectionAndRetryAsync(HttpRequestMessage request, Boolean async, Boolean doRequestAuth, CancellationToken cancellationToken)
+         at System.Net.Http.DiagnosticsHandler.SendAsyncCore(HttpRequestMessage request, Boolean async, CancellationToken cancellationToken)
+         at System.Net.Http.RedirectHandler.SendAsync(HttpRequestMessage request, Boolean async, CancellationToken cancellationToken)
+         at Microsoft.Extensions.Http.Logging.LoggingHttpMessageHandler.<SendCoreAsync>g__Core|5_0(HttpRequestMessage request, Boolean useAsync, CancellationToken cancellationToken)
+         at Microsoft.Extensions.Http.Logging.LoggingScopeHttpMessageHandler.<SendCoreAsync>g__Core|5_0(HttpRequestMessage request, Boolean useAsync, CancellationToken cancellationToken)
+         at System.Net.Http.HttpClient.<SendAsync>g__Core|83_0(HttpRequestMessage request, HttpCompletionOption completionOption, CancellationTokenSource cts, Boolean disposeCts, CancellationTokenSource pendingRequestsCts, CancellationToken originalCancellationToken)
+         at Darci.Tools.Cad.CadBridge.Generate(CadGenerateRequest request) in C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v3\Darci.Tools\Cad\CadBridge.cs:line 53
+dbug: Darci.Tools.Cad.CadBridge[0]
+      Sending CadQuery script to CAD engine (65 chars)
+info: System.Net.Http.HttpClient.ICadBridge.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:8000/cad/generate
+info: System.Net.Http.HttpClient.ICadBridge.ClientHandler[100]
+      Sending HTTP request POST http://localhost:8000/cad/generate
+info: System.Net.Http.HttpClient.ICadBridge.ClientHandler[101]
+      Received HTTP response headers after 2040.6625ms - 200
+info: System.Net.Http.HttpClient.ICadBridge.LogicalHandler[101]
+      End processing HTTP request after 2040.7774ms - 200
+dbug: Darci.Tools.Cad.CadBridge[0]
+      Sending CadQuery script to CAD engine (65 chars)
+info: System.Net.Http.HttpClient.ICadBridge.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:8000/cad/generate
+info: System.Net.Http.HttpClient.ICadBridge.ClientHandler[100]
+      Sending HTTP request POST http://localhost:8000/cad/generate
+info: System.Net.Http.HttpClient.ICadBridge.ClientHandler[101]
+      Received HTTP response headers after 5172.3687ms - 200
+info: System.Net.Http.HttpClient.ICadBridge.LogicalHandler[101]
+      End processing HTTP request after 5172.5381ms - 200
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[101]
+      Received HTTP response headers after 153966.0296ms - 200
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[101]
+      End processing HTTP request after 153966.2458ms - 200
+dbug: Darci.Tools.Ollama.OllamaClient[0]
+      Generated 1192 chars
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:11434/api/embed
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[100]
+      Sending HTTP request POST http://localhost:11434/api/embed
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[101]
+      Received HTTP response headers after 912.6702ms - 200
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[101]
+      End processing HTTP request after 912.757ms - 200
+dbug: Darci.Memory.MemoryStore[0]
+      Stored memory: I thought about '': Please provide me with more co...
+dbug: Darci.Core.Darci[0]
+      Thought about (null)
+dbug: Darci.Core.Darci[0]
+      Action Think completed in 154893ms: Generating content for goal
+dbug: Darci.Core.Awareness[0]
+      Perception: 0 messages, 0 completions, 0 goal events
+dbug: Darci.Tools.Ollama.OllamaClient[0]
+      Generating with gemma2:9b, prompt length: 79
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:11434/api/generate
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[100]
+      Sending HTTP request POST http://localhost:11434/api/generate
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[101]
+      Received HTTP response headers after 57336.3503ms - 200
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[101]
+      End processing HTTP request after 57336.5215ms - 200
+dbug: Darci.Tools.Ollama.OllamaClient[0]
+      Generated 629 chars
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:11434/api/embed
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[100]
+      Sending HTTP request POST http://localhost:11434/api/embed
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[101]
+      Received HTTP response headers after 353.1741ms - 200
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[101]
+      End processing HTTP request after 353.289ms - 200
+dbug: Darci.Memory.MemoryStore[0]
+      Stored memory: I thought about '': Please provide me with more co...
+dbug: Darci.Core.Darci[0]
+      Thought about (null)
+dbug: Darci.Core.Darci[0]
+      Action Think completed in 57700ms: Generating content for goal
+dbug: Darci.Core.Awareness[0]
+      Perception: 0 messages, 0 completions, 0 goal events
+dbug: Darci.Tools.Ollama.OllamaClient[0]
+      Generating with gemma2:9b, prompt length: 79
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:11434/api/generate
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[100]
+      Sending HTTP request POST http://localhost:11434/api/generate
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[101]
+      Received HTTP response headers after 64042.5429ms - 200
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[101]
+      End processing HTTP request after 64042.6394ms - 200
+dbug: Darci.Tools.Ollama.OllamaClient[0]
+      Generated 814 chars
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:11434/api/embed
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[100]
+      Sending HTTP request POST http://localhost:11434/api/embed
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[101]
+      Received HTTP response headers after 480.8381ms - 200
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[101]
+      End processing HTTP request after 480.9157ms - 200
+dbug: Darci.Memory.MemoryStore[0]
+      Stored memory: I thought about '': Please provide me with more co...
+dbug: Darci.Core.Darci[0]
+      Thought about (null)
+dbug: Darci.Core.Darci[0]
+      Action Think completed in 64540ms: Generating content for goal
+dbug: Darci.Core.Awareness[0]
+      Perception: 0 messages, 0 completions, 0 goal events
+dbug: Darci.Tools.Ollama.OllamaClient[0]
+      Generating with gemma2:9b, prompt length: 79
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:11434/api/generate
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[100]
+      Sending HTTP request POST http://localhost:11434/api/generate
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[101]
+      Received HTTP response headers after 57018.7742ms - 200
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[101]
+      End processing HTTP request after 57018.8756ms - 200
+dbug: Darci.Tools.Ollama.OllamaClient[0]
+      Generated 817 chars
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:11434/api/embed
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[100]
+      Sending HTTP request POST http://localhost:11434/api/embed
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[101]
+      Received HTTP response headers after 473ms - 200
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[101]
+      End processing HTTP request after 473.0535ms - 200
+dbug: Darci.Memory.MemoryStore[0]
+      Stored memory: I thought about '': Please provide me with the res...
+dbug: Darci.Core.Darci[0]
+      Thought about (null)
+dbug: Darci.Core.Darci[0]
+      Action Think completed in 57503ms: Generating content for goal
+dbug: Darci.Core.Awareness[0]
+      Perception: 0 messages, 0 completions, 0 goal events
+dbug: Darci.Tools.Ollama.OllamaClient[0]
+      Generating with gemma2:9b, prompt length: 79
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:11434/api/generate
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[100]
+      Sending HTTP request POST http://localhost:11434/api/generate
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[101]
+      Received HTTP response headers after 59524.1204ms - 200
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[101]
+      End processing HTTP request after 59525.5796ms - 200
+dbug: Darci.Tools.Ollama.OllamaClient[0]
+      Generated 824 chars
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:11434/api/embed
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[100]
+      Sending HTTP request POST http://localhost:11434/api/embed
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[101]
+      Received HTTP response headers after 507.4203ms - 200
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[101]
+      End processing HTTP request after 507.6751ms - 200
+dbug: Darci.Memory.MemoryStore[0]
+      Stored memory: I thought about '': Please provide me with the res...
+dbug: Darci.Core.Darci[0]
+      Thought about (null)
+dbug: Darci.Core.Darci[0]
+      Action Think completed in 60046ms: Generating content for goal
+dbug: Darci.Core.Awareness[0]
+      Perception: 0 messages, 0 completions, 0 goal events
+dbug: Darci.Tools.Ollama.OllamaClient[0]
+      Generating with gemma2:9b, prompt length: 79
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:11434/api/generate
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[100]
+      Sending HTTP request POST http://localhost:11434/api/generate
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[101]
+      Received HTTP response headers after 81252.1539ms - 200
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[101]
+      End processing HTTP request after 81252.2299ms - 200
+dbug: Darci.Tools.Ollama.OllamaClient[0]
+      Generated 1106 chars
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:11434/api/embed
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[100]
+      Sending HTTP request POST http://localhost:11434/api/embed
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[101]
+      Received HTTP response headers after 695.5972ms - 200
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[101]
+      End processing HTTP request after 695.8092ms - 200
+dbug: Darci.Memory.MemoryStore[0]
+      Stored memory: I thought about '': Please provide me with more co...
+dbug: Darci.Core.Darci[0]
+      Thought about (null)
+dbug: Darci.Core.Darci[0]
+      Action Think completed in 81958ms: Generating content for goal
+dbug: Darci.Core.Awareness[0]
+      Perception: 0 messages, 0 completions, 0 goal events
+dbug: Darci.Tools.Ollama.OllamaClient[0]
+      Generating with gemma2:9b, prompt length: 79
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:11434/api/generate
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[100]
+      Sending HTTP request POST http://localhost:11434/api/generate
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[101]
+      Received HTTP response headers after 77703.2468ms - 200
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[101]
+      End processing HTTP request after 77703.409ms - 200
+dbug: Darci.Tools.Ollama.OllamaClient[0]
+      Generated 868 chars
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:11434/api/embed
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[100]
+      Sending HTTP request POST http://localhost:11434/api/embed
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[101]
+      Received HTTP response headers after 2167.6516ms - 200
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[101]
+      End processing HTTP request after 2167.7398ms - 200
+dbug: Darci.Memory.MemoryStore[0]
+      Stored memory: I thought about '': Please provide me with the res...
+dbug: Darci.Core.Darci[0]
+      Thought about (null)
+dbug: Darci.Core.Darci[0]
+      Action Think completed in 79886ms: Generating content for goal
+dbug: Darci.Core.Awareness[0]
+      Perception: 0 messages, 0 completions, 0 goal events
+dbug: Darci.Tools.Ollama.OllamaClient[0]
+      Generating with gemma2:9b, prompt length: 79
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:11434/api/generate
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[100]
+      Sending HTTP request POST http://localhost:11434/api/generate
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[101]
+      Received HTTP response headers after 162882.935ms - 200
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[101]
+      End processing HTTP request after 162883.0372ms - 200
+dbug: Darci.Tools.Ollama.OllamaClient[0]
+      Generated 839 chars
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:11434/api/embed
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[100]
+      Sending HTTP request POST http://localhost:11434/api/embed
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[101]
+      Received HTTP response headers after 551.0078ms - 200
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[101]
+      End processing HTTP request after 551.2319ms - 200
+dbug: Darci.Memory.MemoryStore[0]
+      Stored memory: I thought about '': Please provide me with more co...
+dbug: Darci.Core.Darci[0]
+      Thought about (null)
+dbug: Darci.Core.Darci[0]
+      Action Think completed in 163446ms: Generating content for goal
+dbug: Darci.Core.Awareness[0]
+      Perception: 0 messages, 0 completions, 0 goal events
+dbug: Darci.Tools.Ollama.OllamaClient[0]
+      Generating with gemma2:9b, prompt length: 79
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:11434/api/generate
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[100]
+      Sending HTTP request POST http://localhost:11434/api/generate
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[101]
+      Received HTTP response headers after 77565.3856ms - 200
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[101]
+      End processing HTTP request after 77565.6136ms - 200
+dbug: Darci.Tools.Ollama.OllamaClient[0]
+      Generated 1075 chars
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:11434/api/embed
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[100]
+      Sending HTTP request POST http://localhost:11434/api/embed
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[101]
+      Received HTTP response headers after 586.114ms - 200
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[101]
+      End processing HTTP request after 586.2604ms - 200
+dbug: Darci.Memory.MemoryStore[0]
+      Stored memory: I thought about '': Please provide me with the res...
+dbug: Darci.Core.Darci[0]
+      Thought about (null)
+dbug: Darci.Core.Darci[0]
+      Action Think completed in 78163ms: Generating content for goal
+dbug: Darci.Core.Awareness[0]
+      Perception: 0 messages, 0 completions, 0 goal events
+dbug: Darci.Tools.Ollama.OllamaClient[0]
+      Generating with gemma2:9b, prompt length: 79
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:11434/api/generate
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[100]
+      Sending HTTP request POST http://localhost:11434/api/generate
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[101]
+      Received HTTP response headers after 76197.7655ms - 200
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[101]
+      End processing HTTP request after 76198.1466ms - 200
+dbug: Darci.Tools.Ollama.OllamaClient[0]
+      Generated 1156 chars
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:11434/api/embed
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[100]
+      Sending HTTP request POST http://localhost:11434/api/embed
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[101]
+      Received HTTP response headers after 707.3933ms - 200
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[101]
+      End processing HTTP request after 707.4604ms - 200
+dbug: Darci.Memory.MemoryStore[0]
+      Stored memory: I thought about '': Please provide me with the con...
+dbug: Darci.Core.Darci[0]
+      Thought about (null)
+dbug: Darci.Core.Darci[0]
+      Action Think completed in 76916ms: Generating content for goal
+dbug: Darci.Core.Awareness[0]
+      Perception: 0 messages, 0 completions, 0 goal events
+dbug: Darci.Tools.Ollama.OllamaClient[0]
+      Generating with gemma2:9b, prompt length: 79
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:11434/api/generate
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[100]
+      Sending HTTP request POST http://localhost:11434/api/generate
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[101]
+      Received HTTP response headers after 71823.097ms - 200
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[101]
+      End processing HTTP request after 71823.1926ms - 200
+dbug: Darci.Tools.Ollama.OllamaClient[0]
+      Generated 1122 chars
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:11434/api/embed
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[100]
+      Sending HTTP request POST http://localhost:11434/api/embed
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[101]
+      Received HTTP response headers after 646.8578ms - 200
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[101]
+      End processing HTTP request after 646.9337ms - 200
+dbug: Darci.Memory.MemoryStore[0]
+      Stored memory: I thought about '': Please provide me with the res...
+dbug: Darci.Core.Darci[0]
+      Thought about (null)
+dbug: Darci.Core.Darci[0]
+      Action Think completed in 72483ms: Generating content for goal
+dbug: Darci.Core.Awareness[0]
+      Perception: 0 messages, 0 completions, 0 goal events
+dbug: Darci.Tools.Ollama.OllamaClient[0]
+      Generating with gemma2:9b, prompt length: 79
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:11434/api/generate
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[100]
+      Sending HTTP request POST http://localhost:11434/api/generate
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[101]
+      Received HTTP response headers after 77455.5757ms - 200
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[101]
+      End processing HTTP request after 77455.8524ms - 200
+dbug: Darci.Tools.Ollama.OllamaClient[0]
+      Generated 1204 chars
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:11434/api/embed
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[100]
+      Sending HTTP request POST http://localhost:11434/api/embed
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[101]
+      Received HTTP response headers after 700.9541ms - 200
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[101]
+      End processing HTTP request after 701.1067ms - 200
+dbug: Darci.Memory.MemoryStore[0]
+      Stored memory: I thought about '': Please provide me with more co...
+dbug: Darci.Core.Darci[0]
+      Thought about (null)
+dbug: Darci.Core.Darci[0]
+      Action Think completed in 78172ms: Generating content for goal
+dbug: Darci.Core.Awareness[0]
+      Perception: 0 messages, 0 completions, 0 goal events
+dbug: Darci.Tools.Ollama.OllamaClient[0]
+      Generating with gemma2:9b, prompt length: 79
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:11434/api/generate
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[100]
+      Sending HTTP request POST http://localhost:11434/api/generate
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[101]
+      Received HTTP response headers after 73983.7211ms - 200
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[101]
+      End processing HTTP request after 73983.8864ms - 200
+dbug: Darci.Tools.Ollama.OllamaClient[0]
+      Generated 1124 chars
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:11434/api/embed
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[100]
+      Sending HTTP request POST http://localhost:11434/api/embed
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[101]
+      Received HTTP response headers after 668.96ms - 200
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[101]
+      End processing HTTP request after 669.0635ms - 200
+dbug: Darci.Memory.MemoryStore[0]
+      Stored memory: I thought about '': Please provide me with more co...
+dbug: Darci.Core.Darci[0]
+      Thought about (null)
+dbug: Darci.Core.Darci[0]
+      Action Think completed in 74667ms: Generating content for goal
+dbug: Darci.Core.Awareness[0]
+      Perception: 0 messages, 0 completions, 0 goal events
+dbug: Darci.Tools.Ollama.OllamaClient[0]
+      Generating with gemma2:9b, prompt length: 79
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:11434/api/generate
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[100]
+      Sending HTTP request POST http://localhost:11434/api/generate
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[101]
+      Received HTTP response headers after 61187.1108ms - 200
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[101]
+      End processing HTTP request after 61187.204ms - 200
+dbug: Darci.Tools.Ollama.OllamaClient[0]
+      Generated 817 chars
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:11434/api/embed
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[100]
+      Sending HTTP request POST http://localhost:11434/api/embed
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[101]
+      Received HTTP response headers after 496.755ms - 200
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[101]
+      End processing HTTP request after 497.0002ms - 200
+dbug: Darci.Memory.MemoryStore[0]
+      Stored memory: I thought about '': Please provide me with the res...
+dbug: Darci.Core.Darci[0]
+      Thought about (null)
+dbug: Darci.Core.Darci[0]
+      Action Think completed in 61695ms: Generating content for goal
+dbug: Darci.Core.Awareness[0]
+      Perception: 0 messages, 0 completions, 0 goal events
+dbug: Darci.Tools.Ollama.OllamaClient[0]
+      Generating with gemma2:9b, prompt length: 79
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:11434/api/generate
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[100]
+      Sending HTTP request POST http://localhost:11434/api/generate
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[101]
+      Received HTTP response headers after 36988.6141ms - 200
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[101]
+      End processing HTTP request after 36988.7923ms - 200
+dbug: Darci.Tools.Ollama.OllamaClient[0]
+      Generated 506 chars
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:11434/api/embed
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[100]
+      Sending HTTP request POST http://localhost:11434/api/embed
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[101]
+      Received HTTP response headers after 314.2054ms - 200
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[101]
+      End processing HTTP request after 314.2755ms - 200
+dbug: Darci.Memory.MemoryStore[0]
+      Stored memory: I thought about '': Please provide me with the res...
+dbug: Darci.Core.Darci[0]
+      Thought about (null)
+dbug: Darci.Core.Darci[0]
+      Action Think completed in 37315ms: Generating content for goal
+dbug: Darci.Core.Awareness[0]
+      Perception: 0 messages, 0 completions, 0 goal events
+dbug: Darci.Tools.Ollama.OllamaClient[0]
+      Generating with gemma2:9b, prompt length: 79
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:11434/api/generate
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[100]
+      Sending HTTP request POST http://localhost:11434/api/generate
+dbug: Darci.Tools.Cad.CadBridge[0]
+      Sending CadQuery script to CAD engine (65 chars)
+info: System.Net.Http.HttpClient.ICadBridge.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:8000/cad/generate
+info: System.Net.Http.HttpClient.ICadBridge.ClientHandler[100]
+      Sending HTTP request POST http://localhost:8000/cad/generate
+info: System.Net.Http.HttpClient.ICadBridge.ClientHandler[101]
+      Received HTTP response headers after 5358.5774ms - 200
+info: System.Net.Http.HttpClient.ICadBridge.LogicalHandler[101]
+      End processing HTTP request after 5358.6578ms - 200
+info: Darci.Core.Awareness[0]
+      Message received from Tinman: Generate an STL for E2E_TOKEN_260213A: a simple so...
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[101]
+      Received HTTP response headers after 65062.7199ms - 200
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[101]
+      End processing HTTP request after 65062.7844ms - 200
+dbug: Darci.Tools.Ollama.OllamaClient[0]
+      Generated 844 chars
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:11434/api/embed
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[100]
+      Sending HTTP request POST http://localhost:11434/api/embed
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[101]
+      Received HTTP response headers after 521.1234ms - 200
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[101]
+      End processing HTTP request after 521.2221ms - 200
+dbug: Darci.Memory.MemoryStore[0]
+      Stored memory: I thought about '': Please provide me with more co...
+dbug: Darci.Core.Darci[0]
+      Thought about (null)
+dbug: Darci.Core.Darci[0]
+      Action Think completed in 65594ms: Generating content for goal
+dbug: Darci.Core.Awareness[0]
+      Perception: 1 messages, 0 completions, 0 goal events
+dbug: Darci.Core.Decision[0]
+      Handling urgent message from Tinman
+info: Darci.Goals.GoalManager[0]
+      Created goal 2: CAD: Generate an STL for E2E_TOKEN_260213A: a simple...
+info: Darci.Core.Decision[0]
+      Immediate CAD generation for: Generate an STL for E2E_TOKEN_260213A: a simple solid 20mm x 20mm x 20mm cube with no holes
+info: Darci.Core.Darci[0]
+      Starting CAD generation for Tinman: Generate an STL for E2E_TOKEN_260213A: a simple solid 20mm x 20mm x 20mm cube with no holes
+dbug: Darci.Tools.Ollama.OllamaClient[0]
+      Generating with gemma2:9b, prompt length: 612
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:11434/api/generate
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[100]
+      Sending HTTP request POST http://localhost:11434/api/generate
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[101]
+      Received HTTP response headers after 36968.3557ms - 200
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[101]
+      End processing HTTP request after 36968.4529ms - 200
+dbug: Darci.Tools.Ollama.OllamaClient[0]
+      Generated 80 chars
+info: Darci.Tools.Toolkit[0]
+      Generated initial CadQuery script (66 chars) for: Generate an STL for E2E_TOKEN_260213A: a simple solid 20mm x 20mm x 20mm cube with no holes
+dbug: Darci.Tools.Cad.CadBridge[0]
+      Sending CadQuery script to CAD engine (66 chars)
+info: System.Net.Http.HttpClient.ICadBridge.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:8000/cad/generate
+info: System.Net.Http.HttpClient.ICadBridge.ClientHandler[100]
+      Sending HTTP request POST http://localhost:8000/cad/generate
+info: System.Net.Http.HttpClient.ICadBridge.ClientHandler[101]
+      Received HTTP response headers after 3527.6011ms - 200
+info: System.Net.Http.HttpClient.ICadBridge.LogicalHandler[101]
+      End processing HTTP request after 3527.6649ms - 200
+info: System.Net.Http.HttpClient.ICadBridge.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:8000/cad/feedback-prompt
+info: System.Net.Http.HttpClient.ICadBridge.ClientHandler[100]
+      Sending HTTP request POST http://localhost:8000/cad/feedback-prompt
+info: System.Net.Http.HttpClient.ICadBridge.ClientHandler[101]
+      Received HTTP response headers after 1.6781ms - 200
+info: System.Net.Http.HttpClient.ICadBridge.LogicalHandler[101]
+      End processing HTTP request after 1.7724ms - 200
+dbug: Darci.Tools.Ollama.OllamaClient[0]
+      Generating with gemma2:9b, prompt length: 477
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:11434/api/generate
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[100]
+      Sending HTTP request POST http://localhost:11434/api/generate
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[101]
+      Received HTTP response headers after 32278.0211ms - 200
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[101]
+      End processing HTTP request after 32278.1042ms - 200
+dbug: Darci.Tools.Ollama.OllamaClient[0]
+      Generated 90 chars
+info: Darci.Tools.Toolkit[0]
+      CAD output APPROVED at iteration 0
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:11434/api/embed
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[100]
+      Sending HTTP request POST http://localhost:11434/api/embed
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[101]
+      Received HTTP response headers after 221.5331ms - 200
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[101]
+      End processing HTTP request after 221.5795ms - 200
+dbug: Darci.Memory.MemoryStore[0]
+      Stored memory: Generated CAD model for 'Generate an STL for E2E_T...
+info: Darci.Core.Darci[0]
+      CAD generation succeeded for: Generate an STL for E2E_TOKEN_260213A: a simple solid 20mm x 20mm x 20mm cube with no holes
+dbug: Darci.Core.Darci[0]
+      Action GenerateCAD completed in 73029ms: Urgent CAD request — generating now
+dbug: Darci.Core.Awareness[0]
+      Perception: 0 messages, 0 completions, 0 goal events
+dbug: Darci.Tools.Ollama.OllamaClient[0]
+      Generating with gemma2:9b, prompt length: 79
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:11434/api/generate
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[100]
+      Sending HTTP request POST http://localhost:11434/api/generate
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[101]
+      Received HTTP response headers after 63556.8899ms - 200
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[101]
+      End processing HTTP request after 63557.0211ms - 200
+dbug: Darci.Tools.Ollama.OllamaClient[0]
+      Generated 906 chars
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:11434/api/embed
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[100]
+      Sending HTTP request POST http://localhost:11434/api/embed
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[101]
+      Received HTTP response headers after 608.7248ms - 200
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[101]
+      End processing HTTP request after 608.7711ms - 200
+dbug: Darci.Memory.MemoryStore[0]
+      Stored memory: I thought about '': Please provide me with more co...
+dbug: Darci.Core.Darci[0]
+      Thought about (null)
+dbug: Darci.Core.Darci[0]
+      Action Think completed in 64177ms: Generating content for goal
+dbug: Darci.Core.Awareness[0]
+      Perception: 0 messages, 0 completions, 0 goal events
+dbug: Darci.Tools.Ollama.OllamaClient[0]
+      Generating with gemma2:9b, prompt length: 79
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:11434/api/generate
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[100]
+      Sending HTTP request POST http://localhost:11434/api/generate
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[101]
+      Received HTTP response headers after 48903.1343ms - 200
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[101]
+      End processing HTTP request after 48903.4446ms - 200
+dbug: Darci.Tools.Ollama.OllamaClient[0]
+      Generated 670 chars
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:11434/api/embed
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[100]
+      Sending HTTP request POST http://localhost:11434/api/embed
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[101]
+      Received HTTP response headers after 432.7777ms - 200
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[101]
+      End processing HTTP request after 432.8249ms - 200
+dbug: Darci.Memory.MemoryStore[0]
+      Stored memory: I thought about '': Please provide me with the res...
+dbug: Darci.Core.Darci[0]
+      Thought about (null)
+dbug: Darci.Core.Darci[0]
+      Action Think completed in 49350ms: Generating content for goal
+dbug: Darci.Core.Awareness[0]
+      Perception: 0 messages, 0 completions, 0 goal events
+dbug: Darci.Tools.Ollama.OllamaClient[0]
+      Generating with gemma2:9b, prompt length: 79
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:11434/api/generate
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[100]
+      Sending HTTP request POST http://localhost:11434/api/generate
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[101]
+      Received HTTP response headers after 73088.7366ms - 200
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[101]
+      End processing HTTP request after 73088.7946ms - 200
+dbug: Darci.Tools.Ollama.OllamaClient[0]
+      Generated 949 chars
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:11434/api/embed
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[100]
+      Sending HTTP request POST http://localhost:11434/api/embed
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[101]
+      Received HTTP response headers after 595.6748ms - 200
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[101]
+      End processing HTTP request after 595.874ms - 200
+dbug: Darci.Memory.MemoryStore[0]
+      Stored memory: I thought about '': Please provide me with more co...
+dbug: Darci.Core.Darci[0]
+      Thought about (null)
+dbug: Darci.Core.Darci[0]
+      Action Think completed in 73698ms: Generating content for goal
+dbug: Darci.Core.Awareness[0]
+      Perception: 0 messages, 0 completions, 0 goal events
+dbug: Darci.Tools.Ollama.OllamaClient[0]
+      Generating with gemma2:9b, prompt length: 79
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:11434/api/generate
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[100]
+      Sending HTTP request POST http://localhost:11434/api/generate
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[101]
+      Received HTTP response headers after 77513.3459ms - 200
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[101]
+      End processing HTTP request after 77513.4712ms - 200
+dbug: Darci.Tools.Ollama.OllamaClient[0]
+      Generated 1086 chars
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:11434/api/embed
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[100]
+      Sending HTTP request POST http://localhost:11434/api/embed
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[101]
+      Received HTTP response headers after 641.1258ms - 200
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[101]
+      End processing HTTP request after 641.3944ms - 200
+dbug: Darci.Memory.MemoryStore[0]
+      Stored memory: I thought about '': Please provide me with more co...
+dbug: Darci.Core.Darci[0]
+      Thought about (null)
+dbug: Darci.Core.Darci[0]
+      Action Think completed in 78166ms: Generating content for goal
+dbug: Darci.Core.Awareness[0]
+      Perception: 0 messages, 0 completions, 0 goal events
+dbug: Darci.Tools.Ollama.OllamaClient[0]
+      Generating with gemma2:9b, prompt length: 79
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:11434/api/generate
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[100]
+      Sending HTTP request POST http://localhost:11434/api/generate
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[101]
+      Received HTTP response headers after 55469.1342ms - 200
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[101]
+      End processing HTTP request after 55469.3271ms - 200
+dbug: Darci.Tools.Ollama.OllamaClient[0]
+      Generated 733 chars
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:11434/api/embed
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[100]
+      Sending HTTP request POST http://localhost:11434/api/embed
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[101]
+      Received HTTP response headers after 459.8738ms - 200
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[101]
+      End processing HTTP request after 459.9169ms - 200
+dbug: Darci.Memory.MemoryStore[0]
+      Stored memory: I thought about '': Please provide me with the res...
+dbug: Darci.Core.Darci[0]
+      Thought about (null)
+dbug: Darci.Core.Darci[0]
+      Action Think completed in 55940ms: Generating content for goal
+dbug: Darci.Core.Awareness[0]
+      Perception: 0 messages, 0 completions, 0 goal events
+dbug: Darci.Tools.Ollama.OllamaClient[0]
+      Generating with gemma2:9b, prompt length: 79
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:11434/api/generate
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[100]
+      Sending HTTP request POST http://localhost:11434/api/generate

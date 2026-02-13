@@ -4,6 +4,7 @@ using Darci.Goals;
 using Darci.Memory;
 using Darci.Personality;
 using Darci.Tools;
+using Darci.Tools.Cad;
 using Darci.Tools.Ollama;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -24,6 +25,9 @@ builder.Services.AddSwaggerGen(c =>
 
 // HTTP client for Ollama
 builder.Services.AddHttpClient<IOllamaClient, OllamaClient>();
+
+// HTTP client for Python CAD service
+builder.Services.AddHttpClient<ICadBridge, CadBridge>();
 
 // Personality (singleton - one DARCI)
 builder.Services.AddSingleton<IPersonalityEngine>(sp =>
@@ -103,7 +107,6 @@ app.MapGet("/responses", async (Toolkit toolkit, CancellationToken ct) =>
 {
     var responses = new List<OutgoingMessage>();
     
-    // Collect available messages (non-blocking)
     while (toolkit.OutgoingMessages.TryRead(out var msg))
     {
         responses.Add(msg);
@@ -118,7 +121,7 @@ app.MapGet("/responses/wait", async (Toolkit toolkit, CancellationToken ct) =>
     try
     {
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        cts.CancelAfter(TimeSpan.FromSeconds(30)); // 30 second timeout
+        cts.CancelAfter(TimeSpan.FromSeconds(30));
         
         var msg = await toolkit.OutgoingMessages.ReadAsync(cts.Token);
         return Results.Ok(msg);
@@ -150,9 +153,75 @@ app.MapPost("/goals", async (GoalRequest request, IGoalManager goals) =>
     return Results.Created($"/goals/{goal.Id}", goal);
 });
 
+// === CAD Endpoints ===
+
+// Send a CAD request through DARCI's message pipeline (goes through Perceive → Decide → Act)
+app.MapPost("/cad/generate", async (CadRequest request, Awareness awareness) =>
+{
+    var message = new IncomingMessage
+    {
+        Content = request.Description,
+        UserId = request.UserId ?? "Tinman",
+        Urgency = request.Urgent ? Urgency.Now : Urgency.Soon,
+        ReceivedAt = DateTime.UtcNow
+    };
+    
+    // Pre-tag as CAD so Awareness doesn't need to classify
+    message.Intent = new MessageIntent
+    {
+        Type = IntentType.CAD,
+        ExtractedTopic = request.Description,
+        Confidence = 1.0f
+    };
+    
+    await awareness.NotifyMessage(message);
+    
+    return Results.Accepted(null, new
+    {
+        message = "CAD request received. Result will appear in /responses.",
+        id = message.Id
+    });
+});
+
+// Direct execution bypassing DARCI's decision loop (for testing)
+app.MapPost("/cad/execute", async (CadExecuteRequest request, Toolkit toolkit) =>
+{
+    var dims = (request.LengthMm.HasValue || request.WidthMm.HasValue || request.HeightMm.HasValue)
+        ? new CadDimensionSpec
+        {
+            LengthMm = request.LengthMm,
+            WidthMm = request.WidthMm,
+            HeightMm = request.HeightMm
+        }
+        : null;
+    
+    var result = await toolkit.GenerateCAD(
+        request.Description,
+        dims,
+        request.MaxIterations ?? 3);
+    
+    return result.Success ? Results.Ok(result) : Results.UnprocessableEntity(result);
+});
+
+// Check if Python CAD engine is reachable
+app.MapGet("/cad/health", async (Toolkit toolkit) =>
+{
+    var healthy = await toolkit.IsCADEngineHealthy();
+    return healthy
+        ? Results.Ok(new { status = "healthy", service = "cad-engine" })
+        : Results.StatusCode(503);
+});
+
 app.Run();
 
 // === Request/Response Models ===
 
 public record MessageRequest(string Message, string? UserId = null, bool Urgent = false);
 public record GoalRequest(string Title, string? Description, string? UserId, GoalType? Type, GoalPriority? Priority);
+public record CadRequest(string Description, string? UserId = null, bool Urgent = false);
+public record CadExecuteRequest(
+    string Description,
+    float? LengthMm = null,
+    float? WidthMm = null,
+    float? HeightMm = null,
+    int? MaxIterations = null);

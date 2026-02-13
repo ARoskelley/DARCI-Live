@@ -11,8 +11,6 @@ namespace Darci.Core;
 /// DARCI's awareness system - how she perceives her world.
 /// This aggregates all the things she might notice: messages, goal events, completions, etc.
 /// </summary>
-
-
 public class Awareness
 {
     private readonly ILogger<Awareness> _logger;
@@ -24,9 +22,8 @@ public class Awareness
     private DateTime _lastUserContact = DateTime.UtcNow;
     private DateTime _lastAction = DateTime.UtcNow;
 
-    // Quiet hours configuration (can be made configurable)
-    private readonly TimeOnly _quietStart = new(0, 0);   // Midnight
-    private readonly TimeOnly _quietEnd = new(6, 0);     // 6 AM
+    private readonly TimeOnly _quietStart = new(0, 0);
+    private readonly TimeOnly _quietEnd = new(6, 0);
 
     public Awareness(
         ILogger<Awareness> logger,
@@ -39,7 +36,6 @@ public class Awareness
         _goals = goals;
         _toolkit = toolkit;
 
-        // Unbounded channels - DARCI will process at her own pace
         _messageChannel = Channel.CreateUnbounded<IncomingMessage>(new UnboundedChannelOptions
         {
             SingleReader = true,
@@ -53,10 +49,6 @@ public class Awareness
         });
     }
 
-    /// <summary>
-    /// Called by the API when a message arrives from the user.
-    /// This doesn't block - it just adds to DARCI's awareness.
-    /// </summary>
     public async ValueTask NotifyMessage(IncomingMessage message)
     {
         _lastUserContact = DateTime.UtcNow;
@@ -66,19 +58,12 @@ public class Awareness
             message.Content.Length > 50 ? message.Content[..50] : message.Content);
     }
 
-    /// <summary>
-    /// Called when a background task completes (research, file operation, etc.)
-    /// </summary>
     public async ValueTask NotifyTaskCompletion(TaskCompletion completion)
     {
         await _taskCompletionChannel.Writer.WriteAsync(completion);
         _logger.LogDebug("Task {TaskId} completed: {Success}", completion.TaskId, completion.Success);
     }
 
-    /// <summary>
-    /// DARCI calls this to perceive her current state.
-    /// Gathers everything she might want to notice.
-    /// </summary>
     public async Task<Perception> Perceive()
     {
         var now = DateTime.UtcNow;
@@ -107,27 +92,16 @@ public class Awareness
         return perception;
     }
 
-    /// <summary>
-    /// Marks that DARCI took an action (for tracking idle time)
-    /// </summary>
     public void RecordAction()
     {
         _lastAction = DateTime.UtcNow;
     }
 
-    /// <summary>
-    /// Check if there are any urgent messages waiting
-    /// </summary>
     public bool HasUrgentMessages()
     {
-        // Peek without consuming
         return _messageChannel.Reader.TryPeek(out var msg) && msg.Urgency >= Urgency.Now;
     }
 
-    /// <summary>
-    /// Wait for something to happen (message, completion, or timeout)
-    /// This is how DARCI can "rest" efficiently without burning CPU
-    /// </summary>
     public async Task<bool> WaitForEventOrTimeout(TimeSpan timeout, CancellationToken ct)
     {
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
@@ -135,16 +109,15 @@ public class Awareness
 
         try
         {
-            // Wait for either channel to have something
             var messageTask = _messageChannel.Reader.WaitToReadAsync(cts.Token).AsTask();
             var completionTask = _taskCompletionChannel.Reader.WaitToReadAsync(cts.Token).AsTask();
 
             await Task.WhenAny(messageTask, completionTask);
-            return true; // Something arrived
+            return true;
         }
         catch (OperationCanceledException)
         {
-            return false; // Timeout - nothing happened
+            return false;
         }
     }
 
@@ -153,10 +126,8 @@ public class Awareness
         var messages = new List<IncomingMessage>();
         while (_messageChannel.Reader.TryRead(out var msg))
         {
-            // Quick classify first
             msg.Intent = ClassifyIntent(msg.Content);
 
-            // If unknown, ask LLM to classify
             if (msg.Intent.Type == IntentType.Unknown)
             {
                 _logger.LogDebug("Message needs LLM classification: {Preview}...",
@@ -180,17 +151,24 @@ public class Awareness
     }
 
     /// <summary>
-    /// Quick intent classification without LLM.
-    /// Returns Unknown if it needs deeper analysis.
-    /// </summary>
-    /// <summary>
     /// Quick intent classification - uses LLM only when needed.
     /// </summary>
     private MessageIntent ClassifyIntent(string content)
     {
         var lower = content.ToLowerInvariant().Trim();
 
-        // Definitely conversation - no need for LLM
+        // ── CAD requests (high confidence, skip LLM) ──
+        if (IsClearlyCADRequest(lower))
+        {
+            return new MessageIntent
+            {
+                Type = IntentType.CAD,
+                ExtractedTopic = content,
+                Confidence = 0.85f
+            };
+        }
+
+        // Definitely conversation
         if (IsClearlyConversation(lower))
         {
             return new MessageIntent
@@ -211,12 +189,12 @@ public class Awareness
             };
         }
 
-        // Might be actionable - flag for LLM classification
+        // Might be actionable
         if (MightBeActionable(lower))
         {
             return new MessageIntent
             {
-                Type = IntentType.Unknown,  // Will trigger LLM classification
+                Type = IntentType.Unknown,
                 Confidence = 0.0f
             };
         }
@@ -230,42 +208,58 @@ public class Awareness
     }
 
     /// <summary>
-    /// Messages that are clearly just conversation - no action needed
+    /// Detect CAD/3D model requests without needing the LLM.
     /// </summary>
+    private bool IsClearlyCADRequest(string text)
+    {
+        // Direct CAD keywords + action verbs
+        var cadNouns = new[] { "stl", "cad", "3d model", "3d print", "3d part" };
+        var cadVerbs = new[] { "generate", "create", "make", "design", "build", "model" };
+
+        bool hasNoun = ContainsAny(text, cadNouns);
+        bool hasVerb = ContainsAny(text, cadVerbs);
+
+        if (hasNoun && hasVerb)
+            return true;
+
+        // Specific manufacturing phrases
+        if (ContainsAny(text,
+            "generate a part", "generate a model",
+            "mill a ", "cnc ", "lathe ",
+            "create an stl", "make an stl",
+            "design a bracket", "design a mount", "design a plate",
+            "3d model of"))
+            return true;
+
+        return false;
+    }
+
     private bool IsClearlyConversation(string text)
     {
-        // Greetings
         if (StartsWithAny(text, "hi", "hey", "hello", "good morning", "good evening", "yo", "sup"))
             return true;
 
-        // How are you type messages
         if (ContainsAny(text, "how are you", "how's it going", "what's up", "how have you been"))
             return true;
 
-        // Sharing/venting (not asking for action)
         if (StartsWithAny(text, "i think", "i feel", "i believe", "i was", "i've been", "i had"))
             return true;
 
-        // Opinions and reactions
         if (StartsWithAny(text, "that's", "thats", "wow", "cool", "nice", "interesting", "i see", "makes sense"))
             return true;
 
-        // Very short messages are usually conversational
         if (text.Length < 15 && !text.Contains("?"))
             return true;
 
         return false;
     }
 
-    /// <summary>
-    /// Check if message might be requesting an action (worth asking LLM)
-    /// </summary>
     private bool MightBeActionable(string text)
     {
-        // Action words that might indicate a request
         var actionWords = new[] { "research", "look into", "find out", "search", "look up",
                                "can you", "could you", "would you", "please",
-                               "create", "make", "write", "send", "schedule" };
+                               "create", "make", "write", "send", "schedule",
+                               "generate", "design", "build" };
 
         return ContainsAny(text, actionWords);
     }
@@ -284,7 +278,6 @@ public class Awareness
             if (idx >= 0)
             {
                 var after = text[(idx + trigger.Length)..].Trim();
-                // Clean up common suffixes
                 after = after.TrimStart(':', '-', ' ');
                 if (after.Length > 0)
                     return after.Length > 200 ? after[..200] : after;
@@ -297,7 +290,6 @@ public class Awareness
     {
         var localTime = TimeOnly.FromDateTime(time.ToLocalTime());
 
-        // Handle overnight quiet hours (e.g., 11 PM to 6 AM)
         if (_quietStart > _quietEnd)
         {
             return localTime >= _quietStart || localTime < _quietEnd;

@@ -1,5 +1,6 @@
 using Darci.Shared;
 using Darci.Tools;
+using Darci.Tools.Cad;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
@@ -159,6 +160,7 @@ public class Darci : BackgroundService
                 ActionType.CreateGoal => await DoCreateGoal(action),
                 ActionType.ReadFile => await DoReadFile(action),
                 ActionType.WriteFile => await DoWriteFile(action),
+                ActionType.GenerateCAD => await DoCADWork(action),
                 ActionType.Rest => null,
                 ActionType.Observe => null,
                 _ => null
@@ -201,10 +203,8 @@ public class Darci : BackgroundService
         if (string.IsNullOrEmpty(action.MessageContent) || string.IsNullOrEmpty(action.RecipientId))
             return null;
         
-        // Send the reply through the output queue
         await _tools.SendMessage(action.RecipientId, action.MessageContent);
         
-        // Store in memory
         await _tools.StoreMemory(
             $"I said to {action.RecipientId}: {action.MessageContent}",
             new[] { "conversation", "my_response", action.RecipientId });
@@ -221,11 +221,9 @@ public class Darci : BackgroundService
         if (string.IsNullOrEmpty(action.MessageContent) || string.IsNullOrEmpty(action.RecipientId))
             return null;
         
-        // Check quiet hours before notifying
         if (DateTime.Now.Hour is >= 0 and < 6)
         {
             _logger.LogDebug("Skipping notification during quiet hours");
-            // Queue for later instead
             return null;
         }
         
@@ -246,7 +244,6 @@ public class Darci : BackgroundService
         var prompt = action.Prompt ?? $"Think about: {action.Topic}";
         var thought = await _tools.Generate(prompt);
         
-        // Store the thought in memory
         await _tools.StoreMemory(
             $"I thought about '{action.Topic}': {thought}",
             new[] { "reflection", "internal_thought" });
@@ -289,7 +286,6 @@ public class Darci : BackgroundService
         
         var results = await _tools.SearchWeb(action.Query);
         
-        // Store research results in memory
         if (!string.IsNullOrEmpty(results))
         {
             await _tools.StoreMemory(
@@ -305,7 +301,6 @@ public class Darci : BackgroundService
         if (!action.GoalId.HasValue)
             return null;
         
-        // Mark progress on the goal
         await _tools.ProgressGoal(action.GoalId.Value);
         return true;
     }
@@ -334,6 +329,78 @@ public class Darci : BackgroundService
         
         await _tools.WriteFile(action.FilePath, action.FileContent);
         return true;
+    }
+    
+    private async Task<object?> DoCADWork(DarciAction action)
+    {
+        if (string.IsNullOrEmpty(action.CadDescription))
+            return null;
+        
+        var userId = action.RecipientId ?? "Tinman";
+        
+        _logger.LogInformation("Starting CAD generation for {User}: {Desc}",
+            userId, action.CadDescription);
+        
+        // Build dimension spec from action fields
+        CadDimensionSpec? dims = null;
+        if (action.CadLengthMm.HasValue || action.CadWidthMm.HasValue || action.CadHeightMm.HasValue)
+        {
+            dims = new CadDimensionSpec
+            {
+                LengthMm = action.CadLengthMm,
+                WidthMm = action.CadWidthMm,
+                HeightMm = action.CadHeightMm
+            };
+        }
+        
+        var result = await _tools.GenerateCAD(
+            action.CadDescription,
+            dims,
+            action.CadMaxIterations);
+        
+        if (result.Success)
+        {
+            // Store success in memory
+            var bb = result.FinalValidation?.BoundingBoxMm;
+            var bbStr = bb != null
+                ? $"{bb.GetValueOrDefault("x", 0):F1} x {bb.GetValueOrDefault("y", 0):F1} x {bb.GetValueOrDefault("z", 0):F1} mm"
+                : "unknown";
+            
+            await _tools.StoreMemory(
+                $"Generated CAD model for '{action.CadDescription}': " +
+                $"STL at {result.FinalStlPath}, bounding box {bbStr}, " +
+                $"approved at iteration {result.ApprovedAtIteration}, " +
+                $"watertight: {result.FinalValidation?.IsWatertight}, " +
+                $"triangles: {result.FinalValidation?.TriangleCount}",
+                new[] { "cad", "success", userId });
+            
+            // Notify the user
+            var msg = $"Your 3D model is ready!\n" +
+                      $"  STL: {result.FinalStlPath}\n" +
+                      $"  Bounding box: {bbStr}\n" +
+                      $"  Watertight: {result.FinalValidation?.IsWatertight}\n" +
+                      $"  Triangles: {result.FinalValidation?.TriangleCount}\n" +
+                      $"  Iterations: {(result.ApprovedAtIteration ?? 0) + 1}";
+            
+            await _tools.SendMessage(userId, msg);
+            
+            _logger.LogInformation("CAD generation succeeded for: {Desc}", action.CadDescription);
+        }
+        else
+        {
+            // Store failure in memory for learning
+            await _tools.StoreMemory(
+                $"CAD generation FAILED for '{action.CadDescription}': {result.Error}",
+                new[] { "cad", "failure", userId });
+            
+            await _tools.SendMessage(userId,
+                $"I wasn't able to generate that model. Error: {result.Error}");
+            
+            _logger.LogWarning("CAD generation failed for: {Desc} — {Error}",
+                action.CadDescription, result.Error);
+        }
+        
+        return result;
     }
     
     // ========== Status ==========

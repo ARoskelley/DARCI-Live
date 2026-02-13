@@ -137,6 +137,9 @@ public class Decision
             // Tasks need to be understood and acted on
             IntentType.Task => await HandleTaskRequest(message, state),
             
+            // CAD requests generate 3D models
+            IntentType.CAD => await HandleCADRequest(message, state),
+            
             // Feedback adjusts state
             IntentType.Feedback => await HandleFeedback(message, state),
             
@@ -240,6 +243,41 @@ public class Decision
             "Acknowledging task request");
     }
     
+    private async Task<DarciAction> HandleCADRequest(IncomingMessage message, State state)
+    {
+        var description = message.Intent?.ExtractedTopic ?? message.Content;
+        
+        // Create a CAD goal so DARCI tracks this work
+        var goal = await _goals.CreateGoal(new GoalCreation
+        {
+            Title = $"CAD: {TruncateForTitle(description)}",
+            Description = description,
+            UserId = message.UserId,
+            Source = GoalSource.UserRequested,
+            Type = GoalType.CAD,
+            Priority = message.Urgency >= Urgency.Now ? GoalPriority.High : GoalPriority.Medium
+        });
+        
+        if (message.Urgency >= Urgency.Now)
+        {
+            // Urgent: generate immediately
+            _logger.LogInformation("Immediate CAD generation for: {Desc}", description);
+            return DarciAction.GenerateCad(
+                description,
+                userId: message.UserId,
+                messageId: message.Id,
+                forGoalId: goal.Id,
+                reason: "Urgent CAD request — generating now");
+        }
+        
+        // Non-urgent: acknowledge, the goal system will pick it up
+        return DarciAction.Reply(
+            $"Got it — I'll generate a 3D model for: {TruncateForTitle(description)}. I'll let you know when it's ready.",
+            message.UserId,
+            message.Id,
+            "Acknowledging CAD request");
+    }
+    
     private async Task<DarciAction> HandleFeedback(IncomingMessage message, State state)
     {
         var lower = message.Content.ToLowerInvariant();
@@ -275,12 +313,8 @@ public class Decision
     {
         if (completion.Success)
         {
-            // If this was for a goal, update the goal
-            // Then decide if user needs to be notified
-            
             if (completion.TaskType == "research" && completion.Result is string results)
             {
-                // Research completed - might want to notify user
                 return new DarciAction
                 {
                     Type = ActionType.Notify,
@@ -288,6 +322,13 @@ public class Decision
                     RecipientId = "Tinman", // TODO: track who requested
                     Reasoning = "Research task completed, user might want to know"
                 };
+            }
+            
+            if (completion.TaskType == "cad")
+            {
+                // CAD generation completed — DoCADWork already sends its own notification,
+                // so just note it and continue
+                return DarciAction.Rest(TimeSpan.FromMilliseconds(100), "CAD task completed and user notified");
             }
         }
         
@@ -361,19 +402,17 @@ public class Decision
                 InResponseToGoalId = goalId,
                 Reasoning = "Goal step requires user notification"
             },
+            GoalStepType.CAD => DarciAction.GenerateCad(
+                goal.Description,
+                userId: goal.UserId,
+                forGoalId: goalId,
+                reason: "Working on CAD goal step"),
             _ => DarciAction.Rest(TimeSpan.FromMilliseconds(100))
         };
     }
     
     private async Task<string?> ChooseThinkingTopic(State state)
     {
-        // When truly idle, DARCI might think about:
-        // - Recent conversations
-        // - Patterns she's noticed
-        // - Goals that need planning
-        // - Her own development
-        
-        // For now, keep it simple
         var topics = new[]
         {
             "patterns in recent conversations",
@@ -381,7 +420,6 @@ public class Decision
             "what I've learned recently"
         };
         
-        // Only think if we haven't been thinking too much
         if (state.ConsecutiveRestCycles > 100)
         {
             return topics[Random.Shared.Next(topics.Length)];
@@ -392,16 +430,10 @@ public class Decision
     
     private TimeSpan CalculateRestDuration(State state, Perception perception)
     {
-        // Shorter rests when:
-        // - Energy is high
-        // - There might be messages coming
-        // - We recently received messages
-        
         var baseRest = TimeSpan.FromMilliseconds(500);
         
         if (perception.TimeSinceLastUserContact < TimeSpan.FromMinutes(5))
         {
-            // User is active - stay responsive
             return TimeSpan.FromMilliseconds(100);
         }
         
@@ -412,11 +444,9 @@ public class Decision
         
         if (perception.IsQuietHours)
         {
-            // Longer rests during quiet hours
             return TimeSpan.FromSeconds(5);
         }
         
-        // Gradually increase rest duration when nothing is happening
         var multiplier = Math.Min(state.ConsecutiveRestCycles / 10.0, 10.0);
         return TimeSpan.FromMilliseconds(baseRest.TotalMilliseconds * (1 + multiplier));
     }
