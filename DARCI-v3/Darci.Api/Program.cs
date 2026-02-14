@@ -1,10 +1,12 @@
 using Darci.Core;
+using Darci.Api;
 using Darci.Shared;
 using Darci.Goals;
 using Darci.Memory;
 using Darci.Personality;
 using Darci.Tools;
 using Darci.Tools.Cad;
+using Darci.Tools.Notifications;
 using Darci.Tools.Ollama;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -55,6 +57,29 @@ builder.Services.AddSingleton<IGoalManager>(sp =>
 builder.Services.AddSingleton<Toolkit>();
 builder.Services.AddSingleton<IToolkit>(sp => sp.GetRequiredService<Toolkit>());
 
+// Response delivery + notification fanout
+builder.Services.AddSingleton<IResponseStore, InMemoryResponseStore>();
+builder.Services.AddSingleton<INotificationLogStore, InMemoryNotificationLogStore>();
+builder.Services.AddSingleton(new DarciNotificationPreferences
+{
+    // Hardcoded single-user preferences/contact info for now.
+    EmailEnabled = true,
+    TelegramEnabled = true,
+    EmailTo = "aroskelley2112@gmail.com",
+    EmailFrom = "darci@example.com",
+    SmtpHost = "smtp.example.com",
+    SmtpPort = 587,
+    SmtpUseSsl = true,
+    SmtpUsername = "smtp-user",
+    SmtpPassword = "smtp-password",
+    TelegramBotToken = "8505196152:AAEjELJIGfelZkdOeptOnTqy7-ZHtITfzVQ",
+    TelegramChatId = "8587072376"
+});
+builder.Services.AddSingleton<INotificationProvider, EmailNotificationProvider>();
+builder.Services.AddSingleton<INotificationProvider, TelegramNotificationProvider>();
+builder.Services.AddSingleton<INotificationService, NotificationService>();
+builder.Services.AddHostedService<ResponseDispatcher>();
+
 // Core DARCI components (singletons - one consciousness)
 builder.Services.AddSingleton<Awareness>();
 builder.Services.AddSingleton<State>();
@@ -103,33 +128,40 @@ app.MapPost("/message", async (MessageRequest request, Awareness awareness) =>
 });
 
 // Get pending responses (poll endpoint)
-app.MapGet("/responses", async (Toolkit toolkit, CancellationToken ct) =>
+app.MapGet("/responses", async (IResponseStore responses, CancellationToken ct) =>
 {
-    var responses = new List<OutgoingMessage>();
+    var pending = new List<OutgoingMessage>();
     
-    while (toolkit.OutgoingMessages.TryRead(out var msg))
+    while (responses.TryRead(out var msg))
     {
-        responses.Add(msg);
+        pending.Add(msg);
     }
     
-    return responses;
+    return pending;
 });
 
 // Long-poll for responses (waits for a response or timeout)
-app.MapGet("/responses/wait", async (Toolkit toolkit, CancellationToken ct) =>
+app.MapGet("/responses/wait", async (IResponseStore responses, CancellationToken ct) =>
 {
     try
     {
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         cts.CancelAfter(TimeSpan.FromSeconds(30));
         
-        var msg = await toolkit.OutgoingMessages.ReadAsync(cts.Token);
+        var msg = await responses.ReadAsync(cts.Token);
         return Results.Ok(msg);
     }
     catch (OperationCanceledException)
     {
         return Results.NoContent();
     }
+});
+
+// Recent notification delivery log
+app.MapGet("/notifications/log", (INotificationLogStore logs, int? limit) =>
+{
+    var actualLimit = Math.Clamp(limit ?? 50, 1, 500);
+    return Results.Ok(logs.GetRecent(actualLimit));
 });
 
 // Get active goals

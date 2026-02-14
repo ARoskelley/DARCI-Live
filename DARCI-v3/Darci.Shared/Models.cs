@@ -287,7 +287,7 @@ public class DarciAction
     public float? CadLengthMm { get; init; }
     public float? CadWidthMm { get; init; }
     public float? CadHeightMm { get; init; }
-    public int CadMaxIterations { get; init; } = 3;
+    public int CadMaxIterations { get; init; } = 5;
     
     public static DarciAction Rest(TimeSpan? duration = null, string? reason = null) => new()
     {

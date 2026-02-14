@@ -18,7 +18,7 @@ public class Toolkit : IToolkit
     private readonly ICadBridge _cad;
     private readonly Channel<OutgoingMessage> _outgoingMessages;
 
-    private const int MaxCadIterations = 5;
+    private const int MaxCadIterations = 8;
 
     public Toolkit(
         ILogger<Toolkit> logger,
@@ -186,9 +186,9 @@ Be concise and factual. If you don't know something, say so.";
     public async Task<CadPipelineResult> GenerateCAD(
         string description,
         CadDimensionSpec? dimensions = null,
-        int maxIterations = 3)
+        int maxIterations = 5)
     {
-        maxIterations = Math.Min(maxIterations, MaxCadIterations);
+        maxIterations = Math.Clamp(maxIterations, 1, MaxCadIterations);
 
         var result = new CadPipelineResult
         {
@@ -214,6 +214,9 @@ Be concise and factual. If you don't know something, say so.";
             currentScript.Length, description);
 
         // Step 2: Generate → Validate → Feedback loop
+        CadGenerateResponse? bestPassingResult = null;
+        int? bestPassingIteration = null;
+
         for (int i = 0; i < maxIterations; i++)
         {
             var iterLog = new CadIterationLog { Iteration = i, Script = currentScript };
@@ -239,6 +242,22 @@ Be concise and factual. If you don't know something, say so.";
 
             if (passed)
             {
+                bestPassingResult = cadResponse;
+                bestPassingIteration = i;
+
+                if (i == maxIterations - 1)
+                {
+                    _logger.LogInformation(
+                        "Using validated CAD result from final iteration {Iter} without extra approval pass",
+                        i);
+                    result.Success = true;
+                    result.FinalStlPath = cadResponse.StlPath;
+                    result.FinalRenders = cadResponse.RenderImages;
+                    result.FinalValidation = cadResponse.Validation;
+                    result.ApprovedAtIteration = i;
+                    return result;
+                }
+
                 var feedbackPrompt = await _cad.GetFeedbackPrompt(sanitizedDescription, cadResponse);
 
                 if (feedbackPrompt == null)
@@ -306,6 +325,19 @@ Be concise and factual. If you don't know something, say so.";
 
                 currentScript = newScript;
             }
+        }
+
+        if (bestPassingResult != null)
+        {
+            _logger.LogInformation(
+                "Reached iteration cap; returning best validated CAD result from iteration {Iter}",
+                bestPassingIteration);
+            result.Success = true;
+            result.FinalStlPath = bestPassingResult.StlPath;
+            result.FinalRenders = bestPassingResult.RenderImages;
+            result.FinalValidation = bestPassingResult.Validation;
+            result.ApprovedAtIteration = bestPassingIteration;
+            return result;
         }
 
         result.Success = false;

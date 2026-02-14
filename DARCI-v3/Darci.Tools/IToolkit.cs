@@ -41,7 +41,7 @@ public interface IToolkit
     Task<CadPipelineResult> GenerateCAD(
         string description,
         CadDimensionSpec? dimensions = null,
-        int maxIterations = 3);
+        int maxIterations = 5);
     
     /// <summary>
     /// Single-shot: execute a known script without the feedback loop

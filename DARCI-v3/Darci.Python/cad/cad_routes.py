@@ -81,7 +81,10 @@ async def cad_feedback_prompt(req: CadFeedbackRequest):
     if error:
         sections.append(
             f"**EXECUTION ERROR:** {error}\n\n"
-            f"Fix the script. Make the minimum change needed.\n")
+            "Fix the script with the minimum change needed.\n"
+            "Preserve all already-correct geometry and dimensions.\n"
+            "Use lowercase Workplane methods (`.circle`, `.rect`, `.box`, `.hole`).\n"
+            "Do NOT use constructor-style calls like `cq.Circle(...)`.\n")
     else:
         passed = validation.get("passed", False)
         bb = validation.get("bounding_box_mm", {})
@@ -109,10 +112,14 @@ async def cad_feedback_prompt(req: CadFeedbackRequest):
             sections.append(
                 f"\nBounding box: {bb.get('x', '?')} x {bb.get('y', '?')} x "
                 f"{bb.get('z', '?')} mm\n")
+            sections.append(
+                "Change only what is required to satisfy failed checks.\n"
+                "Do not rewrite unrelated parts of the model.\n")
 
     sections.append(f"\n**Current script:**\n```python\n{script}\n```\n")
     sections.append(
         "\nIf changes needed, output ONLY the corrected CadQuery script "
-        "(assign to `result`). If correct, respond with ONLY `APPROVED`.\n")
+        "(assign to `result`). If correct, respond with ONLY `APPROVED`.\n"
+        "Avoid oscillation: do not undo previously fixed constraints.\n")
 
     return CadFeedbackResponse(feedback_prompt="\n".join(sections))
