@@ -24,6 +24,23 @@ public class NotificationService : INotificationService
 
     public async Task NotifyAsync(OutgoingMessage message, CancellationToken ct)
     {
+        if (!message.ExternalNotify)
+        {
+            foreach (var provider in _providers)
+            {
+                _logStore.Add(new NotificationLogEntry
+                {
+                    Provider = provider.Name,
+                    Status = "skipped",
+                    UserId = message.UserId,
+                    Target = provider.GetTarget(_preferences),
+                    MessagePreview = Truncate(message.Content, 200),
+                    Error = "External notification not requested for this message"
+                });
+            }
+            return;
+        }
+
         foreach (var provider in _providers)
         {
             var target = provider.GetTarget(_preferences);

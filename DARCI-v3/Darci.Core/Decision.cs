@@ -43,19 +43,21 @@ public class Decision
         if (urgentMessage != null)
         {
             _logger.LogDebug("Handling urgent message from {UserId}", urgentMessage.UserId);
-            return await DecideResponseTo(urgentMessage, state);
+            return await DecideAndMarkProcessed(urgentMessage, state);
         }
         
-        // Priority 2: Normal messages (unless we're deep in something)
+        // Priority 2: Normal messages
+        // IMPORTANT: messages are drained during perception, so skipping them here
+        // drops them permanently. Always service at least one message per cycle.
         var normalMessages = perception.NewMessages
             .Where(m => m.Urgency < Urgency.Now && !m.IsProcessed)
             .ToList();
         
-        if (normalMessages.Any() && state.Focus < 0.8f)
+        if (normalMessages.Any())
         {
             var message = normalMessages.First();
             _logger.LogDebug("Handling message from {UserId}", message.UserId);
-            return await DecideResponseTo(message, state);
+            return await DecideAndMarkProcessed(message, state);
         }
         
         // Priority 3: Task completions need acknowledgment/next steps
@@ -152,6 +154,24 @@ public class Decision
             _ => await GenerateReplyAction(message, state)
         };
     }
+
+    private async Task<DarciAction> DecideAndMarkProcessed(IncomingMessage message, State state)
+    {
+        var action = await DecideResponseTo(message, state);
+        message.IsProcessed = true;
+        return action;
+    }
+
+    private static bool ShouldExternallyNotifyReply(IncomingMessage message)
+    {
+        return string.Equals(message.Source, "telegram", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool ShouldRunCadImmediately(IncomingMessage message)
+    {
+        return message.Urgency >= Urgency.Now
+            || string.Equals(message.Source, "telegram", StringComparison.OrdinalIgnoreCase);
+    }
     
     private async Task<DarciAction> GenerateReplyAction(IncomingMessage message, State state)
     {
@@ -175,7 +195,12 @@ public class Decision
         // Generate the reply using LLM
         var reply = await _tools.GenerateReply(context);
         
-        return DarciAction.Reply(reply, message.UserId, message.Id, "Responding to user message");
+        return DarciAction.Reply(
+            reply,
+            message.UserId,
+            message.Id,
+            "Responding to user message",
+            externalNotify: ShouldExternallyNotifyReply(message));
     }
     
     private async Task<DarciAction> HandleResearchRequest(IncomingMessage message, State state)
@@ -198,7 +223,12 @@ public class Decision
             : $"Got it - I'll look into {TruncateForTitle(topic)}.";
         
         // Return acknowledgment first, then the goal work will happen in the next cycle
-        return DarciAction.Reply(ack, message.UserId, message.Id, "Acknowledging research request");
+        return DarciAction.Reply(
+            ack,
+            message.UserId,
+            message.Id,
+            "Acknowledging research request",
+            externalNotify: ShouldExternallyNotifyReply(message));
     }
     
     private async Task<DarciAction> HandleReminderRequest(IncomingMessage message, State state)
@@ -220,7 +250,8 @@ public class Decision
             $"I'll remember that. I've noted: {TruncateForTitle(reminderContent)}",
             message.UserId,
             message.Id,
-            "Confirming reminder");
+            "Confirming reminder",
+            externalNotify: ShouldExternallyNotifyReply(message));
     }
     
     private async Task<DarciAction> HandleTaskRequest(IncomingMessage message, State state)
@@ -240,7 +271,8 @@ public class Decision
             "I understand. I'll work on this.",
             message.UserId,
             message.Id,
-            "Acknowledging task request");
+            "Acknowledging task request",
+            externalNotify: ShouldExternallyNotifyReply(message));
     }
     
     private async Task<DarciAction> HandleCADRequest(IncomingMessage message, State state)
@@ -258,9 +290,9 @@ public class Decision
             Priority = message.Urgency >= Urgency.Now ? GoalPriority.High : GoalPriority.Medium
         });
         
-        if (message.Urgency >= Urgency.Now)
+        if (ShouldRunCadImmediately(message))
         {
-            // Urgent: generate immediately
+            // Urgent/telegram: generate immediately
             _logger.LogInformation("Immediate CAD generation for: {Desc}", description);
             return DarciAction.GenerateCad(
                 description,
@@ -275,7 +307,8 @@ public class Decision
             $"Got it — I'll generate a 3D model for: {TruncateForTitle(description)}. I'll let you know when it's ready.",
             message.UserId,
             message.Id,
-            "Acknowledging CAD request");
+            "Acknowledging CAD request",
+            externalNotify: ShouldExternallyNotifyReply(message));
     }
     
     private async Task<DarciAction> HandleFeedback(IncomingMessage message, State state)

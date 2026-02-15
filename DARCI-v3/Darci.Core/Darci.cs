@@ -203,7 +203,7 @@ public class Darci : BackgroundService
         if (string.IsNullOrEmpty(action.MessageContent) || string.IsNullOrEmpty(action.RecipientId))
             return null;
         
-        await _tools.SendMessage(action.RecipientId, action.MessageContent);
+        await _tools.SendMessage(action.RecipientId, action.MessageContent, externalNotify: action.ExternalNotify);
         
         await _tools.StoreMemory(
             $"I said to {action.RecipientId}: {action.MessageContent}",
@@ -227,7 +227,7 @@ public class Darci : BackgroundService
             return null;
         }
         
-        await _tools.SendMessage(action.RecipientId, action.MessageContent);
+        await _tools.SendMessage(action.RecipientId, action.MessageContent, externalNotify: true);
         
         _logger.LogInformation("Notified {User}: {Preview}...",
             action.RecipientId,
@@ -381,8 +381,13 @@ public class Darci : BackgroundService
                       $"  Watertight: {result.FinalValidation?.IsWatertight}\n" +
                       $"  Triangles: {result.FinalValidation?.TriangleCount}\n" +
                       $"  Iterations: {(result.ApprovedAtIteration ?? 0) + 1}";
+
+            if (result.SystemValidationNotes.Count > 0)
+            {
+                msg += "\n  System checks:\n" + string.Join("\n", result.SystemValidationNotes.Select(n => $"   - {n}"));
+            }
             
-            await _tools.SendMessage(userId, msg);
+            await _tools.SendMessage(userId, msg, externalNotify: true);
             
             _logger.LogInformation("CAD generation succeeded for: {Desc}", action.CadDescription);
         }
@@ -393,8 +398,10 @@ public class Darci : BackgroundService
                 $"CAD generation FAILED for '{action.CadDescription}': {result.Error}",
                 new[] { "cad", "failure", userId });
             
-            await _tools.SendMessage(userId,
-                $"I wasn't able to generate that model. Error: {result.Error}");
+            await _tools.SendMessage(
+                userId,
+                $"I wasn't able to generate that model. Error: {result.Error}",
+                externalNotify: false);
             
             _logger.LogWarning("CAD generation failed for: {Desc} — {Error}",
                 action.CadDescription, result.Error);

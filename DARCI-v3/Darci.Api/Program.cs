@@ -15,6 +15,8 @@ var builder = WebApplication.CreateBuilder(args);
 var dbPath = Path.Combine(AppContext.BaseDirectory, "Data", "darci.db");
 Directory.CreateDirectory(Path.GetDirectoryName(dbPath)!);
 var connectionString = $"Data Source={dbPath}";
+var telegramBotToken = Environment.GetEnvironmentVariable("DARCI_TELEGRAM_BOT_TOKEN") ?? "";
+var telegramChatId = Environment.GetEnvironmentVariable("DARCI_TELEGRAM_CHAT_ID") ?? "8587072376";
 
 // === Services Registration ===
 
@@ -66,19 +68,22 @@ builder.Services.AddSingleton(new DarciNotificationPreferences
     EmailEnabled = true,
     TelegramEnabled = true,
     EmailTo = "aroskelley2112@gmail.com",
-    EmailFrom = "darci@example.com",
-    SmtpHost = "smtp.example.com",
+    EmailFrom = "aroskelley2112@gmail.com",
+    SmtpHost = "smtp.gmail.com",
     SmtpPort = 587,
     SmtpUseSsl = true,
-    SmtpUsername = "smtp-user",
-    SmtpPassword = "smtp-password",
-    TelegramBotToken = "8505196152:AAEjELJIGfelZkdOeptOnTqy7-ZHtITfzVQ",
-    TelegramChatId = "8587072376"
+    SmtpUsername = "aroskelley2112@gmail.com",
+    SmtpPassword = Environment.GetEnvironmentVariable("DARCI_SMTP_PASSWORD") ?? "smtp-password",
+    TelegramBotToken = telegramBotToken,
+    TelegramChatId = telegramChatId,
+    TelegramInboundEnabled = true,
+    TelegramInboundUserId = "Tinman"
 });
 builder.Services.AddSingleton<INotificationProvider, EmailNotificationProvider>();
 builder.Services.AddSingleton<INotificationProvider, TelegramNotificationProvider>();
 builder.Services.AddSingleton<INotificationService, NotificationService>();
 builder.Services.AddHostedService<ResponseDispatcher>();
+builder.Services.AddHostedService<TelegramInboundService>();
 
 // Core DARCI components (singletons - one consciousness)
 builder.Services.AddSingleton<Awareness>();
@@ -118,6 +123,7 @@ app.MapPost("/message", async (MessageRequest request, Awareness awareness) =>
     {
         Content = request.Message,
         UserId = request.UserId ?? "Tinman",
+        Source = "api",
         Urgency = request.Urgent ? Urgency.Now : Urgency.Soon,
         ReceivedAt = DateTime.UtcNow
     };
@@ -164,6 +170,18 @@ app.MapGet("/notifications/log", (INotificationLogStore logs, int? limit) =>
     return Results.Ok(logs.GetRecent(actualLimit));
 });
 
+// Telegram inbound runtime config status (no secrets)
+app.MapGet("/telegram/inbound/status", (DarciNotificationPreferences prefs) =>
+{
+    return Results.Ok(new
+    {
+        enabled = prefs.TelegramInboundEnabled,
+        botTokenSet = !string.IsNullOrWhiteSpace(prefs.TelegramBotToken),
+        chatId = prefs.TelegramChatId,
+        userId = prefs.TelegramInboundUserId
+    });
+});
+
 // Get active goals
 app.MapGet("/goals", async (IGoalManager goals, string? userId) =>
 {
@@ -194,6 +212,7 @@ app.MapPost("/cad/generate", async (CadRequest request, Awareness awareness) =>
     {
         Content = request.Description,
         UserId = request.UserId ?? "Tinman",
+        Source = "api",
         Urgency = request.Urgent ? Urgency.Now : Urgency.Soon,
         ReceivedAt = DateTime.UtcNow
     };

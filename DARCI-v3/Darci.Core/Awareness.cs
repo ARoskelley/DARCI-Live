@@ -19,6 +19,7 @@ public class Awareness
     private readonly Channel<IncomingMessage> _messageChannel;
     private readonly Channel<TaskCompletion> _taskCompletionChannel;
     private readonly IToolkit _toolkit;
+    private readonly List<IncomingMessage> _messageBacklog = new();
     private DateTime _lastUserContact = DateTime.UtcNow;
     private DateTime _lastAction = DateTime.UtcNow;
 
@@ -67,13 +68,29 @@ public class Awareness
     public async Task<Perception> Perceive()
     {
         var now = DateTime.UtcNow;
+        var newlyReceived = await DrainMessages();
+
+        if (newlyReceived.Count > 0)
+        {
+            _messageBacklog.AddRange(newlyReceived);
+        }
+
+        _messageBacklog.RemoveAll(m => m.IsProcessed);
+
+        // Safety bound: keep only the newest unprocessed messages if backlog grows unexpectedly.
+        const int maxBacklog = 200;
+        if (_messageBacklog.Count > maxBacklog)
+        {
+            _messageBacklog.RemoveRange(0, _messageBacklog.Count - maxBacklog);
+        }
+
         var perception = new Perception
         {
             Timestamp = now,
             TimeSinceLastUserContact = now - _lastUserContact,
             TimeSinceLastAction = now - _lastAction,
             IsQuietHours = IsQuietHours(now),
-            NewMessages = await DrainMessages(),
+            NewMessages = _messageBacklog.Where(m => !m.IsProcessed).ToList(),
             CompletedTasks = await DrainCompletions(),
             GoalEvents = await _goals.GetRecentEvents(),
             PendingMemoriesToProcess = await _memory.GetPendingConsolidationCount(),

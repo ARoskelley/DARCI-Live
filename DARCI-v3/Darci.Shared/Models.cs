@@ -70,6 +70,7 @@ public class IncomingMessage
     public int Id { get; init; }
     public string Content { get; init; } = "";
     public string UserId { get; init; } = "Tinman";
+    public string Source { get; init; } = "api";
     public DateTime ReceivedAt { get; init; } = DateTime.UtcNow;
     public Urgency Urgency { get; init; } = Urgency.Soon;
     public bool IsProcessed { get; set; } = false;
@@ -104,6 +105,7 @@ public class OutgoingMessage
     public string Content { get; init; } = "";
     public DateTime CreatedAt { get; init; }
     public int? InResponseToMessageId { get; init; }
+    public bool ExternalNotify { get; init; } = false;
 }
 
 // ============================================================
@@ -279,6 +281,7 @@ public class DarciAction
     public string? FileContent { get; init; }
     public TimeSpan RestDuration { get; init; } = TimeSpan.FromMilliseconds(100);
     public string? Reasoning { get; init; }
+    public bool ExternalNotify { get; init; } = false;
     public int? InResponseToMessageId { get; init; }
     public int? InResponseToGoalId { get; init; }
     
@@ -296,11 +299,17 @@ public class DarciAction
         Reasoning = reason ?? "Nothing needs my attention right now"
     };
     
-    public static DarciAction Reply(string content, string userId, int? messageId = null, string? reason = null) => new()
+    public static DarciAction Reply(
+        string content,
+        string userId,
+        int? messageId = null,
+        string? reason = null,
+        bool externalNotify = false) => new()
     {
         Type = ActionType.Reply,
         MessageContent = content,
         RecipientId = userId,
+        ExternalNotify = externalNotify,
         InResponseToMessageId = messageId,
         Reasoning = reason
     };

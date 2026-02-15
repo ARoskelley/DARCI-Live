@@ -76,6 +76,7 @@ public class CadPipelineResult
     public string? Error { get; set; }
     public int? ApprovedAtIteration { get; set; }
     public List<CadIterationLog> Iterations { get; set; } = new();
+    public List<string> SystemValidationNotes { get; set; } = new();
 }
 
 public class CadIterationLog

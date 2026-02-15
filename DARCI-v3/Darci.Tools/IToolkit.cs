@@ -10,7 +10,7 @@ namespace Darci.Tools;
 public interface IToolkit
 {
     // === Communication ===
-    Task SendMessage(string userId, string content);
+    Task SendMessage(string userId, string content, bool externalNotify = false);
     Task<string> GenerateReply(ReplyContext context);
     
     // === Language/Thinking ===

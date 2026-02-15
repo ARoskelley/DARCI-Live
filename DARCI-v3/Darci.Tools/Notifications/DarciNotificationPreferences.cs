@@ -4,6 +4,7 @@ public class DarciNotificationPreferences
 {
     public bool EmailEnabled { get; init; } = true;
     public bool TelegramEnabled { get; init; } = true;
+    public bool TelegramInboundEnabled { get; init; } = true;
 
     public string EmailTo { get; init; } = "";
     public string EmailFrom { get; init; } = "";
@@ -15,4 +16,5 @@ public class DarciNotificationPreferences
 
     public string TelegramBotToken { get; init; } = "";
     public string TelegramChatId { get; init; } = "";
+    public string TelegramInboundUserId { get; init; } = "Tinman";
 }
