@@ -1,1 +1,0 @@
-"""DARCI CAD generation module."""
