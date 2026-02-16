@@ -6,10 +6,16 @@ using Darci.Memory;
 using Darci.Personality;
 using Darci.Tools;
 using Darci.Tools.Cad;
+using Darci.Tools.Engineering;
+using Darci.Tools.Engineering.Providers;
 using Darci.Tools.Notifications;
 using Darci.Tools.Ollama;
 
 var builder = WebApplication.CreateBuilder(args);
+EnvironmentFileLoader.Load(
+    builder.Environment.ContentRootPath,
+    ".env.local",
+    ".env.engineering.local");
 
 // === Configuration ===
 var dbPath = Path.Combine(AppContext.BaseDirectory, "Data", "darci.db");
@@ -32,6 +38,11 @@ builder.Services.AddHttpClient<IOllamaClient, OllamaClient>();
 
 // HTTP client for Python CAD service
 builder.Services.AddHttpClient<ICadBridge, CadBridge>();
+builder.Services.AddHttpClient<KittyCadEngineeringProvider>();
+builder.Services.AddHttpClient<CadCoderEngineeringProvider>();
+builder.Services.AddSingleton<IEngineeringCadProvider>(sp => sp.GetRequiredService<KittyCadEngineeringProvider>());
+builder.Services.AddSingleton<IEngineeringCadProvider>(sp => sp.GetRequiredService<CadCoderEngineeringProvider>());
+builder.Services.AddSingleton<IEngineeringWorkbench, CadQueryEngineeringWorkbench>();
 
 // Personality (singleton - one DARCI)
 builder.Services.AddSingleton<IPersonalityEngine>(sp =>
@@ -263,6 +274,194 @@ app.MapGet("/cad/health", async (Toolkit toolkit) =>
         : Results.StatusCode(503);
 });
 
+// Direct engineering workbench execution with artifact bundling to tmp/engineering.
+app.MapPost("/engineering/execute", async (EngineeringExecuteRequest request, Toolkit toolkit, IWebHostEnvironment env) =>
+{
+    var dims = (request.LengthMm.HasValue || request.WidthMm.HasValue || request.HeightMm.HasValue)
+        ? new CadDimensionSpec
+        {
+            LengthMm = request.LengthMm,
+            WidthMm = request.WidthMm,
+            HeightMm = request.HeightMm
+        }
+        : null;
+
+    var result = await toolkit.RunEngineeringWorkbench(new EngineeringWorkRequest
+    {
+        Description = request.Description,
+        PartType = request.PartType,
+        Parameters = request.Parameters,
+        ProviderOnly = request.ProviderOnly ?? false,
+        Dimensions = dims,
+        MaxIterations = request.MaxIterations ?? 3
+    });
+
+    var bundle = EngineeringOutputBundler.Create(
+        env.ContentRootPath,
+        request.Description,
+        result,
+        request.CreateZip ?? true);
+
+    var response = new
+    {
+        result,
+        artifacts = new
+        {
+            outputDir = bundle.OutputDir,
+            zipPath = bundle.ZipPath,
+            files = bundle.FilesWritten
+        }
+    };
+
+    return result.Success ? Results.Ok(response) : Results.UnprocessableEntity(response);
+});
+
+// Multi-part collection execution: generates a project folder + one collection zip.
+app.MapPost("/engineering/collection", async (EngineeringCollectionRequest request, Toolkit toolkit, IWebHostEnvironment env) =>
+{
+    if (request.Parts == null || request.Parts.Count == 0)
+    {
+        return Results.BadRequest(new { error = "At least one part is required." });
+    }
+
+    var repoRoot = EngineeringOutputBundler.ResolveRepoRoot(env.ContentRootPath);
+    var partsRoot = Path.Combine(repoRoot, "tmp", "engineering", "_collections_parts");
+    Directory.CreateDirectory(partsRoot);
+
+    var partArtifacts = new List<EngineeringCollectionPartArtifact>();
+
+    foreach (var part in request.Parts)
+    {
+        var partName = string.IsNullOrWhiteSpace(part.Name) ? "part" : part.Name.Trim();
+        var partDescription = string.IsNullOrWhiteSpace(part.Description)
+            ? partName
+            : $"{partName}: {part.Description}";
+        var maxIterations = part.MaxIterations ?? request.DefaultMaxIterations ?? 2;
+
+        var dims = (part.LengthMm.HasValue || part.WidthMm.HasValue || part.HeightMm.HasValue)
+            ? new CadDimensionSpec
+            {
+                LengthMm = part.LengthMm,
+                WidthMm = part.WidthMm,
+                HeightMm = part.HeightMm
+            }
+            : null;
+
+        var result = await toolkit.RunEngineeringWorkbench(new EngineeringWorkRequest
+        {
+            Description = partDescription,
+            PartType = part.PartType,
+            Parameters = part.Parameters,
+            ProviderOnly = part.ProviderOnly ?? request.ProviderOnly ?? false,
+            Dimensions = dims,
+            MaxIterations = maxIterations
+        });
+
+        var partSlug = EngineeringOutputBundler.Slugify(partName);
+        var partDir = Path.Combine(partsRoot, $"{DateTime.UtcNow:yyyyMMdd_HHmmss}_{partSlug}_{Guid.NewGuid().ToString("N")[..8]}");
+        var partBundle = EngineeringOutputBundler.WriteToDirectory(
+            partDir,
+            part.Description,
+            result);
+
+        partArtifacts.Add(new EngineeringCollectionPartArtifact
+        {
+            Name = partName,
+            Description = partDescription,
+            PartType = part.PartType,
+            Parameters = part.Parameters,
+            Success = result.Success,
+            GenerationSource = result.GenerationSource,
+            ProviderAttempts = result.ProviderAttempts,
+            PartDir = partBundle.OutputDir,
+            Files = partBundle.FilesWritten,
+            BoundingBoxMm = result.CadResult?.Validation?.BoundingBoxMm,
+            TriangleCount = result.CadResult?.Validation?.TriangleCount,
+            X = part.X,
+            Y = part.Y,
+            Z = part.Z,
+            RxDeg = part.RxDeg,
+            RyDeg = part.RyDeg,
+            RzDeg = part.RzDeg,
+            Error = result.Error
+        });
+    }
+
+    var connections = (request.Connections ?? new List<EngineeringCollectionConnectionRequest>())
+        .Select(c => new EngineeringAssemblyConnection
+        {
+            From = c.From,
+            To = c.To,
+            Relation = c.Relation ?? "connects"
+        })
+        .ToList();
+
+    var collectionName = string.IsNullOrWhiteSpace(request.Name)
+        ? "engineering-collection"
+        : request.Name.Trim();
+
+    var validation = EngineeringAssemblyValidator.Validate(partArtifacts, connections);
+
+    var collection = EngineeringCollectionBundler.Create(
+        env.ContentRootPath,
+        collectionName,
+        partArtifacts,
+        connections,
+        validation,
+        request.CreateZip ?? true);
+
+    var allSuccess = partArtifacts.All(p => p.Success);
+    var response = new
+    {
+        collection = new
+        {
+            name = collectionName,
+            outputDir = collection.OutputDir,
+            zipPath = collection.ZipPath,
+            files = collection.FilesWritten,
+            partCount = partArtifacts.Count,
+            successCount = partArtifacts.Count(p => p.Success),
+            failureCount = partArtifacts.Count(p => !p.Success),
+            validation = new
+            {
+                passed = validation.Passed,
+                issues = validation.Issues
+            }
+        },
+        parts = partArtifacts.Select(p => new
+        {
+            p.Name,
+            p.PartType,
+            p.Success,
+            p.GenerationSource,
+            p.ProviderAttempts,
+            p.PartDir,
+            p.Files,
+            p.BoundingBoxMm,
+            p.TriangleCount,
+            p.Error
+        })
+    };
+
+    return (allSuccess && validation.Passed) ? Results.Ok(response) : Results.UnprocessableEntity(response);
+});
+
+app.MapGet("/engineering/providers/status", async (bool? probe, CancellationToken ct) =>
+{
+    var includeProbes = probe ?? false;
+    var providers = await EngineeringProviderStatusService.GetStatus(includeProbes, ct);
+    return Results.Ok(new
+    {
+        probe = includeProbes,
+        providers
+    });
+});
+
+app.MapGet("/engineering/toolchain/setup", () =>
+{
+    return Results.Ok(EngineeringProviderStatusService.GetSetupGuide());
+});
+
 app.Run();
 
 // === Request/Response Models ===
@@ -276,3 +475,44 @@ public record CadExecuteRequest(
     float? WidthMm = null,
     float? HeightMm = null,
     int? MaxIterations = null);
+
+public record EngineeringExecuteRequest(
+    string Description,
+    float? LengthMm = null,
+    float? WidthMm = null,
+    float? HeightMm = null,
+    int? MaxIterations = null,
+    string? PartType = null,
+    Dictionary<string, double>? Parameters = null,
+    bool? ProviderOnly = null,
+    bool? CreateZip = true);
+
+public record EngineeringCollectionRequest(
+    string Name,
+    List<EngineeringCollectionPartRequest> Parts,
+    List<EngineeringCollectionConnectionRequest>? Connections = null,
+    int? DefaultMaxIterations = null,
+    bool? ProviderOnly = null,
+    bool? CreateZip = true);
+
+public record EngineeringCollectionPartRequest(
+    string Name,
+    string Description,
+    float? LengthMm = null,
+    float? WidthMm = null,
+    float? HeightMm = null,
+    int? MaxIterations = null,
+    string? PartType = null,
+    Dictionary<string, double>? Parameters = null,
+    bool? ProviderOnly = null,
+    double? X = null,
+    double? Y = null,
+    double? Z = null,
+    double? RxDeg = null,
+    double? RyDeg = null,
+    double? RzDeg = null);
+
+public record EngineeringCollectionConnectionRequest(
+    string From,
+    string To,
+    string? Relation = null);

@@ -18,3 +18,8 @@ Data/*.db-journal
 ## OS
 .DS_Store
 Thumbs.db
+
+## Local environment secrets
+.env
+.env.local
+.env.*.local

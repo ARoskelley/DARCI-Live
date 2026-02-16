@@ -4,6 +4,7 @@ using System.Text.RegularExpressions;
 using Darci.Shared;
 using Darci.Memory;
 using Darci.Tools.Cad;
+using Darci.Tools.Engineering;
 using Darci.Tools.Ollama;
 using Microsoft.Extensions.Logging;
 
@@ -18,6 +19,7 @@ public class Toolkit : IToolkit
     private readonly IOllamaClient _ollama;
     private readonly IMemoryStore _memory;
     private readonly ICadBridge _cad;
+    private readonly IEngineeringWorkbench _engineeringWorkbench;
     private readonly Channel<OutgoingMessage> _outgoingMessages;
 
     private const int MaxCadIterations = 8;
@@ -27,12 +29,14 @@ public class Toolkit : IToolkit
         ILogger<Toolkit> logger,
         IOllamaClient ollama,
         IMemoryStore memory,
-        ICadBridge cad)
+        ICadBridge cad,
+        IEngineeringWorkbench engineeringWorkbench)
     {
         _logger = logger;
         _ollama = ollama;
         _memory = memory;
         _cad = cad;
+        _engineeringWorkbench = engineeringWorkbench;
 
         _outgoingMessages = Channel.CreateUnbounded<OutgoingMessage>();
     }
@@ -409,6 +413,11 @@ Be concise and factual. If you don't know something, say so.";
     public async Task<bool> IsCADEngineHealthy()
     {
         return await _cad.IsHealthy();
+    }
+
+    public async Task<EngineeringWorkbenchResult> RunEngineeringWorkbench(EngineeringWorkRequest request)
+    {
+        return await _engineeringWorkbench.Run(request);
     }
 
     // ================================================================

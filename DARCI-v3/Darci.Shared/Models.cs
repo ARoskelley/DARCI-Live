@@ -31,6 +31,7 @@ public enum ActionType
     
     // CAD
     GenerateCAD,
+    Engineer,
     
     // Meta
     Rest,
@@ -244,6 +245,7 @@ public enum GoalStepType
 {
     Research,
     Generate,
+    Engineer,
     Notify,
     Wait,
     Custom,
@@ -291,6 +293,8 @@ public class DarciAction
     public float? CadWidthMm { get; init; }
     public float? CadHeightMm { get; init; }
     public int CadMaxIterations { get; init; } = 5;
+    public string? EngineeringDescription { get; init; }
+    public int EngineeringMaxIterations { get; init; } = 3;
     
     public static DarciAction Rest(TimeSpan? duration = null, string? reason = null) => new()
     {
@@ -355,6 +359,23 @@ public class DarciAction
         InResponseToMessageId = messageId,
         InResponseToGoalId = forGoalId,
         Reasoning = reason ?? "Generating CAD model"
+    };
+
+    public static DarciAction Engineer(
+        string description,
+        string? userId = null,
+        int? messageId = null,
+        int? forGoalId = null,
+        int maxIterations = 3,
+        string? reason = null) => new()
+    {
+        Type = ActionType.Engineer,
+        EngineeringDescription = description,
+        EngineeringMaxIterations = maxIterations,
+        RecipientId = userId,
+        InResponseToMessageId = messageId,
+        InResponseToGoalId = forGoalId,
+        Reasoning = reason ?? "Running engineering workbench step"
     };
 }
 

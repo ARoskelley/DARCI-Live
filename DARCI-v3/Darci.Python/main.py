@@ -12,6 +12,7 @@ Start with:
 
 from fastapi import FastAPI
 from cad.cad_routes import router as cad_router
+from cadcoder.cadcoder_routes import router as cadcoder_router
 
 app = FastAPI(
     title="DARCI Python Service",
@@ -20,6 +21,7 @@ app = FastAPI(
 )
 
 app.include_router(cad_router)
+app.include_router(cadcoder_router)
 
 
 @app.get("/")

@@ -1,5 +1,6 @@
 using Darci.Shared;
 using Darci.Tools.Cad;
+using Darci.Tools.Engineering;
 
 namespace Darci.Tools;
 
@@ -55,4 +56,9 @@ public interface IToolkit
     /// Check if the Python CAD engine is reachable
     /// </summary>
     Task<bool> IsCADEngineHealthy();
+
+    /// <summary>
+    /// Run the engineering workbench flow (non-breaking extension over CAD).
+    /// </summary>
+    Task<EngineeringWorkbenchResult> RunEngineeringWorkbench(EngineeringWorkRequest request);
 }

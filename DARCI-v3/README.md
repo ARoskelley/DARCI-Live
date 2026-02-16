@@ -54,6 +54,16 @@ cd Darci.Api
 dotnet run
 ```
 
+For engineering extensions (KittyCAD, MuJoCo, CalculiX, KiCad, ROS2, LibEMG), fill `DARCI-v3/.env.engineering.local` (git-ignored). DARCI auto-loads `.env.local` and `.env.engineering.local` on startup.
+
+For CAD execution and the local CadCoder adapter, run the Python service too:
+
+```bash
+cd DARCI-v3/Darci.Python
+pip install -r requirements.txt
+uvicorn main:app --host 127.0.0.1 --port 8000
+```
+
 DARCI will start and show her startup banner. She's now alive and running.
 
 ## API Endpoints
@@ -85,6 +95,20 @@ curl http://localhost:5080/responses/wait
 ### Check Status
 ```bash
 curl http://localhost:5080/status
+```
+
+### Engineering Provider Status
+```bash
+# Config-only status
+curl http://localhost:5080/engineering/providers/status
+
+# Active probing (pings APIs / checks CLIs and python modules)
+curl "http://localhost:5080/engineering/providers/status?probe=true"
+```
+
+### Engineering Toolchain Setup Template
+```bash
+curl http://localhost:5080/engineering/toolchain/setup
 ```
 
 ### View Active Goals

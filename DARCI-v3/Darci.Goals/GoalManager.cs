@@ -224,6 +224,7 @@ public class GoalManager : IGoalManager
             GoalType.CAD => new[]
             {
                 (GoalStepType.CAD, $"Generate 3D model: {creation.Description}"),
+                (GoalStepType.Engineer, $"Run engineering validation loop for: {creation.Description}"),
                 (GoalStepType.Notify, "Deliver STL file to user")
             },
             _ => new[]

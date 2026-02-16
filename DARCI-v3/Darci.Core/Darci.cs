@@ -1,6 +1,7 @@
 using Darci.Shared;
 using Darci.Tools;
 using Darci.Tools.Cad;
+using Darci.Tools.Engineering;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
@@ -161,6 +162,7 @@ public class Darci : BackgroundService
                 ActionType.ReadFile => await DoReadFile(action),
                 ActionType.WriteFile => await DoWriteFile(action),
                 ActionType.GenerateCAD => await DoCADWork(action),
+                ActionType.Engineer => await DoEngineerWork(action),
                 ActionType.Rest => null,
                 ActionType.Observe => null,
                 _ => null
@@ -407,6 +409,50 @@ public class Darci : BackgroundService
                 action.CadDescription, result.Error);
         }
         
+        return result;
+    }
+
+    private async Task<object?> DoEngineerWork(DarciAction action)
+    {
+        if (string.IsNullOrWhiteSpace(action.EngineeringDescription))
+        {
+            return null;
+        }
+
+        var userId = action.RecipientId ?? "Tinman";
+        _logger.LogInformation("Starting engineering workbench step for {User}: {Desc}",
+            userId, action.EngineeringDescription);
+
+        var request = new EngineeringWorkRequest
+        {
+            Description = action.EngineeringDescription,
+            MaxIterations = action.EngineeringMaxIterations
+        };
+
+        var result = await _tools.RunEngineeringWorkbench(request);
+        if (result.Success && result.CadResult?.Success == true)
+        {
+            await _tools.StoreMemory(
+                $"Engineering workbench succeeded for '{action.EngineeringDescription}': " +
+                $"STL at {result.CadResult.StlPath}",
+                new[] { "engineering", "cad", "success", userId });
+
+            await _tools.SendMessage(
+                userId,
+                $"Engineering step complete.\n  STL: {result.CadResult.StlPath}",
+                externalNotify: true);
+            return result;
+        }
+
+        await _tools.StoreMemory(
+            $"Engineering workbench failed for '{action.EngineeringDescription}': {result.Error}",
+            new[] { "engineering", "cad", "failure", userId });
+
+        await _tools.SendMessage(
+            userId,
+            $"Engineering step failed: {result.Error ?? "unknown error"}",
+            externalNotify: false);
+
         return result;
     }
     

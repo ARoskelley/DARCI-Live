@@ -440,6 +440,11 @@ public class Decision
                 userId: goal.UserId,
                 forGoalId: goalId,
                 reason: "Working on CAD goal step"),
+            GoalStepType.Engineer => DarciAction.Engineer(
+                goal.Description,
+                userId: goal.UserId,
+                forGoalId: goalId,
+                reason: "Running engineering workbench step"),
             _ => DarciAction.Rest(TimeSpan.FromMilliseconds(100))
         };
     }
