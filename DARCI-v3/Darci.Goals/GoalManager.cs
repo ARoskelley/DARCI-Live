@@ -93,7 +93,7 @@ public class GoalManager : IGoalManager
             SELECT g.* FROM Goals g
             INNER JOIN GoalSteps s ON s.GoalId = g.Id
             WHERE g.Status IN ('Active', 'InProgress')
-            AND s.Status = 'Pending'
+            AND s.Status IN ('Pending', 'InProgress')
             ORDER BY 
                 CASE g.Priority 
                     WHEN 'Urgent' THEN 0 
@@ -116,15 +116,60 @@ public class GoalManager : IGoalManager
     public async Task<GoalStep?> GetNextStep(int goalId)
     {
         using var conn = new SqliteConnection(_connectionString);
-        
-        var record = await conn.QueryFirstOrDefaultAsync<GoalStepRecord>(@"
-            SELECT * FROM GoalSteps 
+        await conn.OpenAsync();
+        using var tx = conn.BeginTransaction();
+
+        // Resume in-progress work first so DARCI can recover across restarts.
+        var inProgress = await conn.QueryFirstOrDefaultAsync<GoalStepRecord>(@"
+            SELECT * FROM GoalSteps
+            WHERE GoalId = @GoalId AND Status = 'InProgress'
+            ORDER BY StepOrder
+            LIMIT 1",
+            new { GoalId = goalId },
+            transaction: tx);
+
+        if (inProgress != null)
+        {
+            tx.Commit();
+            return MapToStep(inProgress);
+        }
+
+        // Claim the next pending step atomically.
+        var pending = await conn.QueryFirstOrDefaultAsync<GoalStepRecord>(@"
+            SELECT * FROM GoalSteps
             WHERE GoalId = @GoalId AND Status = 'Pending'
             ORDER BY StepOrder
             LIMIT 1",
-            new { GoalId = goalId });
-        
-        return record == null ? null : MapToStep(record);
+            new { GoalId = goalId },
+            transaction: tx);
+
+        if (pending == null)
+        {
+            tx.Commit();
+            return null;
+        }
+
+        await conn.ExecuteAsync(@"
+            UPDATE GoalSteps
+            SET Status = 'InProgress'
+            WHERE Id = @Id AND Status = 'Pending'",
+            new { pending.Id },
+            transaction: tx);
+
+        await conn.ExecuteAsync(@"
+            UPDATE Goals
+            SET Status = 'InProgress'
+            WHERE Id = @GoalId AND Status = 'Active'",
+            new { GoalId = goalId },
+            transaction: tx);
+
+        var claimed = await conn.QueryFirstOrDefaultAsync<GoalStepRecord>(
+            "SELECT * FROM GoalSteps WHERE Id = @Id",
+            new { pending.Id },
+            transaction: tx);
+
+        tx.Commit();
+        return claimed == null ? null : MapToStep(claimed);
     }
     
     public async Task<List<GoalEvent>> GetRecentEvents(int limit = 10)
@@ -177,32 +222,84 @@ public class GoalManager : IGoalManager
     public async Task AddProgress(int goalId, string progressNote)
     {
         using var conn = new SqliteConnection(_connectionString);
-        
-        // Mark current step complete
-        await conn.ExecuteAsync(@"
-            UPDATE GoalSteps SET Status = 'Completed' 
+        await conn.OpenAsync();
+        using var tx = conn.BeginTransaction();
+
+        var completedRows = await conn.ExecuteAsync(@"
+            UPDATE GoalSteps
+            SET Status = 'Completed'
             WHERE GoalId = @GoalId AND Status = 'InProgress'",
-            new { GoalId = goalId });
-        
-        // Update goal status
-        await conn.ExecuteAsync(@"
-            UPDATE Goals SET Status = 'InProgress', Notes = COALESCE(Notes || '\n', '') || @Note 
-            WHERE Id = @Id",
-            new { Id = goalId, Note = $"[{DateTime.UtcNow:g}] {progressNote}" });
-        
-        // Check if all steps complete
-        var pendingSteps = await conn.ExecuteScalarAsync<int>(
-            "SELECT COUNT(*) FROM GoalSteps WHERE GoalId = @GoalId AND Status = 'Pending'",
-            new { GoalId = goalId });
-        
-        if (pendingSteps == 0)
+            new { GoalId = goalId },
+            transaction: tx);
+
+        // Fallback for legacy states where steps were never marked InProgress.
+        if (completedRows == 0)
         {
-            await UpdateGoalStatus(goalId, GoalStatus.Completed);
+            var pendingId = await conn.ExecuteScalarAsync<int?>(@"
+                SELECT Id FROM GoalSteps
+                WHERE GoalId = @GoalId AND Status = 'Pending'
+                ORDER BY StepOrder
+                LIMIT 1",
+                new { GoalId = goalId },
+                transaction: tx);
+
+            if (pendingId.HasValue)
+            {
+                completedRows = await conn.ExecuteAsync(@"
+                    UPDATE GoalSteps
+                    SET Status = 'Completed'
+                    WHERE Id = @Id",
+                    new { Id = pendingId.Value },
+                    transaction: tx);
+            }
+        }
+
+        if (completedRows == 0)
+        {
+            await RecordEvent(conn, goalId, GoalEventType.Blocked,
+                "Progress was requested but no actionable step was found.", tx);
+            tx.Commit();
+            return;
+        }
+
+        await conn.ExecuteAsync(@"
+            UPDATE Goals
+            SET Status = 'InProgress',
+                Notes = COALESCE(Notes || '\n', '') || @Note
+            WHERE Id = @Id",
+            new { Id = goalId, Note = $"[{DateTime.UtcNow:g}] {progressNote}" },
+            transaction: tx);
+
+        var remainingSteps = await conn.ExecuteScalarAsync<int>(@"
+            SELECT COUNT(*)
+            FROM GoalSteps
+            WHERE GoalId = @GoalId
+              AND Status IN ('Pending', 'InProgress')",
+            new { GoalId = goalId },
+            transaction: tx);
+
+        if (remainingSteps == 0)
+        {
+            await conn.ExecuteAsync(@"
+                UPDATE Goals
+                SET Status = 'Completed', CompletedAt = @CompletedAt
+                WHERE Id = @Id",
+                new
+                {
+                    Id = goalId,
+                    CompletedAt = DateTime.UtcNow.ToString("o")
+                },
+                transaction: tx);
+
+            await RecordEvent(conn, goalId, GoalEventType.Completed, progressNote, tx);
+            _logger.LogInformation("Goal {Id} completed", goalId);
         }
         else
         {
-            await RecordEvent(conn, goalId, GoalEventType.ProgressMade, progressNote);
+            await RecordEvent(conn, goalId, GoalEventType.ProgressMade, progressNote, tx);
         }
+
+        tx.Commit();
     }
     
     private async Task CreateInitialSteps(int goalId, GoalCreation creation)
@@ -252,7 +349,12 @@ public class GoalManager : IGoalManager
         }
     }
     
-    private async Task RecordEvent(SqliteConnection conn, int goalId, GoalEventType type, string? details = null)
+    private async Task RecordEvent(
+        SqliteConnection conn,
+        int goalId,
+        GoalEventType type,
+        string? details = null,
+        SqliteTransaction? tx = null)
     {
         await conn.ExecuteAsync(@"
             INSERT INTO GoalEvents (GoalId, EventType, Details, OccurredAt)
@@ -263,7 +365,8 @@ public class GoalManager : IGoalManager
                 EventType = type.ToString(),
                 Details = details,
                 OccurredAt = DateTime.UtcNow.ToString("o")
-            });
+            },
+            transaction: tx);
     }
     
     private void InitializeDatabase()
@@ -310,6 +413,7 @@ public class GoalManager : IGoalManager
             CREATE INDEX IF NOT EXISTS idx_goals_status ON Goals(Status);
             CREATE INDEX IF NOT EXISTS idx_goals_user ON Goals(UserId);
             CREATE INDEX IF NOT EXISTS idx_goalsteps_goal ON GoalSteps(GoalId);
+            CREATE INDEX IF NOT EXISTS idx_goalsteps_goal_status ON GoalSteps(GoalId, Status);
         ");
         
         _logger.LogInformation("Goals database initialized");

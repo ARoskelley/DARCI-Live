@@ -10,6 +10,7 @@ public class EngineeringWorkRequest
     public bool ProviderOnly { get; set; }
     public CadDimensionSpec? Dimensions { get; set; }
     public int MaxIterations { get; set; } = 3;
+    public bool StrictToolValidation { get; set; } = true;
 }
 
 public class EngineeringWorkbenchResult
@@ -20,6 +21,7 @@ public class EngineeringWorkbenchResult
     public CadGenerateResponse? CadResult { get; set; }
     public string? GenerationSource { get; set; }
     public List<EngineeringProviderAttempt> ProviderAttempts { get; set; } = new();
+    public EngineeringValidationSummary ValidationSummary { get; set; } = new();
 }
 
 public class EngineeringProviderAttempt
@@ -27,4 +29,11 @@ public class EngineeringProviderAttempt
     public string Provider { get; set; } = "";
     public bool Success { get; set; }
     public string? Error { get; set; }
+}
+
+public class EngineeringValidationSummary
+{
+    public bool Passed { get; set; }
+    public List<string> Errors { get; set; } = new();
+    public List<string> Warnings { get; set; } = new();
 }

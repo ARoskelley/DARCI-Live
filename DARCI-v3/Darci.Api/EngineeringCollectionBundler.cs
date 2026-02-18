@@ -25,6 +25,7 @@ public sealed class EngineeringCollectionPartArtifact
     public string? Error { get; init; }
     public string? GenerationSource { get; init; }
     public List<EngineeringProviderAttempt> ProviderAttempts { get; init; } = new();
+    public EngineeringValidationSummary? ValidationSummary { get; init; }
 }
 
 public sealed class EngineeringCollectionBundle
@@ -50,6 +51,7 @@ public static class EngineeringCollectionBundler
         IReadOnlyList<EngineeringCollectionPartArtifact> parts,
         IReadOnlyList<EngineeringAssemblyConnection> connections,
         EngineeringValidationReport validation,
+        EngineeringAssemblySimulationReport? simulation,
         bool createZip)
     {
         var repoRoot = EngineeringOutputBundler.ResolveRepoRoot(contentRootPath);
@@ -99,6 +101,16 @@ public static class EngineeringCollectionBundler
         }));
         files.Add(validationPath);
 
+        if (simulation != null)
+        {
+            var simulationPath = Path.Combine(outputDir, "simulation-report.json");
+            File.WriteAllText(simulationPath, JsonSerializer.Serialize(simulation, new JsonSerializerOptions
+            {
+                WriteIndented = true
+            }));
+            files.Add(simulationPath);
+        }
+
         var summaryPath = Path.Combine(outputDir, "collection-summary.json");
         var summary = new
         {
@@ -115,6 +127,18 @@ public static class EngineeringCollectionBundler
                 errorCount = validation.Issues.Count(i => i.Severity == "error"),
                 warningCount = validation.Issues.Count(i => i.Severity == "warning")
             },
+            simulation = simulation == null
+                ? null
+                : new
+                {
+                    simulation.Passed,
+                    simulation.StaticPairsChecked,
+                    simulation.StaticCollisionCount,
+                    simulation.GlobalMinClearanceMm,
+                    issueCount = simulation.Issues.Count,
+                    errorCount = simulation.Issues.Count(i => i.Severity == "error"),
+                    warningCount = simulation.Issues.Count(i => i.Severity == "warning")
+                },
             parts = parts.Select(p => new
             {
                 p.Name,
@@ -125,6 +149,7 @@ public static class EngineeringCollectionBundler
                 p.GenerationSource,
                 providerAttemptCount = p.ProviderAttempts.Count,
                 providerFailures = p.ProviderAttempts.Where(a => !a.Success),
+                p.ValidationSummary,
                 p.PartDir,
                 p.Files,
                 p.BoundingBoxMm,

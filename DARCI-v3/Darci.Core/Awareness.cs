@@ -185,6 +185,17 @@ public class Awareness
             };
         }
 
+        // Engineering collection requests (tag-triggered or obvious assembly intent)
+        if (HasEngineeringCollectionTag(lower) || IsLikelyEngineeringCollectionRequest(lower))
+        {
+            return new MessageIntent
+            {
+                Type = IntentType.EngineeringCollection,
+                ExtractedTopic = ExtractCollectionTopic(content),
+                Confidence = HasEngineeringCollectionTag(lower) ? 0.98f : 0.75f
+            };
+        }
+
         // Definitely conversation
         if (IsClearlyConversation(lower))
         {
@@ -271,6 +282,27 @@ public class Awareness
         return false;
     }
 
+    private bool HasEngineeringCollectionTag(string text)
+    {
+        return StartsWithAny(text, "#collection", "/collection", "#assembly", "/assembly")
+            || ContainsAny(text, " #collection", " #assembly");
+    }
+
+    private bool IsLikelyEngineeringCollectionRequest(string text)
+    {
+        var assemblyTerms = new[]
+        {
+            "assembly", "multi-part", "multi part", "system",
+            "fit between", "fit check", "clearance",
+            "simulate movement", "motion simulation", "kinematic",
+            "portal gear project", "gear train"
+        };
+
+        var hasAssembly = ContainsAny(text, assemblyTerms);
+        var hasAction = ContainsAny(text, "build", "design", "create", "generate", "engineer", "make");
+        return hasAssembly && hasAction;
+    }
+
     private bool MightBeActionable(string text)
     {
         var actionWords = new[] { "research", "look into", "find out", "search", "look up",
@@ -301,6 +333,24 @@ public class Awareness
             }
         }
         return null;
+    }
+
+    private string ExtractCollectionTopic(string content)
+    {
+        var trimmed = content.Trim();
+        var lower = trimmed.ToLowerInvariant();
+        var tags = new[] { "#collection", "/collection", "#assembly", "/assembly" };
+
+        foreach (var tag in tags)
+        {
+            if (lower.StartsWith(tag, StringComparison.Ordinal))
+            {
+                var after = trimmed[tag.Length..].TrimStart(':', '-', ' ', '\n', '\r', '\t');
+                return string.IsNullOrWhiteSpace(after) ? trimmed : after;
+            }
+        }
+
+        return trimmed;
     }
 
     private bool IsQuietHours(DateTime time)

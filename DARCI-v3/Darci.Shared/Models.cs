@@ -97,6 +97,7 @@ public enum IntentType
     StatusCheck,
     Feedback,
     CAD,
+    EngineeringCollection,
     Unknown
 }
 
@@ -286,6 +287,7 @@ public class DarciAction
     public bool ExternalNotify { get; init; } = false;
     public int? InResponseToMessageId { get; init; }
     public int? InResponseToGoalId { get; init; }
+    public bool ProgressGoalStepOnSuccess { get; init; } = false;
     
     // CAD-specific fields
     public string? CadDescription { get; init; }
@@ -295,6 +297,7 @@ public class DarciAction
     public int CadMaxIterations { get; init; } = 5;
     public string? EngineeringDescription { get; init; }
     public int EngineeringMaxIterations { get; init; } = 3;
+    public bool EngineeringRunCollection { get; init; } = false;
     
     public static DarciAction Rest(TimeSpan? duration = null, string? reason = null) => new()
     {
@@ -325,11 +328,16 @@ public class DarciAction
         Reasoning = reason
     };
     
-    public static DarciAction Research(string query, int? forGoalId = null, string? reason = null) => new()
+    public static DarciAction Research(
+        string query,
+        int? forGoalId = null,
+        string? reason = null,
+        bool progressGoalStepOnSuccess = false) => new()
     {
         Type = ActionType.Research,
         Query = query,
         InResponseToGoalId = forGoalId,
+        ProgressGoalStepOnSuccess = progressGoalStepOnSuccess,
         Reasoning = reason
     };
     
@@ -348,6 +356,7 @@ public class DarciAction
         float? lengthMm = null,
         float? widthMm = null,
         float? heightMm = null,
+        bool progressGoalStepOnSuccess = false,
         string? reason = null) => new()
     {
         Type = ActionType.GenerateCAD,
@@ -358,6 +367,7 @@ public class DarciAction
         RecipientId = userId,
         InResponseToMessageId = messageId,
         InResponseToGoalId = forGoalId,
+        ProgressGoalStepOnSuccess = progressGoalStepOnSuccess,
         Reasoning = reason ?? "Generating CAD model"
     };
 
@@ -367,6 +377,7 @@ public class DarciAction
         int? messageId = null,
         int? forGoalId = null,
         int maxIterations = 3,
+        bool progressGoalStepOnSuccess = false,
         string? reason = null) => new()
     {
         Type = ActionType.Engineer,
@@ -375,7 +386,26 @@ public class DarciAction
         RecipientId = userId,
         InResponseToMessageId = messageId,
         InResponseToGoalId = forGoalId,
+        ProgressGoalStepOnSuccess = progressGoalStepOnSuccess,
         Reasoning = reason ?? "Running engineering workbench step"
+    };
+
+    public static DarciAction EngineerCollection(
+        string description,
+        string? userId = null,
+        int? messageId = null,
+        int? forGoalId = null,
+        bool progressGoalStepOnSuccess = false,
+        string? reason = null) => new()
+    {
+        Type = ActionType.Engineer,
+        EngineeringDescription = description,
+        EngineeringRunCollection = true,
+        RecipientId = userId,
+        InResponseToMessageId = messageId,
+        InResponseToGoalId = forGoalId,
+        ProgressGoalStepOnSuccess = progressGoalStepOnSuccess,
+        Reasoning = reason ?? "Running engineering collection pipeline"
     };
 }
 

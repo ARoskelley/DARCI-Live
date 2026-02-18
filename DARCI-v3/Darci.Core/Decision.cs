@@ -141,6 +141,9 @@ public class Decision
             
             // CAD requests generate 3D models
             IntentType.CAD => await HandleCADRequest(message, state),
+
+            // Engineering collection requests build multi-part assemblies
+            IntentType.EngineeringCollection => await HandleEngineeringCollectionRequest(message, state),
             
             // Feedback adjusts state
             IntentType.Feedback => await HandleFeedback(message, state),
@@ -168,6 +171,12 @@ public class Decision
     }
 
     private static bool ShouldRunCadImmediately(IncomingMessage message)
+    {
+        return message.Urgency >= Urgency.Now
+            || string.Equals(message.Source, "telegram", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool ShouldRunEngineeringCollectionImmediately(IncomingMessage message)
     {
         return message.Urgency >= Urgency.Now
             || string.Equals(message.Source, "telegram", StringComparison.OrdinalIgnoreCase);
@@ -310,6 +319,28 @@ public class Decision
             "Acknowledging CAD request",
             externalNotify: ShouldExternallyNotifyReply(message));
     }
+
+    private async Task<DarciAction> HandleEngineeringCollectionRequest(IncomingMessage message, State state)
+    {
+        var description = message.Intent?.ExtractedTopic ?? message.Content;
+
+        if (ShouldRunEngineeringCollectionImmediately(message))
+        {
+            _logger.LogInformation("Immediate engineering collection run for: {Desc}", description);
+            return DarciAction.EngineerCollection(
+                description,
+                userId: message.UserId,
+                messageId: message.Id,
+                reason: "Engineering collection request from user");
+        }
+
+        return DarciAction.Reply(
+            "I can run that as an engineering collection. Send it with `#collection` (optionally with JSON), or mark it urgent and I'll start immediately.",
+            message.UserId,
+            message.Id,
+            "Prompting for collection execution mode",
+            externalNotify: ShouldExternallyNotifyReply(message));
+    }
     
     private async Task<DarciAction> HandleFeedback(IncomingMessage message, State state)
     {
@@ -419,12 +450,17 @@ public class Decision
         // Execute the next step
         return nextStep.Type switch
         {
-            GoalStepType.Research => DarciAction.Research(nextStep.Query!, goalId, "Working on goal research"),
+            GoalStepType.Research => DarciAction.Research(
+                nextStep.Query!,
+                goalId,
+                "Working on goal research",
+                progressGoalStepOnSuccess: true),
             GoalStepType.Generate => new DarciAction
             {
                 Type = ActionType.Think,
                 Prompt = nextStep.Prompt,
                 InResponseToGoalId = goalId,
+                ProgressGoalStepOnSuccess = true,
                 Reasoning = "Generating content for goal"
             },
             GoalStepType.Notify => new DarciAction
@@ -433,17 +469,20 @@ public class Decision
                 MessageContent = nextStep.Message,
                 RecipientId = goal.UserId,
                 InResponseToGoalId = goalId,
+                ProgressGoalStepOnSuccess = true,
                 Reasoning = "Goal step requires user notification"
             },
             GoalStepType.CAD => DarciAction.GenerateCad(
                 goal.Description,
                 userId: goal.UserId,
                 forGoalId: goalId,
+                progressGoalStepOnSuccess: true,
                 reason: "Working on CAD goal step"),
             GoalStepType.Engineer => DarciAction.Engineer(
                 goal.Description,
                 userId: goal.UserId,
                 forGoalId: goalId,
+                progressGoalStepOnSuccess: true,
                 reason: "Running engineering workbench step"),
             _ => DarciAction.Rest(TimeSpan.FromMilliseconds(100))
         };

@@ -32,7 +32,7 @@ public interface IToolkit
     
     // === Goals ===
     Task<int> CreateGoal(string description, string userId);
-    Task ProgressGoal(int goalId);
+    Task ProgressGoal(int goalId, string? progressNote = null);
     
     // === CAD Generation ===
     

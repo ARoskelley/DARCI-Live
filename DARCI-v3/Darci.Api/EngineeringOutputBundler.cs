@@ -80,6 +80,7 @@ public static class EngineeringOutputBundler
             error = result.Error,
             generationSource = result.GenerationSource,
             providerAttempts = result.ProviderAttempts,
+            validationSummary = result.ValidationSummary,
             cadResult = result.CadResult
         };
         File.WriteAllText(summaryPath, JsonSerializer.Serialize(summary, new JsonSerializerOptions

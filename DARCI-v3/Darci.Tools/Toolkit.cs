@@ -2,6 +2,7 @@ using System.Threading.Channels;
 using System.Globalization;
 using System.Text.RegularExpressions;
 using Darci.Shared;
+using Darci.Goals;
 using Darci.Memory;
 using Darci.Tools.Cad;
 using Darci.Tools.Engineering;
@@ -18,6 +19,7 @@ public class Toolkit : IToolkit
     private readonly ILogger<Toolkit> _logger;
     private readonly IOllamaClient _ollama;
     private readonly IMemoryStore _memory;
+    private readonly IGoalManager _goals;
     private readonly ICadBridge _cad;
     private readonly IEngineeringWorkbench _engineeringWorkbench;
     private readonly Channel<OutgoingMessage> _outgoingMessages;
@@ -29,12 +31,14 @@ public class Toolkit : IToolkit
         ILogger<Toolkit> logger,
         IOllamaClient ollama,
         IMemoryStore memory,
+        IGoalManager goals,
         ICadBridge cad,
         IEngineeringWorkbench engineeringWorkbench)
     {
         _logger = logger;
         _ollama = ollama;
         _memory = memory;
+        _goals = goals;
         _cad = cad;
         _engineeringWorkbench = engineeringWorkbench;
 
@@ -83,6 +87,7 @@ Respond with ONLY one word:
 - task (user is asking ME to do a task)
 - reminder (user is asking ME to remind them)
 - cad (user is asking ME to create/generate/design a 3D part, STL, or CAD model)
+- engineeringcollection (user is asking ME to design a multi-part assembly/system with fit or movement checks)
 - feedback (user is giving feedback on my responses)
 
 Message: ""{message}""
@@ -91,10 +96,11 @@ Classification:";
 
         var response = await _ollama.Generate(prompt);
         var intentStr = response.Trim().ToLowerInvariant().Replace(".", "");
+        var normalizedIntent = Regex.Replace(intentStr, @"[\s_\-]", "");
 
         _logger.LogDebug("LLM classified message as: {Intent}", intentStr);
 
-        var type = intentStr switch
+        var type = normalizedIntent switch
         {
             "conversation" => IntentType.Conversation,
             "question" => IntentType.Question,
@@ -102,6 +108,9 @@ Classification:";
             "task" => IntentType.Task,
             "reminder" => IntentType.Reminder,
             "cad" => IntentType.CAD,
+            "engineeringcollection" => IntentType.EngineeringCollection,
+            "collection" => IntentType.EngineeringCollection,
+            "assembly" => IntentType.EngineeringCollection,
             "goalupdate" => IntentType.GoalUpdate,
             "statuscheck" => IntentType.StatusCheck,
             "feedback" => IntentType.Feedback,
@@ -176,15 +185,33 @@ Be concise and factual. If you don't know something, say so.";
 
     public async Task<int> CreateGoal(string description, string userId)
     {
-        // TODO: Wire up to GoalManager
-        _logger.LogInformation("Creating goal for {User}: {Description}", userId, description);
-        return 0;
+        var trimmed = string.IsNullOrWhiteSpace(description)
+            ? "Task"
+            : description.Trim();
+        var title = trimmed.Length > 50 ? trimmed[..47] + "..." : trimmed;
+
+        var goal = await _goals.CreateGoal(new GoalCreation
+        {
+            Title = title,
+            Description = trimmed,
+            UserId = userId,
+            Type = GoalType.Task,
+            Source = GoalSource.UserRequested,
+            Priority = GoalPriority.Medium
+        });
+
+        _logger.LogInformation("Created goal {GoalId} for {User}", goal.Id, userId);
+        return goal.Id;
     }
 
-    public async Task ProgressGoal(int goalId)
+    public async Task ProgressGoal(int goalId, string? progressNote = null)
     {
-        // TODO: Wire up to GoalManager
-        _logger.LogInformation("Progressing goal {GoalId}", goalId);
+        var note = string.IsNullOrWhiteSpace(progressNote)
+            ? "Completed goal step."
+            : progressNote.Trim();
+
+        await _goals.AddProgress(goalId, note);
+        _logger.LogInformation("Recorded progress for goal {GoalId}: {Note}", goalId, note);
     }
 
     // ================================================================

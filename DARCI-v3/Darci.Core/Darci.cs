@@ -5,6 +5,10 @@ using Darci.Tools.Engineering;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
+using System.Globalization;
+using System.Net.Http.Json;
+using System.Text.Json;
+using System.Text.RegularExpressions;
 
 namespace Darci.Core;
 
@@ -167,6 +171,12 @@ public class Darci : BackgroundService
                 ActionType.Observe => null,
                 _ => null
             };
+
+            if (action.ProgressGoalStepOnSuccess && action.InResponseToGoalId.HasValue)
+            {
+                var progressNote = BuildGoalStepProgressNote(action);
+                await _tools.ProgressGoal(action.InResponseToGoalId.Value, progressNote);
+            }
             
             sw.Stop();
             
@@ -298,13 +308,13 @@ public class Darci : BackgroundService
         return results;
     }
     
-    private async Task<object?> DoGoalWork(DarciAction action)
+    private Task<object?> DoGoalWork(DarciAction action)
     {
         if (!action.GoalId.HasValue)
-            return null;
-        
-        await _tools.ProgressGoal(action.GoalId.Value);
-        return true;
+            return Task.FromResult<object?>(null);
+
+        // Picking up a goal should not mark any step complete.
+        return Task.FromResult<object?>(true);
     }
     
     private async Task<object?> DoCreateGoal(DarciAction action)
@@ -420,6 +430,11 @@ public class Darci : BackgroundService
         }
 
         var userId = action.RecipientId ?? "Tinman";
+        if (action.EngineeringRunCollection)
+        {
+            return await DoEngineeringCollectionWork(action.EngineeringDescription, userId);
+        }
+
         _logger.LogInformation("Starting engineering workbench step for {User}: {Desc}",
             userId, action.EngineeringDescription);
 
@@ -455,6 +470,440 @@ public class Darci : BackgroundService
 
         return result;
     }
+
+    private async Task<object?> DoEngineeringCollectionWork(string description, string userId)
+    {
+        _logger.LogInformation("Starting engineering collection workflow for {User}: {Desc}", userId, description);
+
+        await _tools.SendMessage(
+            userId,
+            "Starting engineering collection run. I will generate parts, run fit/motion simulation, and report results.",
+            externalNotify: true);
+
+        var payload = await BuildCollectionRequestPayload(description);
+        if (payload.Parts.Count == 0)
+        {
+            await _tools.SendMessage(
+                userId,
+                "I couldn't build a valid engineering collection payload. Include `#collection` plus JSON, or provide a clearer assembly specification.",
+                externalNotify: true);
+            return null;
+        }
+
+        var apiBaseUrl = Environment.GetEnvironmentVariable("DARCI_API_BASE_URL")?.Trim();
+        if (string.IsNullOrWhiteSpace(apiBaseUrl))
+        {
+            apiBaseUrl = "http://127.0.0.1:5080";
+        }
+
+        using var client = new HttpClient
+        {
+            BaseAddress = new Uri(apiBaseUrl, UriKind.Absolute),
+            Timeout = TimeSpan.FromMinutes(30)
+        };
+
+        using var response = await client.PostAsJsonAsync("/engineering/collection", payload);
+        var body = await response.Content.ReadAsStringAsync();
+
+        var summary = ParseCollectionResponse(body);
+        var passed = response.IsSuccessStatusCode && summary.ValidationPassed && summary.SimulationPassed;
+
+        var statusText = passed ? "complete" : "finished with issues";
+        var lines = new List<string>
+        {
+            $"Engineering collection {statusText}.",
+            $"  Validation passed: {summary.ValidationPassed}",
+            $"  Simulation passed: {summary.SimulationPassed}",
+            $"  Output dir: {summary.OutputDir ?? "n/a"}"
+        };
+        if (!string.IsNullOrWhiteSpace(summary.ZipPath))
+        {
+            lines.Add($"  Zip: {summary.ZipPath}");
+        }
+        if (summary.IssuePreview.Count > 0)
+        {
+            lines.Add("  Issues:");
+            lines.AddRange(summary.IssuePreview.Select(i => $"   - {i}"));
+        }
+
+        var message = string.Join("\n", lines);
+        await _tools.SendMessage(userId, message, externalNotify: true);
+
+        await _tools.StoreMemory(
+            $"Engineering collection run for '{description}' {statusText}. Output={summary.OutputDir}; zip={summary.ZipPath}; validation={summary.ValidationPassed}; simulation={summary.SimulationPassed}",
+            new[] { "engineering", "collection", passed ? "success" : "failure", userId });
+
+        return new
+        {
+            success = passed,
+            outputDir = summary.OutputDir,
+            zipPath = summary.ZipPath,
+            validationPassed = summary.ValidationPassed,
+            simulationPassed = summary.SimulationPassed
+        };
+    }
+
+    private async Task<EngineeringCollectionRequestPayload> BuildCollectionRequestPayload(string description)
+    {
+        var fromTaggedJson = TryParseCollectionPayload(description);
+        if (fromTaggedJson != null)
+        {
+            return NormalizeCollectionPayload(fromTaggedJson, description);
+        }
+
+        var portalTemplate = TryBuildPortalCollectionTemplate(description);
+        if (portalTemplate != null)
+        {
+            return portalTemplate;
+        }
+
+        var prompt = BuildCollectionPrompt(description);
+        var llm = await _tools.Generate(prompt);
+        var fromLlm = TryParseCollectionPayload(llm);
+        if (fromLlm != null)
+        {
+            return NormalizeCollectionPayload(fromLlm, description);
+        }
+
+        return NormalizeCollectionPayload(new EngineeringCollectionRequestPayload
+        {
+            Name = "engineering-collection",
+            Parts = new List<EngineeringCollectionPartPayload>
+            {
+                new()
+                {
+                    Name = "main-part",
+                    Description = description
+                }
+            }
+        }, description);
+    }
+
+    private static EngineeringCollectionRequestPayload? TryParseCollectionPayload(string raw)
+    {
+        var json = ExtractJsonObject(raw);
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return null;
+        }
+
+        try
+        {
+            return JsonSerializer.Deserialize<EngineeringCollectionRequestPayload>(
+                json,
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static EngineeringCollectionRequestPayload NormalizeCollectionPayload(
+        EngineeringCollectionRequestPayload payload,
+        string fallbackDescription)
+    {
+        payload.Name = string.IsNullOrWhiteSpace(payload.Name) ? "engineering-collection" : payload.Name.Trim();
+        payload.StrictValidation ??= true;
+        payload.RunSimulation ??= true;
+        payload.CreateZip ??= true;
+        payload.DefaultMaxIterations ??= 3;
+        payload.SimulationSamples ??= 256;
+        payload.CollisionToleranceMm ??= 0.1;
+        payload.ClearanceTargetMm ??= 0.2;
+        payload.Connections ??= new List<EngineeringCollectionConnectionPayload>();
+
+        payload.Parts ??= new List<EngineeringCollectionPartPayload>();
+        for (var i = 0; i < payload.Parts.Count; i++)
+        {
+            var p = payload.Parts[i];
+            p.Name = string.IsNullOrWhiteSpace(p.Name) ? $"part-{i + 1}" : p.Name.Trim();
+            p.Description = string.IsNullOrWhiteSpace(p.Description)
+                ? fallbackDescription
+                : p.Description.Trim();
+            p.MaxIterations ??= payload.DefaultMaxIterations;
+            payload.Parts[i] = p;
+        }
+
+        return payload;
+    }
+
+    private static EngineeringCollectionRequestPayload? TryBuildPortalCollectionTemplate(string description)
+    {
+        var lower = description.ToLowerInvariant();
+        if (!lower.Contains("portal") || !lower.Contains("gear"))
+        {
+            return null;
+        }
+
+        var module = ExtractDouble(lower, @"module\s*([0-9]+(?:\.[0-9]+)?)") ?? 2.0;
+        var driveTeeth = ExtractInt(lower, @"(?:drive|pinion)[^0-9]{0,16}(\d+)\s*(?:teeth|tooth)") ?? 12;
+        var drivenTeeth = ExtractInt(lower, @"(?:driven|output|idler)[^0-9]{0,16}(\d+)\s*(?:teeth|tooth)") ?? 24;
+
+        return new EngineeringCollectionRequestPayload
+        {
+            Name = "portal-gear-assembly",
+            StrictValidation = true,
+            RunSimulation = true,
+            CreateZip = true,
+            DefaultMaxIterations = 4,
+            Parts = new List<EngineeringCollectionPartPayload>
+            {
+                new()
+                {
+                    Name = "drive_gear",
+                    Description = "Drive gear for portal assembly",
+                    PartType = "gear",
+                    Parameters = new Dictionary<string, double>
+                    {
+                        ["teeth"] = driveTeeth,
+                        ["module"] = module,
+                        ["bore_diameter_mm"] = 8.0,
+                        ["face_width_mm"] = 10.0
+                    },
+                    X = 0,
+                    Y = 0,
+                    Z = 0
+                },
+                new()
+                {
+                    Name = "driven_gear",
+                    Description = "Driven gear for portal assembly",
+                    PartType = "gear",
+                    Parameters = new Dictionary<string, double>
+                    {
+                        ["teeth"] = drivenTeeth,
+                        ["module"] = module,
+                        ["bore_diameter_mm"] = 10.0,
+                        ["face_width_mm"] = 10.0
+                    },
+                    X = module * (driveTeeth + drivenTeeth) * 0.5,
+                    Y = 0,
+                    Z = 0
+                },
+                new()
+                {
+                    Name = "gear_housing",
+                    Description = "Housing body for portal gear pair",
+                    PartType = "housing",
+                    Parameters = new Dictionary<string, double>
+                    {
+                        ["length_mm"] = 120.0,
+                        ["width_mm"] = 80.0,
+                        ["height_mm"] = 60.0,
+                        ["center_bore_mm"] = 26.0
+                    },
+                    X = (module * (driveTeeth + drivenTeeth) * 0.5) / 2.0,
+                    Y = -10.0,
+                    Z = -5.0
+                }
+            },
+            Connections = new List<EngineeringCollectionConnectionPayload>
+            {
+                new()
+                {
+                    From = "drive_gear",
+                    To = "driven_gear",
+                    Relation = "mesh",
+                    Motion = new EngineeringConnectionMotionPayload
+                    {
+                        Type = "rotational",
+                        Axis = new List<double> { 0, 0, 1 },
+                        RangeDeg = 180,
+                        Steps = 13,
+                        MovingPart = "driven_gear"
+                    }
+                },
+                new()
+                {
+                    From = "gear_housing",
+                    To = "drive_gear",
+                    Relation = "houses"
+                },
+                new()
+                {
+                    From = "gear_housing",
+                    To = "driven_gear",
+                    Relation = "houses"
+                }
+            }
+        };
+    }
+
+    private static string BuildCollectionPrompt(string description)
+    {
+        return $@"Convert this engineering request into JSON for DARCI's engineering collection pipeline.
+Return ONLY valid JSON. No markdown.
+
+Schema:
+{{
+  ""name"": ""string"",
+  ""parts"": [
+    {{
+      ""name"": ""string"",
+      ""description"": ""string"",
+      ""partType"": ""gear|shaft|bearing|pin|housing|plate|bracket|other"",
+      ""parameters"": {{ ""key"": number }},
+      ""x"": number,
+      ""y"": number,
+      ""z"": number
+    }}
+  ],
+  ""connections"": [
+    {{
+      ""from"": ""part-name"",
+      ""to"": ""part-name"",
+      ""relation"": ""mesh|mates|houses|retained|connects"",
+      ""motion"": {{
+        ""type"": ""rotational|linear"",
+        ""axis"": [x, y, z],
+        ""rangeDeg"": number,
+        ""rangeMm"": number,
+        ""steps"": number,
+        ""movingPart"": ""part-name""
+      }}
+    }}
+  ],
+  ""strictValidation"": true,
+  ""runSimulation"": true,
+  ""createZip"": true
+}}
+
+Request:
+{description}";
+    }
+
+    private static string? ExtractJsonObject(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return null;
+        }
+
+        var trimmed = text.Trim();
+        if (trimmed.Contains("```json", StringComparison.OrdinalIgnoreCase))
+        {
+            var start = trimmed.IndexOf("```json", StringComparison.OrdinalIgnoreCase) + "```json".Length;
+            var end = trimmed.IndexOf("```", start, StringComparison.Ordinal);
+            if (end > start)
+            {
+                trimmed = trimmed[start..end].Trim();
+            }
+        }
+        else if (trimmed.StartsWith("```", StringComparison.Ordinal))
+        {
+            var start = trimmed.IndexOf('\n');
+            var end = trimmed.LastIndexOf("```", StringComparison.Ordinal);
+            if (start > 0 && end > start)
+            {
+                trimmed = trimmed[(start + 1)..end].Trim();
+            }
+        }
+
+        var firstBrace = trimmed.IndexOf('{');
+        var lastBrace = trimmed.LastIndexOf('}');
+        if (firstBrace < 0 || lastBrace <= firstBrace)
+        {
+            return null;
+        }
+
+        return trimmed[firstBrace..(lastBrace + 1)];
+    }
+
+    private static int? ExtractInt(string text, string pattern)
+    {
+        var match = Regex.Match(text, pattern, RegexOptions.IgnoreCase);
+        if (!match.Success || match.Groups.Count < 2)
+        {
+            return null;
+        }
+
+        return int.TryParse(match.Groups[1].Value, out var value) ? value : null;
+    }
+
+    private static double? ExtractDouble(string text, string pattern)
+    {
+        var match = Regex.Match(text, pattern, RegexOptions.IgnoreCase);
+        if (!match.Success || match.Groups.Count < 2)
+        {
+            return null;
+        }
+
+        return double.TryParse(match.Groups[1].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out var value)
+            ? value
+            : null;
+    }
+
+    private static CollectionRunSummary ParseCollectionResponse(string body)
+    {
+        if (string.IsNullOrWhiteSpace(body))
+        {
+            return new CollectionRunSummary();
+        }
+
+        try
+        {
+            using var doc = JsonDocument.Parse(body);
+            var root = doc.RootElement;
+            var collection = root.TryGetProperty("collection", out var collectionEl) ? collectionEl : root;
+            var validation = collection.TryGetProperty("validation", out var valEl) ? valEl : default;
+            var simulation = root.TryGetProperty("simulation", out var simEl)
+                ? simEl
+                : (collection.TryGetProperty("simulation", out var nestedSimEl) ? nestedSimEl : default);
+
+            var summary = new CollectionRunSummary
+            {
+                OutputDir = collection.TryGetProperty("outputDir", out var outEl) ? outEl.GetString() : null,
+                ZipPath = collection.TryGetProperty("zipPath", out var zipEl) ? zipEl.GetString() : null,
+                ValidationPassed = validation.ValueKind == JsonValueKind.Object
+                    && validation.TryGetProperty("passed", out var passedEl)
+                    && passedEl.GetBoolean(),
+                SimulationPassed = simulation.ValueKind != JsonValueKind.Object
+                    || (simulation.TryGetProperty("passed", out var simPassedEl) && simPassedEl.GetBoolean())
+            };
+
+            if (validation.ValueKind == JsonValueKind.Object
+                && validation.TryGetProperty("issues", out var issuesEl)
+                && issuesEl.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var issue in issuesEl.EnumerateArray().Take(3))
+                {
+                    if (issue.TryGetProperty("message", out var msgEl))
+                    {
+                        var msg = msgEl.GetString();
+                        if (!string.IsNullOrWhiteSpace(msg))
+                        {
+                            summary.IssuePreview.Add(msg.Trim());
+                        }
+                    }
+                }
+            }
+
+            if (summary.IssuePreview.Count < 3
+                && simulation.ValueKind == JsonValueKind.Object
+                && simulation.TryGetProperty("issues", out var simIssuesEl)
+                && simIssuesEl.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var issue in simIssuesEl.EnumerateArray().Take(3 - summary.IssuePreview.Count))
+                {
+                    if (issue.TryGetProperty("message", out var msgEl))
+                    {
+                        var msg = msgEl.GetString();
+                        if (!string.IsNullOrWhiteSpace(msg))
+                        {
+                            summary.IssuePreview.Add(msg.Trim());
+                        }
+                    }
+                }
+            }
+
+            return summary;
+        }
+        catch
+        {
+            return new CollectionRunSummary();
+        }
+    }
     
     // ========== Status ==========
     
@@ -467,6 +916,80 @@ public class Darci : BackgroundService
         Energy = _state.Energy,
         CurrentActivity = _state.CurrentActivity
     };
+
+    private static string BuildGoalStepProgressNote(DarciAction action)
+    {
+        var actionLabel = action.Type switch
+        {
+            ActionType.Research => "Completed research step.",
+            ActionType.Think => "Completed generation/planning step.",
+            ActionType.Notify => "Completed notification step.",
+            ActionType.GenerateCAD => "Completed CAD generation step.",
+            ActionType.Engineer => "Completed engineering validation step.",
+            _ => "Completed goal step."
+        };
+
+        return string.IsNullOrWhiteSpace(action.Reasoning)
+            ? actionLabel
+            : $"{actionLabel} {action.Reasoning}";
+    }
+
+    private sealed class CollectionRunSummary
+    {
+        public string? OutputDir { get; init; }
+        public string? ZipPath { get; init; }
+        public bool ValidationPassed { get; init; }
+        public bool SimulationPassed { get; init; } = true;
+        public List<string> IssuePreview { get; } = new();
+    }
+
+    private sealed class EngineeringCollectionRequestPayload
+    {
+        public string Name { get; set; } = "engineering-collection";
+        public List<EngineeringCollectionPartPayload> Parts { get; set; } = new();
+        public List<EngineeringCollectionConnectionPayload>? Connections { get; set; }
+        public int? DefaultMaxIterations { get; set; }
+        public bool? StrictValidation { get; set; }
+        public bool? RunSimulation { get; set; }
+        public double? CollisionToleranceMm { get; set; }
+        public double? ClearanceTargetMm { get; set; }
+        public int? SimulationSamples { get; set; }
+        public bool? CreateZip { get; set; }
+    }
+
+    private sealed class EngineeringCollectionPartPayload
+    {
+        public string Name { get; set; } = "";
+        public string Description { get; set; } = "";
+        public string? PartType { get; set; }
+        public Dictionary<string, double>? Parameters { get; set; }
+        public int? MaxIterations { get; set; }
+        public double? X { get; set; }
+        public double? Y { get; set; }
+        public double? Z { get; set; }
+        public double? RxDeg { get; set; }
+        public double? RyDeg { get; set; }
+        public double? RzDeg { get; set; }
+    }
+
+    private sealed class EngineeringCollectionConnectionPayload
+    {
+        public string From { get; set; } = "";
+        public string To { get; set; } = "";
+        public string? Relation { get; set; }
+        public EngineeringConnectionMotionPayload? Motion { get; set; }
+    }
+
+    private sealed class EngineeringConnectionMotionPayload
+    {
+        public string? Type { get; set; }
+        public List<double>? Axis { get; set; }
+        public double? RangeDeg { get; set; }
+        public double? RangeMm { get; set; }
+        public int? Steps { get; set; }
+        public List<double>? PivotMm { get; set; }
+        public string? MovingPart { get; set; }
+    }
 }
 
 public class DarciStatus

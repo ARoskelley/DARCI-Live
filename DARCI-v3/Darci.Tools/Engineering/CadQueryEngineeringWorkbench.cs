@@ -136,7 +136,14 @@ public class CadQueryEngineeringWorkbench : IEngineeringWorkbench
                 return result;
             }
 
-            if (cadResult.Success)
+            var validationSummary = EvaluateToolValidation(
+                cadResult,
+                inferredPartType,
+                request.Parameters,
+                request.StrictToolValidation);
+            result.ValidationSummary = validationSummary;
+
+            if (cadResult.Success && validationSummary.Passed)
             {
                 result.Success = true;
                 if (usedDeterministicFallback)
@@ -147,9 +154,13 @@ public class CadQueryEngineeringWorkbench : IEngineeringWorkbench
             }
 
             var feedbackPrompt = await _cad.GetFeedbackPrompt(request.Description, cadResult);
+            feedbackPrompt = AppendToolValidationContext(
+                feedbackPrompt,
+                request.Description,
+                validationSummary);
             if (string.IsNullOrWhiteSpace(feedbackPrompt))
             {
-                result.Error = cadResult.Error ?? "CAD generation failed with no feedback.";
+                result.Error = BuildValidationFailureMessage(cadResult, validationSummary);
                 return result;
             }
 
@@ -191,7 +202,7 @@ public class CadQueryEngineeringWorkbench : IEngineeringWorkbench
                     }
                 }
 
-                result.Error = cadResult.Error ?? "No improved CAD revision produced.";
+                result.Error = BuildValidationFailureMessage(cadResult, validationSummary);
                 return result;
             }
 
@@ -538,6 +549,215 @@ Request: {description}{dims}{typeLine}{paramLine}";
         }
 
         return parameters.TryGetValue(key, out var value) ? value : fallback;
+    }
+
+    private static EngineeringValidationSummary EvaluateToolValidation(
+        CadGenerateResponse cadResult,
+        string? partType,
+        Dictionary<string, double>? parameters,
+        bool strictValidation)
+    {
+        var summary = new EngineeringValidationSummary();
+
+        if (!cadResult.Success)
+        {
+            summary.Errors.Add(cadResult.Error ?? "CAD generation failed.");
+            summary.Passed = false;
+            return summary;
+        }
+
+        var validation = cadResult.Validation;
+        if (validation == null)
+        {
+            summary.Errors.Add("CAD response did not include validation payload.");
+            summary.Passed = false;
+            return summary;
+        }
+
+        if (validation.Warnings.Count > 0)
+        {
+            summary.Warnings.AddRange(validation.Warnings);
+        }
+
+        if (!strictValidation)
+        {
+            summary.Passed = true;
+            return summary;
+        }
+
+        if (!validation.IsWatertight)
+        {
+            summary.Errors.Add("Mesh is not watertight.");
+        }
+
+        var bb = validation.BoundingBoxMm ?? new Dictionary<string, float>();
+        var x = bb.GetValueOrDefault("x", 0f);
+        var y = bb.GetValueOrDefault("y", 0f);
+        var z = bb.GetValueOrDefault("z", 0f);
+
+        if (x <= 0 || y <= 0 || z <= 0)
+        {
+            summary.Errors.Add("Bounding box is missing or has non-positive dimensions.");
+        }
+
+        var minTriangles = GetMinimumTriangleCount(partType, parameters);
+        if (validation.TriangleCount < minTriangles)
+        {
+            summary.Errors.Add(
+                $"Triangle count {validation.TriangleCount} is below the minimum expected {minTriangles} for part type '{partType ?? "unknown"}'.");
+        }
+
+        var expectedLength = ParameterOrNull(parameters, "length_mm");
+        var expectedWidth = ParameterOrNull(parameters, "width_mm");
+        var expectedHeight = ParameterOrNull(parameters, "height_mm");
+        CheckDimension(summary, "length", expectedLength, x);
+        CheckDimension(summary, "width", expectedWidth, y);
+        CheckDimension(summary, "height", expectedHeight, z);
+
+        var type = NormalizePartType(partType);
+        var radialMajor = Math.Max(x, y);
+        var radialMinor = Math.Min(x, y);
+
+        if (type is "shaft" or "pin")
+        {
+            var expectedDiameter = ParameterOrNull(parameters, "diameter_mm");
+            CheckDimension(summary, "diameter", expectedDiameter, radialMajor, toleranceRatio: 0.2);
+
+            if (radialMinor > 0.01)
+            {
+                var ratio = radialMajor / radialMinor;
+                if (ratio > 1.2)
+                {
+                    summary.Warnings.Add(
+                        $"Cross-section ratio is {ratio.ToString("0.###", CultureInfo.InvariantCulture)}; expected near-cylindrical section.");
+                }
+            }
+        }
+
+        if (type == "bearing")
+        {
+            CheckDimension(summary, "outer_diameter", ParameterOrNull(parameters, "outer_diameter_mm"), radialMajor, toleranceRatio: 0.2);
+            CheckDimension(summary, "width", ParameterOrNull(parameters, "width_mm"), z, toleranceRatio: 0.2);
+        }
+
+        if (type == "gear")
+        {
+            var module = ParameterOrNull(parameters, "module");
+            var teeth = ParameterOrNull(parameters, "teeth");
+            if (module.HasValue && teeth.HasValue)
+            {
+                var expectedOuter = module.Value * (teeth.Value + 2.0);
+                CheckDimension(summary, "gear_outer_diameter", expectedOuter, radialMajor, toleranceRatio: 0.35);
+            }
+        }
+
+        summary.Passed = summary.Errors.Count == 0;
+        return summary;
+    }
+
+    private static string? AppendToolValidationContext(
+        string? feedbackPrompt,
+        string originalRequest,
+        EngineeringValidationSummary validationSummary)
+    {
+        if (validationSummary.Passed || validationSummary.Errors.Count == 0)
+        {
+            return feedbackPrompt;
+        }
+
+        var failures = string.Join(
+            "\n",
+            validationSummary.Errors.Select(e => $"- {e}"));
+        var warnings = validationSummary.Warnings.Count == 0
+            ? ""
+            : "\nTool warnings:\n" + string.Join("\n", validationSummary.Warnings.Select(w => $"- {w}"));
+
+        var extra = $@"
+Additional deterministic engineering checks FAILED:
+{failures}{warnings}
+
+Revise the CadQuery script to satisfy these checks while preserving already-correct geometry.
+Output ONLY the corrected Python script (assign final solid to `result`).";
+
+        if (string.IsNullOrWhiteSpace(feedbackPrompt))
+        {
+            return $@"Original request: {originalRequest}
+{extra}";
+        }
+
+        return feedbackPrompt + "\n\n" + extra.Trim();
+    }
+
+    private static string BuildValidationFailureMessage(
+        CadGenerateResponse cadResult,
+        EngineeringValidationSummary validationSummary)
+    {
+        if (validationSummary.Errors.Count == 0)
+        {
+            return cadResult.Error ?? "CAD generation failed with no feedback.";
+        }
+
+        var errors = string.Join("; ", validationSummary.Errors);
+        var prefix = string.IsNullOrWhiteSpace(cadResult.Error)
+            ? "Deterministic validation failed"
+            : cadResult.Error;
+        return $"{prefix}. {errors}";
+    }
+
+    private static int GetMinimumTriangleCount(string? partType, Dictionary<string, double>? parameters)
+    {
+        var normalized = NormalizePartType(partType);
+        var baseline = normalized switch
+        {
+            "gear" => 120,
+            "housing" => 90,
+            "bearing" => 70,
+            "shaft" => 36,
+            "pin" => 24,
+            "plate" => 18,
+            "bracket" => 24,
+            _ => 20
+        };
+
+        var teeth = ParameterOrNull(parameters, "teeth");
+        if (normalized == "gear" && teeth.HasValue)
+        {
+            baseline = Math.Max(baseline, (int)Math.Round(teeth.Value * 5.0));
+        }
+
+        return baseline;
+    }
+
+    private static double? ParameterOrNull(Dictionary<string, double>? parameters, string key)
+    {
+        if (parameters == null)
+        {
+            return null;
+        }
+
+        return parameters.TryGetValue(key, out var value) ? value : null;
+    }
+
+    private static void CheckDimension(
+        EngineeringValidationSummary summary,
+        string label,
+        double? expected,
+        double actual,
+        double toleranceRatio = 0.25,
+        double minToleranceMm = 0.8)
+    {
+        if (!expected.HasValue || expected.Value <= 0 || actual <= 0)
+        {
+            return;
+        }
+
+        var tolerance = Math.Max(minToleranceMm, Math.Abs(expected.Value) * toleranceRatio);
+        var error = Math.Abs(actual - expected.Value);
+        if (error > tolerance)
+        {
+            summary.Errors.Add(
+                $"{label} mismatch: expected about {expected.Value.ToString("0.###", CultureInfo.InvariantCulture)} mm, got {actual.ToString("0.###", CultureInfo.InvariantCulture)} mm.");
+        }
     }
 
     private static string BuildBoxScript(CadDimensionSpec? dimensions)

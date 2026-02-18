@@ -38,6 +38,7 @@ builder.Services.AddHttpClient<IOllamaClient, OllamaClient>();
 
 // HTTP client for Python CAD service
 builder.Services.AddHttpClient<ICadBridge, CadBridge>();
+builder.Services.AddHttpClient<IEngineeringAssemblySimulationClient, EngineeringAssemblySimulationClient>();
 builder.Services.AddHttpClient<KittyCadEngineeringProvider>();
 builder.Services.AddHttpClient<CadCoderEngineeringProvider>();
 builder.Services.AddSingleton<IEngineeringCadProvider>(sp => sp.GetRequiredService<KittyCadEngineeringProvider>());
@@ -293,7 +294,8 @@ app.MapPost("/engineering/execute", async (EngineeringExecuteRequest request, To
         Parameters = request.Parameters,
         ProviderOnly = request.ProviderOnly ?? false,
         Dimensions = dims,
-        MaxIterations = request.MaxIterations ?? 3
+        MaxIterations = request.MaxIterations ?? 3,
+        StrictToolValidation = request.StrictValidation ?? true
     });
 
     var bundle = EngineeringOutputBundler.Create(
@@ -317,7 +319,12 @@ app.MapPost("/engineering/execute", async (EngineeringExecuteRequest request, To
 });
 
 // Multi-part collection execution: generates a project folder + one collection zip.
-app.MapPost("/engineering/collection", async (EngineeringCollectionRequest request, Toolkit toolkit, IWebHostEnvironment env) =>
+app.MapPost("/engineering/collection", async (
+    EngineeringCollectionRequest request,
+    Toolkit toolkit,
+    IWebHostEnvironment env,
+    IEngineeringAssemblySimulationClient simulationClient,
+    CancellationToken ct) =>
 {
     if (request.Parts == null || request.Parts.Count == 0)
     {
@@ -354,7 +361,8 @@ app.MapPost("/engineering/collection", async (EngineeringCollectionRequest reque
             Parameters = part.Parameters,
             ProviderOnly = part.ProviderOnly ?? request.ProviderOnly ?? false,
             Dimensions = dims,
-            MaxIterations = maxIterations
+            MaxIterations = maxIterations,
+            StrictToolValidation = part.StrictValidation ?? request.StrictValidation ?? true
         });
 
         var partSlug = EngineeringOutputBundler.Slugify(partName);
@@ -373,6 +381,7 @@ app.MapPost("/engineering/collection", async (EngineeringCollectionRequest reque
             Success = result.Success,
             GenerationSource = result.GenerationSource,
             ProviderAttempts = result.ProviderAttempts,
+            ValidationSummary = result.ValidationSummary,
             PartDir = partBundle.OutputDir,
             Files = partBundle.FilesWritten,
             BoundingBoxMm = result.CadResult?.Validation?.BoundingBoxMm,
@@ -396,11 +405,60 @@ app.MapPost("/engineering/collection", async (EngineeringCollectionRequest reque
         })
         .ToList();
 
+    var simulationConnections = (request.Connections ?? new List<EngineeringCollectionConnectionRequest>())
+        .Select(c => new EngineeringAssemblySimulationConnection
+        {
+            From = c.From,
+            To = c.To,
+            Relation = c.Relation ?? "connects",
+            Motion = c.Motion == null
+                ? null
+                : new EngineeringAssemblyMotionSpec
+                {
+                    Type = c.Motion.Type,
+                    Axis = c.Motion.Axis,
+                    RangeDeg = c.Motion.RangeDeg,
+                    RangeMm = c.Motion.RangeMm,
+                    Steps = c.Motion.Steps,
+                    PivotMm = c.Motion.PivotMm,
+                    MovingPart = c.Motion.MovingPart
+                }
+        })
+        .ToList();
+
     var collectionName = string.IsNullOrWhiteSpace(request.Name)
         ? "engineering-collection"
         : request.Name.Trim();
 
     var validation = EngineeringAssemblyValidator.Validate(partArtifacts, connections);
+    var runSimulation = request.RunSimulation ?? true;
+    EngineeringAssemblySimulationReport? simulation = null;
+    if (runSimulation && partArtifacts.Count(p => p.Success) >= 2)
+    {
+        var simulationParts = partArtifacts
+            .Select(p => new EngineeringAssemblySimulationPart
+            {
+                Name = p.Name,
+                PartType = p.PartType,
+                StlPath = Directory.GetFiles(p.PartDir, "*.stl", SearchOption.TopDirectoryOnly).FirstOrDefault(),
+                X = p.X ?? 0.0,
+                Y = p.Y ?? 0.0,
+                Z = p.Z ?? 0.0,
+                RxDeg = p.RxDeg ?? 0.0,
+                RyDeg = p.RyDeg ?? 0.0,
+                RzDeg = p.RzDeg ?? 0.0
+            })
+            .ToList();
+
+        simulation = await simulationClient.Simulate(new EngineeringAssemblySimulationRequest
+        {
+            Parts = simulationParts,
+            Connections = simulationConnections,
+            CollisionToleranceMm = request.CollisionToleranceMm ?? 0.1,
+            ClearanceTargetMm = request.ClearanceTargetMm ?? 0.2,
+            SamplePointsPerMesh = Math.Clamp(request.SimulationSamples ?? 256, 64, 2048)
+        }, ct);
+    }
 
     var collection = EngineeringCollectionBundler.Create(
         env.ContentRootPath,
@@ -408,9 +466,11 @@ app.MapPost("/engineering/collection", async (EngineeringCollectionRequest reque
         partArtifacts,
         connections,
         validation,
+        simulation,
         request.CreateZip ?? true);
 
     var allSuccess = partArtifacts.All(p => p.Success);
+    var simulationPassed = simulation?.Passed ?? true;
     var response = new
     {
         collection = new
@@ -426,7 +486,8 @@ app.MapPost("/engineering/collection", async (EngineeringCollectionRequest reque
             {
                 passed = validation.Passed,
                 issues = validation.Issues
-            }
+            },
+            simulation = simulation
         },
         parts = partArtifacts.Select(p => new
         {
@@ -435,15 +496,19 @@ app.MapPost("/engineering/collection", async (EngineeringCollectionRequest reque
             p.Success,
             p.GenerationSource,
             p.ProviderAttempts,
+            p.ValidationSummary,
             p.PartDir,
             p.Files,
             p.BoundingBoxMm,
             p.TriangleCount,
             p.Error
-        })
+        }),
+        simulation
     };
 
-    return (allSuccess && validation.Passed) ? Results.Ok(response) : Results.UnprocessableEntity(response);
+    return (allSuccess && validation.Passed && simulationPassed)
+        ? Results.Ok(response)
+        : Results.UnprocessableEntity(response);
 });
 
 app.MapGet("/engineering/providers/status", async (bool? probe, CancellationToken ct) =>
@@ -485,6 +550,7 @@ public record EngineeringExecuteRequest(
     string? PartType = null,
     Dictionary<string, double>? Parameters = null,
     bool? ProviderOnly = null,
+    bool? StrictValidation = null,
     bool? CreateZip = true);
 
 public record EngineeringCollectionRequest(
@@ -493,6 +559,11 @@ public record EngineeringCollectionRequest(
     List<EngineeringCollectionConnectionRequest>? Connections = null,
     int? DefaultMaxIterations = null,
     bool? ProviderOnly = null,
+    bool? StrictValidation = null,
+    bool? RunSimulation = null,
+    double? CollisionToleranceMm = null,
+    double? ClearanceTargetMm = null,
+    int? SimulationSamples = null,
     bool? CreateZip = true);
 
 public record EngineeringCollectionPartRequest(
@@ -505,6 +576,7 @@ public record EngineeringCollectionPartRequest(
     string? PartType = null,
     Dictionary<string, double>? Parameters = null,
     bool? ProviderOnly = null,
+    bool? StrictValidation = null,
     double? X = null,
     double? Y = null,
     double? Z = null,
@@ -515,4 +587,14 @@ public record EngineeringCollectionPartRequest(
 public record EngineeringCollectionConnectionRequest(
     string From,
     string To,
-    string? Relation = null);
+    string? Relation = null,
+    EngineeringConnectionMotionRequest? Motion = null);
+
+public record EngineeringConnectionMotionRequest(
+    string? Type = null,
+    List<double>? Axis = null,
+    double? RangeDeg = null,
+    double? RangeMm = null,
+    int? Steps = null,
+    List<double>? PivotMm = null,
+    string? MovingPart = null);

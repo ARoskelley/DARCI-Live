@@ -1,0 +1,33 @@
+Option A (recommended): explicit #collection JSON trigger
+1) Start your Telegram message with:
+   #collection
+2) Paste the full JSON payload from:
+   DARCI-v3/tmp/engineering/test_inputs/portal_axle_gate02_collection.json
+
+You can paste this exact opener:
+
+#collection
+Please run this Gate 02 front/rear portal axle engineering collection.
+Generate all parts, run strict validation, run fit/motion simulation, and send me the output directory + zip path + key issues.
+
+[PASTE JSON HERE]
+
+
+Option B: natural-language fallback (no JSON)
+Use this if you want DARCI to auto-build the payload:
+
+#collection Build a GATE 02 front and rear portal axle assembly with left and right sides based on this part set:
+- 42367 portal universal driveshaft
+- 42365 portal axle box
+- 91563 bearing 10x15x4
+- 25618 bearing 5x11x4
+- 42369 portal axle shaft
+- 42393 pin 2.5x12
+- portal gears 15T and 20T
+Run strict engineering validation and movement/fit simulation, then send me the output directory, zip path, and any critical issues.
+
+
+Notes
+- Option A is more deterministic.
+- Option B depends on DARCI's parsing/template logic.
+- If you want immediate execution from Telegram, keep the #collection tag in the first line.
