@@ -103,6 +103,8 @@ def simulate_assembly(
         )
 
     connection_map = _build_connection_map(connections)
+    static_sample_points = _effective_sample_points(sample_points_per_mesh, len(names))
+    motion_sample_points = max(64, static_sample_points // 2)
 
     static_pairs_checked = 0
     static_collision_count = 0
@@ -116,12 +118,19 @@ def simulate_assembly(
             mesh_b = transformed_meshes[part_b]
             static_pairs_checked += 1
 
-            clearance = _estimate_min_clearance_mm(mesh_a, mesh_b, sample_points_per_mesh)
+            relation = connection_map.get(_pair_key(part_a, part_b), "")
+            allows_contact = _allows_contact(relation)
+            coarse_gap = _aabb_gap_distance(mesh_a.bounds, mesh_b.bounds)
+            requires_detailed_clearance = relation != "" or coarse_gap <= max(clearance_target_mm * 3.0, 2.0)
+
+            clearance = (
+                _estimate_min_clearance_mm(mesh_a, mesh_b, static_sample_points)
+                if requires_detailed_clearance
+                else coarse_gap
+            )
             if np.isfinite(clearance):
                 global_min_clearance = min(global_min_clearance, clearance)
 
-            relation = connection_map.get(_pair_key(part_a, part_b), "")
-            allows_contact = _allows_contact(relation)
             overlap_tolerance = collision_tolerance_mm * (2.0 if allows_contact else 1.0)
             colliding, min_overlap, voxel_overlap = _detect_interference(
                 mesh_a,
@@ -184,27 +193,46 @@ def simulate_assembly(
         base_centroid = np.asarray(base_mesh.bounding_box.centroid, dtype=float)
         partner_name = to_name if moving_name == from_name else from_name
         sampled_params = _sample_motion_values(motion)
+        interaction_margin = max(
+            clearance_target_mm * 4.0,
+            _estimate_motion_span_mm(base_mesh, motion) + collision_tolerance_mm * 3.0,
+        )
         collision_steps: list[int] = []
         min_clearance = np.inf
+        potential_neighbors: list[tuple[str, trimesh.Trimesh, bool]] = []
+
+        for other_name, other_mesh in transformed_meshes.items():
+            if other_name == moving_name:
+                continue
+            is_partner = other_name == partner_name
+            if is_partner:
+                potential_neighbors.append((other_name, other_mesh, True))
+                continue
+
+            gap = _aabb_gap_distance(base_mesh.bounds, other_mesh.bounds)
+            if gap <= interaction_margin:
+                potential_neighbors.append((other_name, other_mesh, False))
 
         for idx, parameter in enumerate(sampled_params):
             moved = base_mesh.copy()
             moved.apply_transform(_motion_transform(motion, parameter, base_centroid))
 
             step_colliding = False
-            for other_name, other_mesh in transformed_meshes.items():
-                if other_name == moving_name:
+            for other_name, other_mesh, is_partner in potential_neighbors:
+                coarse_gap = _aabb_gap_distance(moved.bounds, other_mesh.bounds)
+                if np.isfinite(coarse_gap):
+                    min_clearance = min(min_clearance, coarse_gap)
+                if not is_partner and coarse_gap > max(clearance_target_mm * 3.0, 2.0):
                     continue
 
                 clearance = _estimate_min_clearance_mm(
                     moved,
                     other_mesh,
-                    max(64, sample_points_per_mesh // 2),
+                    motion_sample_points,
                 )
                 if np.isfinite(clearance):
                     min_clearance = min(min_clearance, clearance)
 
-                is_partner = other_name == partner_name
                 partner_contact = is_partner and _allows_contact(relation)
                 overlap_tolerance = collision_tolerance_mm * (2.0 if partner_contact else 1.0)
                 colliding, _, _ = _detect_interference(
@@ -414,6 +442,39 @@ def _aabb_overlap_depth(bounds_a: np.ndarray, bounds_b: np.ndarray) -> np.ndarra
     mins = np.maximum(bounds_a[0], bounds_b[0])
     maxs = np.minimum(bounds_a[1], bounds_b[1])
     return np.maximum(0.0, maxs - mins)
+
+
+def _aabb_gap_distance(bounds_a: np.ndarray, bounds_b: np.ndarray) -> float:
+    axis_gap = np.maximum(
+        np.maximum(bounds_a[0] - bounds_b[1], bounds_b[0] - bounds_a[1]),
+        0.0,
+    )
+    return float(np.linalg.norm(axis_gap))
+
+
+def _effective_sample_points(base_samples: int, part_count: int) -> int:
+    count = max(2, int(part_count))
+    if count <= 6:
+        scale = 1.0
+    elif count <= 10:
+        scale = 0.75
+    elif count <= 16:
+        scale = 0.55
+    else:
+        scale = 0.4
+    return int(np.clip(round(base_samples * scale), 64, 2048))
+
+
+def _estimate_motion_span_mm(mesh: trimesh.Trimesh, motion: dict) -> float:
+    if motion["type"] == "linear":
+        return abs(float(motion["range_mm"]))
+
+    if motion["type"] == "rotational":
+        radius = float(np.linalg.norm(mesh.extents) * 0.5)
+        angle_rad = np.deg2rad(abs(float(motion["range_deg"])))
+        return radius * angle_rad
+
+    return 0.0
 
 
 def _detect_interference(

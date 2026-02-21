@@ -21,8 +21,19 @@ public sealed class EngineeringAssemblySimulationClient : IEngineeringAssemblySi
     {
         _http = http;
         _logger = logger;
-        _http.BaseAddress = new Uri("http://localhost:8000");
-        _http.Timeout = TimeSpan.FromSeconds(120);
+
+        var pythonBaseUrl = Environment.GetEnvironmentVariable("DARCI_PYTHON_SERVICE_BASE_URL");
+        if (string.IsNullOrWhiteSpace(pythonBaseUrl))
+        {
+            pythonBaseUrl = "http://localhost:8000";
+        }
+
+        _http.BaseAddress = new Uri(pythonBaseUrl, UriKind.Absolute);
+        _http.Timeout = TimeSpan.FromSeconds(ReadTimeoutSeconds());
+        _logger.LogInformation(
+            "Engineering simulation client configured: baseUrl={BaseUrl}, timeoutSeconds={TimeoutSeconds}",
+            _http.BaseAddress,
+            _http.Timeout.TotalSeconds);
     }
 
     public async Task<EngineeringAssemblySimulationReport> Simulate(
@@ -41,6 +52,13 @@ public sealed class EngineeringAssemblySimulationClient : IEngineeringAssemblySi
             }
 
             return BuildFailure("Simulation service returned an empty response payload.");
+        }
+        catch (TaskCanceledException ex) when (!ct.IsCancellationRequested)
+        {
+            _logger.LogWarning(ex, "Engineering assembly simulation timed out after {TimeoutSeconds}s", _http.Timeout.TotalSeconds);
+            return BuildFailure(
+                $"Simulation service timeout after {_http.Timeout.TotalSeconds:0} seconds. " +
+                "Increase DARCI_SIMULATION_TIMEOUT_SECONDS or reduce simulation sample count.");
         }
         catch (Exception ex)
         {
@@ -64,6 +82,17 @@ public sealed class EngineeringAssemblySimulationClient : IEngineeringAssemblySi
                 }
             }
         };
+    }
+
+    private static int ReadTimeoutSeconds()
+    {
+        var raw = Environment.GetEnvironmentVariable("DARCI_SIMULATION_TIMEOUT_SECONDS");
+        if (int.TryParse(raw, out var value))
+        {
+            return Math.Clamp(value, 30, 3600);
+        }
+
+        return 900;
     }
 }
 

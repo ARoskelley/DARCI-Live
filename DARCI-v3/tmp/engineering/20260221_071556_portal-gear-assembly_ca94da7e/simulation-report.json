@@ -1,0 +1,17 @@
+{
+  "Passed": false,
+  "StaticPairsChecked": 0,
+  "StaticCollisionCount": 0,
+  "GlobalMinClearanceMm": null,
+  "MotionChecks": [],
+  "Issues": [
+    {
+      "Severity": "error",
+      "Code": "simulation_service_error",
+      "Message": "Simulation service call failed: The request was canceled due to the configured HttpClient.Timeout of 120 seconds elapsing.",
+      "PartA": null,
+      "PartB": null,
+      "Connection": null
+    }
+  ]
+}

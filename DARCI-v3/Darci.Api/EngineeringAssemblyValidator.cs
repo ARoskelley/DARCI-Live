@@ -129,13 +129,13 @@ public static class EngineeringAssemblyValidator
             });
         }
 
-        if (type == "gear" && string.Equals(part.GenerationSource, "deterministic:fallback", StringComparison.OrdinalIgnoreCase))
+        if (type == "gear" && IsDeterministicFallbackSource(part.GenerationSource))
         {
             issues.Add(new EngineeringValidationIssue
             {
-                Severity = "warning",
+                Severity = "error",
                 Code = "gear_used_box_fallback_path",
-                Message = $"Gear '{part.Name}' came from deterministic fallback path. Verify tooth profile and bore manually.",
+                Message = $"Gear '{part.Name}' came from deterministic fallback path. Meshing accuracy is unreliable without provider-generated geometry.",
                 PartA = part.Name
             });
         }
@@ -226,8 +226,36 @@ public static class EngineeringAssemblyValidator
 
             if (fromType == "gear" && toType == "gear")
             {
+                if (IsDeterministicFallbackSource(from.GenerationSource)
+                    || IsDeterministicFallbackSource(to.GenerationSource))
+                {
+                    issues.Add(new EngineeringValidationIssue
+                    {
+                        Severity = "error",
+                        Code = "gear_mesh_low_fidelity_source",
+                        Message = $"Gear mesh '{from.Name}' <-> '{to.Name}' uses fallback geometry; rerun with provider-backed CAD generation.",
+                        PartA = from.Name,
+                        PartB = to.Name
+                    });
+                }
+
                 var moduleA = P(from.Parameters, "module");
                 var moduleB = P(to.Parameters, "module");
+                var teethA = P(from.Parameters, "teeth");
+                var teethB = P(to.Parameters, "teeth");
+
+                if (!moduleA.HasValue || !moduleB.HasValue || !teethA.HasValue || !teethB.HasValue)
+                {
+                    issues.Add(new EngineeringValidationIssue
+                    {
+                        Severity = "error",
+                        Code = "gear_mesh_parameters_missing",
+                        Message = $"Gear mesh '{from.Name}' <-> '{to.Name}' requires module and teeth counts on both gears.",
+                        PartA = from.Name,
+                        PartB = to.Name
+                    });
+                }
+
                 if (moduleA.HasValue && moduleB.HasValue && !Within(moduleA.Value, moduleB.Value, 0.05))
                 {
                     issues.Add(new EngineeringValidationIssue
@@ -240,8 +268,6 @@ public static class EngineeringAssemblyValidator
                     });
                 }
 
-                var teethA = P(from.Parameters, "teeth");
-                var teethB = P(to.Parameters, "teeth");
                 if (moduleA.HasValue && moduleB.HasValue && teethA.HasValue && teethB.HasValue &&
                     from.X.HasValue && from.Y.HasValue && to.X.HasValue && to.Y.HasValue)
                 {
@@ -331,6 +357,16 @@ public static class EngineeringAssemblyValidator
         if (ContainsAny(text, "plate", "flange", "panel")) return "plate";
         if (ContainsAny(text, "bracket", "mount")) return "bracket";
         return "";
+    }
+
+    private static bool IsDeterministicFallbackSource(string? generationSource)
+    {
+        if (string.IsNullOrWhiteSpace(generationSource))
+        {
+            return false;
+        }
+
+        return generationSource.Contains("deterministic:fallback", StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool IsCylindricalType(string type)

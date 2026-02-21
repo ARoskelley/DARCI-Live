@@ -285,11 +285,19 @@ public class Awareness
     private bool HasEngineeringCollectionTag(string text)
     {
         return StartsWithAny(text, "#collection", "/collection", "#assembly", "/assembly")
-            || ContainsAny(text, " #collection", " #assembly");
+            || StartsWithAny(text, "#collection-file", "/collection-file", "#assembly-file", "/assembly-file")
+            || ContainsAny(text, " #collection", " #assembly", " #collection-file", " #assembly-file");
     }
 
     private bool IsLikelyEngineeringCollectionRequest(string text)
     {
+        if (text.StartsWith("{", StringComparison.Ordinal)
+            && (text.Contains("\"parts\"", StringComparison.OrdinalIgnoreCase)
+                || text.Contains("\"connections\"", StringComparison.OrdinalIgnoreCase)))
+        {
+            return true;
+        }
+
         var assemblyTerms = new[]
         {
             "assembly", "multi-part", "multi part", "system",
@@ -339,6 +347,16 @@ public class Awareness
     {
         var trimmed = content.Trim();
         var lower = trimmed.ToLowerInvariant();
+        var fileTags = new[] { "#collection-file", "/collection-file", "#assembly-file", "/assembly-file" };
+        foreach (var tag in fileTags)
+        {
+            if (lower.StartsWith(tag, StringComparison.Ordinal))
+            {
+                // Keep file-directive tags intact so downstream parsing can resolve file paths.
+                return trimmed;
+            }
+        }
+
         var tags = new[] { "#collection", "/collection", "#assembly", "/assembly" };
 
         foreach (var tag in tags)

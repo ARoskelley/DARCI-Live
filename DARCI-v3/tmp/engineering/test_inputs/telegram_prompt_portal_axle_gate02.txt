@@ -1,16 +1,9 @@
-Option A (recommended): explicit #collection JSON trigger
-1) Start your Telegram message with:
-   #collection
-2) Paste the full JSON payload from:
-   DARCI-v3/tmp/engineering/test_inputs/portal_axle_gate02_collection.json
+Option A (recommended): file-based collection trigger (no long JSON in Telegram)
+Send this as a single Telegram message:
 
-You can paste this exact opener:
-
-#collection
-Please run this Gate 02 front/rear portal axle engineering collection.
-Generate all parts, run strict validation, run fit/motion simulation, and send me the output directory + zip path + key issues.
-
-[PASTE JSON HERE]
+#collection-file DARCI-v3/tmp/engineering/test_inputs/portal_axle_gate02_collection.json
+Run this Gate 02 front/rear portal axle engineering collection.
+Generate all parts, run strict validation, run fit/motion simulation, and send output directory + zip path + key issues.
 
 
 Option B: natural-language fallback (no JSON)
@@ -28,6 +21,6 @@ Run strict engineering validation and movement/fit simulation, then send me the 
 
 
 Notes
-- Option A is more deterministic.
+- Option A is more deterministic and avoids Telegram message length splitting.
 - Option B depends on DARCI's parsing/template logic.
-- If you want immediate execution from Telegram, keep the #collection tag in the first line.
+- For Option A, keep `#collection-file` on the first line.

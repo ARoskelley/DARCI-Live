@@ -480,15 +480,21 @@ public class Darci : BackgroundService
             "Starting engineering collection run. I will generate parts, run fit/motion simulation, and report results.",
             externalNotify: true);
 
-        var payload = await BuildCollectionRequestPayload(description);
+        var (payload, payloadSource) = await BuildCollectionRequestPayload(description);
         if (payload.Parts.Count == 0)
         {
             await _tools.SendMessage(
                 userId,
-                "I couldn't build a valid engineering collection payload. Include `#collection` plus JSON, or provide a clearer assembly specification.",
+                "I couldn't build a valid engineering collection payload. Use `#collection` with inline JSON, or `#collection-file <path-to-json>`.",
                 externalNotify: true);
             return null;
         }
+
+        _logger.LogInformation(
+            "Engineering collection payload source={Source}; parts={Parts}; connections={Connections}",
+            payloadSource,
+            payload.Parts.Count,
+            payload.Connections?.Count ?? 0);
 
         var apiBaseUrl = Environment.GetEnvironmentVariable("DARCI_API_BASE_URL")?.Trim();
         if (string.IsNullOrWhiteSpace(apiBaseUrl))
@@ -512,6 +518,8 @@ public class Darci : BackgroundService
         var lines = new List<string>
         {
             $"Engineering collection {statusText}.",
+            $"  Payload source: {payloadSource}",
+            $"  Payload: {payload.Parts.Count} parts, {payload.Connections?.Count ?? 0} connections",
             $"  Validation passed: {summary.ValidationPassed}",
             $"  Simulation passed: {summary.SimulationPassed}",
             $"  Output dir: {summary.OutputDir ?? "n/a"}"
@@ -530,7 +538,7 @@ public class Darci : BackgroundService
         await _tools.SendMessage(userId, message, externalNotify: true);
 
         await _tools.StoreMemory(
-            $"Engineering collection run for '{description}' {statusText}. Output={summary.OutputDir}; zip={summary.ZipPath}; validation={summary.ValidationPassed}; simulation={summary.SimulationPassed}",
+            $"Engineering collection run for '{description}' ({payloadSource}) {statusText}. Output={summary.OutputDir}; zip={summary.ZipPath}; validation={summary.ValidationPassed}; simulation={summary.SimulationPassed}",
             new[] { "engineering", "collection", passed ? "success" : "failure", userId });
 
         return new
@@ -538,23 +546,33 @@ public class Darci : BackgroundService
             success = passed,
             outputDir = summary.OutputDir,
             zipPath = summary.ZipPath,
+            payloadSource,
             validationPassed = summary.ValidationPassed,
             simulationPassed = summary.SimulationPassed
         };
     }
 
-    private async Task<EngineeringCollectionRequestPayload> BuildCollectionRequestPayload(string description)
+    private async Task<(EngineeringCollectionRequestPayload Payload, string Source)> BuildCollectionRequestPayload(string description)
     {
+        var fromFile = TryParseCollectionPayloadFromFileDirective(description, out var filePath);
+        if (fromFile != null)
+        {
+            var source = string.IsNullOrWhiteSpace(filePath)
+                ? "file-directive"
+                : $"file-directive:{filePath}";
+            return (NormalizeCollectionPayload(fromFile, description), source);
+        }
+
         var fromTaggedJson = TryParseCollectionPayload(description);
         if (fromTaggedJson != null)
         {
-            return NormalizeCollectionPayload(fromTaggedJson, description);
+            return (NormalizeCollectionPayload(fromTaggedJson, description), "inline-json");
         }
 
         var portalTemplate = TryBuildPortalCollectionTemplate(description);
         if (portalTemplate != null)
         {
-            return portalTemplate;
+            return (portalTemplate, "portal-template");
         }
 
         var prompt = BuildCollectionPrompt(description);
@@ -562,21 +580,55 @@ public class Darci : BackgroundService
         var fromLlm = TryParseCollectionPayload(llm);
         if (fromLlm != null)
         {
-            return NormalizeCollectionPayload(fromLlm, description);
+            return (NormalizeCollectionPayload(fromLlm, description), "llm-json");
         }
 
-        return NormalizeCollectionPayload(new EngineeringCollectionRequestPayload
-        {
-            Name = "engineering-collection",
-            Parts = new List<EngineeringCollectionPartPayload>
+        return (
+            NormalizeCollectionPayload(new EngineeringCollectionRequestPayload
             {
-                new()
+                Name = "engineering-collection",
+                Parts = new List<EngineeringCollectionPartPayload>
                 {
-                    Name = "main-part",
-                    Description = description
+                    new()
+                    {
+                        Name = "main-part",
+                        Description = description
+                    }
+                }
+            }, description),
+            "fallback-single-part");
+    }
+
+    private static EngineeringCollectionRequestPayload? TryParseCollectionPayloadFromFileDirective(
+        string raw,
+        out string? resolvedPath)
+    {
+        resolvedPath = null;
+        foreach (var candidate in ExtractCollectionFilePathCandidates(raw))
+        {
+            var path = ResolveCollectionFilePath(candidate);
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                continue;
+            }
+
+            try
+            {
+                var fileContent = File.ReadAllText(path);
+                var payload = TryParseCollectionPayload(fileContent);
+                if (payload != null)
+                {
+                    resolvedPath = path;
+                    return payload;
                 }
             }
-        }, description);
+            catch
+            {
+                // Keep scanning additional candidates.
+            }
+        }
+
+        return null;
     }
 
     private static EngineeringCollectionRequestPayload? TryParseCollectionPayload(string raw)
@@ -597,6 +649,180 @@ public class Darci : BackgroundService
         {
             return null;
         }
+    }
+
+    private static List<string> ExtractCollectionFilePathCandidates(string raw)
+    {
+        var candidates = new List<string>();
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return candidates;
+        }
+
+        var patterns = new[]
+        {
+            @"(?im)^\s*(?:#|/)?(?:collection|assembly)(?:-file|\s+file)\s*[:=]?\s*(?<path>.+?)\s*$",
+            @"(?im)^\s*collection[_\-\s]?file\s*[:=]\s*(?<path>.+?)\s*$",
+            @"(?im)^\s*assembly[_\-\s]?file\s*[:=]\s*(?<path>.+?)\s*$"
+        };
+
+        foreach (var pattern in patterns)
+        {
+            foreach (Match match in Regex.Matches(raw, pattern))
+            {
+                if (!match.Success)
+                {
+                    continue;
+                }
+
+                var path = NormalizePathToken(match.Groups["path"].Value);
+                if (IsLikelyJsonPath(path))
+                {
+                    candidates.Add(path);
+                }
+            }
+        }
+
+        var trimmed = NormalizePathToken(raw.Trim());
+        if (!raw.Contains('\n') && IsLikelyJsonPath(trimmed))
+        {
+            candidates.Add(trimmed);
+        }
+
+        return candidates
+            .Where(c => !string.IsNullOrWhiteSpace(c))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private static string NormalizePathToken(string rawPath)
+    {
+        if (string.IsNullOrWhiteSpace(rawPath))
+        {
+            return "";
+        }
+
+        var cleaned = rawPath.Trim().Trim('"', '\'', '`').Trim();
+        if (cleaned.EndsWith(".", StringComparison.Ordinal))
+        {
+            cleaned = cleaned[..^1];
+        }
+
+        return cleaned;
+    }
+
+    private static bool IsLikelyJsonPath(string candidatePath)
+    {
+        if (string.IsNullOrWhiteSpace(candidatePath))
+        {
+            return false;
+        }
+
+        return candidatePath.EndsWith(".json", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string? ResolveCollectionFilePath(string candidatePath)
+    {
+        var normalized = NormalizePathToken(candidatePath);
+        if (!IsLikelyJsonPath(normalized))
+        {
+            return null;
+        }
+
+        var possiblePaths = new List<string>();
+        void AddCandidate(string? path)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return;
+            }
+
+            try
+            {
+                possiblePaths.Add(Path.GetFullPath(path));
+            }
+            catch
+            {
+                // Ignore malformed candidate paths.
+            }
+        }
+
+        if (Path.IsPathRooted(normalized))
+        {
+            AddCandidate(normalized);
+        }
+        else
+        {
+            AddCandidate(Path.Combine(Directory.GetCurrentDirectory(), normalized));
+            AddCandidate(Path.Combine(AppContext.BaseDirectory, normalized));
+        }
+
+        var darciRoot = TryFindDarciRoot();
+        if (!string.IsNullOrWhiteSpace(darciRoot))
+        {
+            AddCandidate(Path.Combine(darciRoot, normalized));
+            var parentRoot = Directory.GetParent(darciRoot)?.FullName;
+            if (!string.IsNullOrWhiteSpace(parentRoot))
+            {
+                AddCandidate(Path.Combine(parentRoot, normalized));
+            }
+
+            var forward = normalized.Replace('\\', '/');
+            const string darciPrefix = "darci-v3/";
+            if (forward.StartsWith(darciPrefix, StringComparison.OrdinalIgnoreCase))
+            {
+                var tail = forward[darciPrefix.Length..].Replace('/', Path.DirectorySeparatorChar);
+                AddCandidate(Path.Combine(darciRoot, tail));
+            }
+        }
+
+        foreach (var candidate in possiblePaths.Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            if (File.Exists(candidate))
+            {
+                return candidate;
+            }
+        }
+
+        return null;
+    }
+
+    private static string? TryFindDarciRoot()
+    {
+        static string? Scan(string startPath)
+        {
+            if (string.IsNullOrWhiteSpace(startPath))
+            {
+                return null;
+            }
+
+            DirectoryInfo? current;
+            try
+            {
+                current = new DirectoryInfo(startPath);
+            }
+            catch
+            {
+                return null;
+            }
+
+            while (current != null)
+            {
+                var hasApi = Directory.Exists(Path.Combine(current.FullName, "Darci.Api"));
+                var hasSolution = File.Exists(Path.Combine(current.FullName, "DARCI.sln"));
+                if (hasApi && hasSolution)
+                {
+                    return current.FullName;
+                }
+
+                current = current.Parent;
+            }
+
+            return null;
+        }
+
+        return Scan(Directory.GetCurrentDirectory())
+            ?? Scan(AppContext.BaseDirectory);
     }
 
     private static EngineeringCollectionRequestPayload NormalizeCollectionPayload(

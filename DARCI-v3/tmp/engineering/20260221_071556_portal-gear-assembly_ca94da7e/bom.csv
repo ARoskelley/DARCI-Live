@@ -1,0 +1,4 @@
+part_name,part_type,description,success,generation_source,bbox_x,bbox_y,bbox_z,triangles,part_dir
+"drive_gear","gear","drive_gear: Drive gear for portal assembly",true,"deterministic:fast",26.327,26.327,10,1152,"C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\darci-v3\tmp\engineering\_collections_parts\20260221_071347_drive-gear_7e65317c"
+"driven_gear","gear","driven_gear: Driven gear for portal assembly",true,"deterministic:fast",50.327,50.327,10,1296,"C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\darci-v3\tmp\engineering\_collections_parts\20260221_071352_driven-gear_fa17bb76"
+"gear_housing","housing","gear_housing: Housing body for portal gear pair",true,"deterministic:fast",120,80,60,536,"C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\darci-v3\tmp\engineering\_collections_parts\20260221_071356_gear-housing_57e09723"

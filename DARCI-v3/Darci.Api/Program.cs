@@ -450,13 +450,23 @@ app.MapPost("/engineering/collection", async (
             })
             .ToList();
 
+        var requestedSamples = request.SimulationSamples ?? 256;
+        var adaptiveCap = partArtifacts.Count switch
+        {
+            <= 6 => 1024,
+            <= 10 => 768,
+            <= 16 => 512,
+            _ => 384
+        };
+        var effectiveSamples = Math.Clamp(requestedSamples, 64, adaptiveCap);
+
         simulation = await simulationClient.Simulate(new EngineeringAssemblySimulationRequest
         {
             Parts = simulationParts,
             Connections = simulationConnections,
             CollisionToleranceMm = request.CollisionToleranceMm ?? 0.1,
             ClearanceTargetMm = request.ClearanceTargetMm ?? 0.2,
-            SamplePointsPerMesh = Math.Clamp(request.SimulationSamples ?? 256, 64, 2048)
+            SamplePointsPerMesh = effectiveSamples
         }, ct);
     }
 
