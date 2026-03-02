@@ -1,9 +1,0 @@
-flowchart LR
-  subgraph portal_gear_assembly["portal-gear-assembly"]
-    drive_gear["drive_gear"]
-    driven_gear["driven_gear"]
-    gear_housing["gear_housing"]
-  end
-  drive_gear -->|"mesh"| driven_gear
-  gear_housing -->|"houses"| drive_gear
-  gear_housing -->|"houses"| driven_gear

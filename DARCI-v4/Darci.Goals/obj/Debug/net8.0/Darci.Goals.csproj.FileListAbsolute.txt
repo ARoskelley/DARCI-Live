@@ -1,0 +1,16 @@
+C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Goals\bin\Debug\net8.0\Darci.Goals.deps.json
+C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Goals\bin\Debug\net8.0\Darci.Goals.dll
+C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Goals\bin\Debug\net8.0\Darci.Goals.pdb
+C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Goals\bin\Debug\net8.0\Darci.Shared.dll
+C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Goals\bin\Debug\net8.0\Darci.Shared.pdb
+C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Goals\obj\Debug\net8.0\Darci.Goals.csproj.AssemblyReference.cache
+C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Goals\obj\Debug\net8.0\Darci.Goals.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Goals\obj\Debug\net8.0\Darci.Goals.AssemblyInfoInputs.cache
+C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Goals\obj\Debug\net8.0\Darci.Goals.AssemblyInfo.cs
+C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Goals\obj\Debug\net8.0\Darci.Goals.csproj.CoreCompileInputs.cache
+C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Goals\obj\Debug\net8.0\Darci.Goals.sourcelink.json
+C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Goals\obj\Debug\net8.0\Darci.Go.E1AD89CB.Up2Date
+C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Goals\obj\Debug\net8.0\Darci.Goals.dll
+C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Goals\obj\Debug\net8.0\refint\Darci.Goals.dll
+C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Goals\obj\Debug\net8.0\Darci.Goals.pdb
+C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Goals\obj\Debug\net8.0\ref\Darci.Goals.dll
