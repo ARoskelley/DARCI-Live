@@ -1,0 +1,5 @@
+# DARCI v4 Training Scripts - Python Dependencies
+torch>=2.0.0
+numpy>=1.24.0
+onnx>=1.14.0
+onnxruntime>=1.15.0
