@@ -9,15 +9,13 @@ namespace Darci.Core;
 /// <summary>
 /// DARCI's decision-making system.
 ///
-/// v4 changes (Phase 1 — instrumentation):
-///   After every call to <see cref="Decide"/>, the chosen action and the
-///   current state vector are logged to the <see cref="ExperienceBuffer"/>
-///   decision_log table. This data drives behavioral cloning in Phase 2.
+/// v4 Phase 3 — Neural decisions:
+///   When <see cref="IDecisionNetwork.IsAvailable"/> is true, the trained ONNX
+///   model drives action selection. The v3 priority ladder remains as a fallback
+///   when the model file is absent or fails to load.
 ///
-///   The v3 priority-ladder logic is preserved verbatim so the network
-///   has a high-quality teacher signal. Once the trained network is loaded
-///   (Phase 3), a future update will replace the ladder with a
-///   <see cref="IDecisionNetwork.SelectAction"/> call.
+///   Every decision (network or ladder) is logged to the experience buffer so
+///   the training pipeline can always see what was decided and why.
 /// </summary>
 public class Decision
 {
@@ -26,37 +24,221 @@ public class Decision
     private readonly IGoalManager _goals;
     private readonly IStateEncoder _encoder;
     private readonly ExperienceBuffer _buffer;
+    private readonly IDecisionNetwork _network;
 
     public Decision(
         ILogger<Decision> logger,
         IToolkit tools,
         IGoalManager goals,
         IStateEncoder encoder,
-        ExperienceBuffer buffer)
+        ExperienceBuffer buffer,
+        IDecisionNetwork network)
     {
-        _logger = logger;
-        _tools = tools;
-        _goals = goals;
+        _logger  = logger;
+        _tools   = tools;
+        _goals   = goals;
         _encoder = encoder;
-        _buffer = buffer;
+        _buffer  = buffer;
+        _network = network;
     }
 
     /// <summary>
     /// Given DARCI's current state and what she perceives, decide what to do.
-    /// Logs the (state_vector, action_id) pair to the experience buffer.
+    ///
+    /// When the neural network is available it drives the decision.
+    /// Otherwise the v3 priority ladder is used as fallback.
+    /// Every decision is logged for continuous training data collection.
     /// </summary>
     public async Task<DarciAction> Decide(State state, Perception perception)
     {
-        // Encode the state BEFORE running the priority ladder so the vector
-        // reflects the moment of decision, not the moment after acting.
         var stateVector = _encoder.Encode(state.ToEncoderInput(perception));
 
-        var action = await RunPriorityLadder(state, perception);
+        DarciAction action;
+        bool networkDecided = false;
+        float? confidence = null;
+        int actionId;
 
-        // Log for behavioral cloning (Phase 2 training data).
-        _ = LogDecisionAsync(stateVector, action);
+        if (_network.IsAvailable)
+        {
+            var actionMask = BuildActionMask(state, perception);
+            actionId = _network.SelectAction(stateVector, actionMask);
+
+            // Separate Predict call so we can compute the softmax confidence
+            var logits = _network.Predict(stateVector);
+            confidence = Softmax(logits, actionMask)[actionId];
+
+            action = await BrainActionToDarciAction(actionId, state, perception);
+            networkDecided = true;
+
+            _logger.LogDebug(
+                "Neural decision: {Action} (confidence: {Conf:P1})",
+                (BrainAction)actionId, confidence);
+        }
+        else
+        {
+            action = await RunPriorityLadder(state, perception);
+            actionId = ActionTypeToBrainAction(action.Type);
+        }
+
+        _ = LogDecisionAsync(stateVector, action, networkDecided, confidence, actionId);
 
         return action;
+    }
+
+    // =========================================================
+    // Neural decision helpers
+    // =========================================================
+
+    /// <summary>
+    /// Builds a 10-element validity mask from current state and perception.
+    /// Invalid actions get logit = -∞ before softmax so they never win.
+    /// Follows ARCHITECTURE.md §4.3.
+    /// </summary>
+    private bool[] BuildActionMask(State state, Perception perception)
+    {
+        var mask = new bool[10];
+        Array.Fill(mask, true);
+
+        bool hasMessages       = perception.NewMessages.Any(m => !m.IsProcessed);
+        bool hasPendingMemories = perception.PendingMemoriesToProcess > 0;
+        bool lowEnergy          = state.Energy < 0.2f;
+        bool quietHours         = perception.IsQuietHours;
+
+        if (!hasMessages)
+        {
+            mask[(int)BrainAction.ReplyToMessage] = false;
+            mask[(int)BrainAction.NotifyUser]     = false;
+        }
+
+        if (!hasPendingMemories)
+            mask[(int)BrainAction.ConsolidateMemories] = false;
+
+        if (lowEnergy)
+        {
+            mask[(int)BrainAction.Research] = false;
+            mask[(int)BrainAction.Think]    = false;
+        }
+
+        if (quietHours)
+            mask[(int)BrainAction.NotifyUser] = false;
+
+        return mask;
+    }
+
+    /// <summary>
+    /// Translates a BrainAction ID into a concrete <see cref="DarciAction"/> the
+    /// executor understands. The network picks WHICH action; this method applies
+    /// the same construction logic as the priority ladder (which goal, which message,
+    /// which topic, etc.).
+    /// </summary>
+    private async Task<DarciAction> BrainActionToDarciAction(
+        int brainAction, State state, Perception perception)
+    {
+        switch ((BrainAction)brainAction)
+        {
+            case BrainAction.Rest:
+                return DarciAction.Rest(TimeSpan.FromSeconds(5), "Neural network chose to rest");
+
+            case BrainAction.ReplyToMessage:
+            {
+                var msg = perception.NewMessages.FirstOrDefault(m => !m.IsProcessed)
+                       ?? perception.NewMessages.FirstOrDefault();
+                if (msg == null)
+                    return DarciAction.Rest(TimeSpan.FromSeconds(1), "Network chose reply but queue is empty");
+                return await DecideAndMarkProcessed(msg, state);
+            }
+
+            case BrainAction.Research:
+            {
+                var topic = perception.NewMessages.FirstOrDefault()?.Intent?.ExtractedTopic
+                         ?? perception.NewMessages.FirstOrDefault()?.Content
+                         ?? "open goals and recent context";
+                return DarciAction.Research(topic, state.CurrentGoalId, "Neural network initiated research");
+            }
+
+            case BrainAction.CreateGoal:
+            {
+                var msg = perception.NewMessages.FirstOrDefault();
+                if (msg != null)
+                    return await HandleTaskRequest(msg, state);
+                return DarciAction.Think(
+                    "what goals I should create next",
+                    "Neural network wants to create a goal but no message context");
+            }
+
+            case BrainAction.WorkOnGoal:
+            {
+                if (state.CurrentGoalId.HasValue)
+                    return await ContinueGoalWork(state.CurrentGoalId.Value, state);
+                var goal = await _goals.GetNextActionableGoal();
+                if (goal != null)
+                {
+                    state.StartActivity($"Working on: {goal.Title}", goal.Id);
+                    return DarciAction.WorkOn(goal.Id, "Neural network chose to work on goal");
+                }
+                return DarciAction.Rest(TimeSpan.FromSeconds(1), "Network chose WorkOnGoal but no goals available");
+            }
+
+            case BrainAction.StoreMemory:
+                return new DarciAction
+                {
+                    Type      = ActionType.Remember,
+                    Reasoning = "Neural network chose to store memory"
+                };
+
+            case BrainAction.RecallMemories:
+                return new DarciAction
+                {
+                    Type      = ActionType.Recall,
+                    Query     = "recent context",
+                    Reasoning = "Neural network chose to recall memories"
+                };
+
+            case BrainAction.ConsolidateMemories:
+                return new DarciAction
+                {
+                    Type      = ActionType.Consolidate,
+                    Reasoning = "Neural network chose to consolidate memories"
+                };
+
+            case BrainAction.NotifyUser:
+            {
+                var userId = perception.NewMessages.FirstOrDefault()?.UserId ?? "Tinman";
+                return new DarciAction
+                {
+                    Type        = ActionType.Notify,
+                    RecipientId = userId,
+                    Reasoning   = "Neural network chose to notify user"
+                };
+            }
+
+            case BrainAction.Think:
+            {
+                var topic = await ChooseThinkingTopic(state)
+                         ?? perception.NewMessages.FirstOrDefault()?.Intent?.ExtractedTopic
+                         ?? "how to be more helpful";
+                return DarciAction.Think(topic, "Neural network initiated self-reflection");
+            }
+
+            default:
+                return DarciAction.Rest(TimeSpan.FromSeconds(1), "Unrecognised neural action — resting");
+        }
+    }
+
+    /// <summary>
+    /// Softmax over logits with action masking.
+    /// Masked-out actions get probability 0 regardless of their logit value.
+    /// </summary>
+    private static float[] Softmax(float[] logits, bool[] mask)
+    {
+        var masked = new float[logits.Length];
+        for (int i = 0; i < logits.Length; i++)
+            masked[i] = mask[i] ? logits[i] : float.NegativeInfinity;
+
+        float max = masked.Where(x => !float.IsNegativeInfinity(x)).DefaultIfEmpty(0f).Max();
+        var exp   = masked.Select(x => float.IsNegativeInfinity(x) ? 0f : MathF.Exp(x - max)).ToArray();
+        float sum = exp.Sum();
+        return sum == 0f ? exp : exp.Select(x => x / sum).ToArray();
     }
 
     // =========================================================
@@ -147,16 +329,21 @@ public class Decision
     // Decision logging (Phase 1 instrumentation)
     // =========================================================
 
-    private async Task LogDecisionAsync(float[] stateVector, DarciAction action)
+    private async Task LogDecisionAsync(
+        float[] stateVector,
+        DarciAction action,
+        bool networkDecided,
+        float? confidence,
+        int actionId)
     {
         try
         {
             var log = new DecisionLog
             {
                 StateVector     = stateVector,
-                ActionChosen    = ActionTypeToBrainAction(action.Type),
-                NetworkDecision = false,   // v3 ladder — not the network
-                Confidence      = null,
+                ActionChosen    = actionId,
+                NetworkDecision = networkDecided,
+                Confidence      = confidence,
                 Timestamp       = DateTime.UtcNow
             };
 

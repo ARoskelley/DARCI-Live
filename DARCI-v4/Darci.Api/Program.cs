@@ -109,17 +109,26 @@ builder.Services.AddSingleton<ExperienceBuffer>(sp =>
         connectionString,
         logger: sp.GetRequiredService<ILogger<ExperienceBuffer>>()));
 
+// Decision Network: ONNX inference — falls back gracefully if model file is absent
+var modelPath = Path.Combine(AppContext.BaseDirectory, "Models", "darci_policy.onnx");
+builder.Services.AddSingleton<IDecisionNetwork>(sp =>
+    new OnnxDecisionNetwork(
+        sp.GetRequiredService<ILogger<OnnxDecisionNetwork>>(),
+        sp.GetRequiredService<ExperienceBuffer>(),
+        modelPath));
+
 // Core DARCI components (singletons - one consciousness)
 builder.Services.AddSingleton<Awareness>();
 builder.Services.AddSingleton<State>();
-// Constructor: (ILogger, IToolkit, IGoalManager, IStateEncoder, ExperienceBuffer)
+// Constructor: (ILogger, IToolkit, IGoalManager, IStateEncoder, ExperienceBuffer, IDecisionNetwork)
 builder.Services.AddSingleton<Decision>(sp =>
     new Decision(
         sp.GetRequiredService<ILogger<Decision>>(),
         sp.GetRequiredService<IToolkit>(),
         sp.GetRequiredService<IGoalManager>(),
         sp.GetRequiredService<IStateEncoder>(),
-        sp.GetRequiredService<ExperienceBuffer>()));
+        sp.GetRequiredService<ExperienceBuffer>(),
+        sp.GetRequiredService<IDecisionNetwork>()));
 
 // DARCI herself - the background service
 // Constructor: (ILogger, Awareness, Decision, State, IToolkit, IStateEncoder, ExperienceBuffer)
@@ -570,17 +579,35 @@ app.MapGet("/engineering/toolchain/setup", () =>
 
 // === v4 Brain / Neural Monitoring Endpoints ===
 
-// Brain status: experience buffer count, state encoder dimensions
-app.MapGet("/brain/status", async (ExperienceBuffer buffer, IStateEncoder encoder) =>
+// Brain status: network availability, experience buffer, training progress
+app.MapGet("/brain/status", async (ExperienceBuffer buffer, IStateEncoder encoder, IDecisionNetwork network) =>
 {
     var experienceCount = await buffer.CountAsync();
     return Results.Ok(new
     {
         version = "v4.0",
-        phase = "Phase 1 — Behavioral Cloning Data Collection",
+        phase = network.IsAvailable ? "Phase 3 — Neural Decision Making" : "Phase 1 — Data Collection",
         stateVectorDimensions = encoder.Dimensions,
         experienceBufferCount = experienceCount,
-        networkMode = "shadow" // network predicts but code still decides
+        networkAvailable = network.IsAvailable,
+        networkEpsilon = network.Epsilon,
+        networkTrainingSteps = network.TrainingSteps,
+        networkMode = network.IsAvailable ? "live" : "fallback"
+    });
+});
+
+// Hot-swap the neural model without restarting DARCI
+app.MapPost("/brain/load-model", async (IDecisionNetwork network) =>
+{
+    var path = Path.Combine(AppContext.BaseDirectory, "Models", "darci_policy.onnx");
+    if (!File.Exists(path))
+        return Results.NotFound(new { error = "No model file found at expected path", path });
+
+    await network.LoadModelAsync(path);
+    return Results.Ok(new
+    {
+        message = "Model loaded successfully",
+        isAvailable = network.IsAvailable
     });
 });
 
