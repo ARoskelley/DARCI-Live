@@ -16,4 +16,10 @@
     <ProjectReference Include="..\Darci.Brain\Darci.Brain.csproj" />
   </ItemGroup>
 
+  <!-- Copy ONNX model files from training output on build -->
+  <ItemGroup>
+    <None Include="..\Darci.Brain.Training\models\*.onnx" CopyToOutputDirectory="PreserveNewest" Link="Models\%(Filename)%(Extension)" />
+    <None Include="..\Darci.Brain.Training\models\*.onnx.data" CopyToOutputDirectory="PreserveNewest" Link="Models\%(Filename)%(Extension)" />
+  </ItemGroup>
+
 </Project>

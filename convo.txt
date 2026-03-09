@@ -1,0 +1,906 @@
+info: Darci.Core.Darci[0]
+      DARCI is waking up...
+info: Darci.Personality.PersonalityEngine[0]
+      Loaded personality traits - Warmth: 60 %, Trust: 40 %
+info: Darci.Core.State[0]
+      DARCI state initialized. Mood: Satisfied, Energy: 99 %
+info: Darci.Brain.ExperienceBuffer[0]
+      ExperienceBuffer initialised (capacity=10000)
+info: Darci.Core.Darci[0]
+      DARCI is alive. Experience buffer ready.
+dbug: Darci.Core.Awareness[0]
+      Perception: 0 messages, 0 completions, 3 goal events
+dbug: Darci.Core.Decision[0]
+      Neural decision: Think (confidence: 1.7 %)
+dbug: Darci.Tools.Ollama.OllamaClient[0]
+      Generating with gemma2:9b, prompt length: 42
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:11434/api/generate
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[100]
+      Sending HTTP request POST http://localhost:11434/api/generate
+info: Microsoft.Hosting.Lifetime[14]
+      Now listening on: http://localhost:5081
+info: Microsoft.Hosting.Lifetime[0]
+      Application started. Press Ctrl+C to shut down.
+info: Microsoft.Hosting.Lifetime[0]
+      Hosting environment: Development
+info: Microsoft.Hosting.Lifetime[0]
+      Content root path: C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\darci-v4\darci.api
+info: System.Net.Http.HttpClient.Default.ClientHandler[101]
+      Received HTTP response headers after 30589.9937ms - 200
+info: System.Net.Http.HttpClient.Default.LogicalHandler[101]
+      End processing HTTP request after 30599.3815ms - 200
+dbug: Darci.Api.TelegramInboundService[0]
+      Telegram inbound poll completed; offset=0, updates=0
+info: System.Net.Http.HttpClient.Default.LogicalHandler[100]
+      Start processing HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=1
+info: System.Net.Http.HttpClient.Default.ClientHandler[100]
+      Sending HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=1
+info: System.Net.Http.HttpClient.Default.ClientHandler[101]
+      Received HTTP response headers after 30166.0836ms - 200
+info: System.Net.Http.HttpClient.Default.LogicalHandler[101]
+      End processing HTTP request after 30166.2603ms - 200
+dbug: Darci.Api.TelegramInboundService[0]
+      Telegram inbound poll completed; offset=0, updates=0
+info: System.Net.Http.HttpClient.Default.LogicalHandler[100]
+      Start processing HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=1
+info: System.Net.Http.HttpClient.Default.ClientHandler[100]
+      Sending HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=1
+info: System.Net.Http.HttpClient.Default.ClientHandler[101]
+      Received HTTP response headers after 30169.8743ms - 200
+info: System.Net.Http.HttpClient.Default.LogicalHandler[101]
+      End processing HTTP request after 30170.3348ms - 200
+dbug: Darci.Api.TelegramInboundService[0]
+      Telegram inbound poll completed; offset=0, updates=0
+info: System.Net.Http.HttpClient.Default.LogicalHandler[100]
+      Start processing HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=1
+info: System.Net.Http.HttpClient.Default.ClientHandler[100]
+      Sending HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=1
+info: System.Net.Http.HttpClient.Default.ClientHandler[101]
+      Received HTTP response headers after 16317.0481ms - 200
+info: System.Net.Http.HttpClient.Default.LogicalHandler[101]
+      End processing HTTP request after 16317.1706ms - 200
+info: Darci.Core.Awareness[0]
+      Message received from Tinman: Hey DARCI, how are you?...
+info: Darci.Api.TelegramInboundService[0]
+      Accepted Telegram inbound message for DARCI from chat 8587072376
+dbug: Darci.Api.TelegramInboundService[0]
+      Telegram inbound poll completed; offset=560617945, updates=1
+info: System.Net.Http.HttpClient.Default.LogicalHandler[100]
+      Start processing HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=560617946
+info: System.Net.Http.HttpClient.Default.ClientHandler[100]
+      Sending HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=560617946
+info: System.Net.Http.HttpClient.Default.ClientHandler[101]
+      Received HTTP response headers after 30155.3101ms - 200
+info: System.Net.Http.HttpClient.Default.LogicalHandler[101]
+      End processing HTTP request after 30155.4164ms - 200
+dbug: Darci.Api.TelegramInboundService[0]
+      Telegram inbound poll completed; offset=560617945, updates=0
+info: System.Net.Http.HttpClient.Default.LogicalHandler[100]
+      Start processing HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=560617946
+info: System.Net.Http.HttpClient.Default.ClientHandler[100]
+      Sending HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=560617946
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[101]
+      Received HTTP response headers after 149604.6132ms - 200
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[101]
+      End processing HTTP request after 149604.7118ms - 200
+dbug: Darci.Tools.Ollama.OllamaClient[0]
+      Generated 2263 chars
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:11434/api/embed
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[100]
+      Sending HTTP request POST http://localhost:11434/api/embed
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[101]
+      Received HTTP response headers after 1818.4275ms - 200
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[101]
+      End processing HTTP request after 1818.6082ms - 200
+dbug: Darci.Memory.MemoryStore[0]
+      Stored memory: Reflection: As an AI assistant, my purpose is to b...
+dbug: Darci.Core.Darci[0]
+      Action Think completed in 151472ms: Neural network initiated self-reflection
+dbug: Darci.Core.Darci[0]
+      Reward: +0.1 for action Think
+dbug: Darci.Core.Awareness[0]
+      Perception: 1 messages, 0 completions, 3 goal events
+dbug: Darci.Brain.ExperienceBuffer[0]
+      Evicted 1 oldest experiences (buffer at capacity)
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:11434/api/embed
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[100]
+      Sending HTTP request POST http://localhost:11434/api/embed
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[101]
+      Received HTTP response headers after 80.9635ms - 200
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[101]
+      End processing HTTP request after 81.0514ms - 200
+dbug: Darci.Memory.MemoryStore[0]
+      Recalled 5 memories for query: Hey DARCI, how are you?
+dbug: Darci.Tools.Ollama.OllamaClient[0]
+      Generating with gemma2:9b, prompt length: 3381
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:11434/api/generate
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[100]
+      Sending HTTP request POST http://localhost:11434/api/generate
+info: System.Net.Http.HttpClient.Default.ClientHandler[101]
+      Received HTTP response headers after 30518.7751ms - 200
+info: System.Net.Http.HttpClient.Default.LogicalHandler[101]
+      End processing HTTP request after 30518.8668ms - 200
+dbug: Darci.Api.TelegramInboundService[0]
+      Telegram inbound poll completed; offset=560617945, updates=0
+info: System.Net.Http.HttpClient.Default.LogicalHandler[100]
+      Start processing HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=560617946
+info: System.Net.Http.HttpClient.Default.ClientHandler[100]
+      Sending HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=560617946
+info: System.Net.Http.HttpClient.Default.ClientHandler[101]
+      Received HTTP response headers after 30158.4774ms - 200
+info: System.Net.Http.HttpClient.Default.LogicalHandler[101]
+      End processing HTTP request after 30158.5634ms - 200
+dbug: Darci.Api.TelegramInboundService[0]
+      Telegram inbound poll completed; offset=560617945, updates=0
+info: System.Net.Http.HttpClient.Default.LogicalHandler[100]
+      Start processing HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=560617946
+info: System.Net.Http.HttpClient.Default.ClientHandler[100]
+      Sending HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=560617946
+info: System.Net.Http.HttpClient.Default.ClientHandler[101]
+      Received HTTP response headers after 30164.9182ms - 200
+info: System.Net.Http.HttpClient.Default.LogicalHandler[101]
+      End processing HTTP request after 30165.1632ms - 200
+dbug: Darci.Api.TelegramInboundService[0]
+      Telegram inbound poll completed; offset=560617945, updates=0
+info: System.Net.Http.HttpClient.Default.LogicalHandler[100]
+      Start processing HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=560617946
+info: System.Net.Http.HttpClient.Default.ClientHandler[100]
+      Sending HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=560617946
+info: System.Net.Http.HttpClient.Default.ClientHandler[101]
+      Received HTTP response headers after 30158.3925ms - 200
+info: System.Net.Http.HttpClient.Default.LogicalHandler[101]
+      End processing HTTP request after 30158.4998ms - 200
+dbug: Darci.Api.TelegramInboundService[0]
+      Telegram inbound poll completed; offset=560617945, updates=0
+info: System.Net.Http.HttpClient.Default.LogicalHandler[100]
+      Start processing HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=560617946
+info: System.Net.Http.HttpClient.Default.ClientHandler[100]
+      Sending HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=560617946
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[101]
+      Received HTTP response headers after 133534.9423ms - 200
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[101]
+      End processing HTTP request after 133535.0159ms - 200
+dbug: Darci.Tools.Ollama.OllamaClient[0]
+      Generated 116 chars
+dbug: Darci.Core.Decision[0]
+      Neural decision: ReplyToMessage (confidence: 99.3 %)
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:11434/api/embed
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[100]
+      Sending HTTP request POST http://localhost:11434/api/embed
+info: Darci.Tools.Notifications.EmailNotificationProvider[0]
+      Sending EMAIL notification to aroskelley2112@gmail.com
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[101]
+      Received HTTP response headers after 151.0697ms - 200
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[101]
+      End processing HTTP request after 151.1773ms - 200
+dbug: Darci.Memory.MemoryStore[0]
+      Stored memory: I said to Tinman: I'm doing well, thank you!  Just...
+info: Darci.Core.Darci[0]
+      Replied to Tinman: I'm doing well, thank you!  Just enjoying a bit of...
+dbug: Darci.Core.Darci[0]
+      Action Reply completed in 166ms: Responding to user message
+dbug: Darci.Core.Darci[0]
+      Reward: +1.0 for action Reply
+dbug: Darci.Core.Awareness[0]
+      Perception: 0 messages, 0 completions, 3 goal events
+dbug: Darci.Brain.ExperienceBuffer[0]
+      Evicted 1 oldest experiences (buffer at capacity)
+dbug: Darci.Core.Decision[0]
+      Neural decision: Rest (confidence: 96.9 %)
+dbug: Darci.Core.Darci[0]
+      Reward: +0.1 for action Rest
+info: Darci.Tools.Notifications.TelegramNotificationProvider[0]
+      Sending Telegram notification to chat 8587072376
+info: System.Net.Http.HttpClient.Default.LogicalHandler[100]
+      Start processing HTTP request POST https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/sendMessage        
+info: System.Net.Http.HttpClient.Default.ClientHandler[100]
+      Sending HTTP request POST https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/sendMessage
+info: System.Net.Http.HttpClient.Default.ClientHandler[101]
+      Received HTTP response headers after 647.6069ms - 200
+info: System.Net.Http.HttpClient.Default.LogicalHandler[101]
+      End processing HTTP request after 647.7432ms - 200
+info: System.Net.Http.HttpClient.Default.ClientHandler[101]
+      Received HTTP response headers after 30455.8216ms - 200
+info: System.Net.Http.HttpClient.Default.LogicalHandler[101]
+      End processing HTTP request after 30455.899ms - 200
+dbug: Darci.Api.TelegramInboundService[0]
+      Telegram inbound poll completed; offset=560617945, updates=0
+info: System.Net.Http.HttpClient.Default.LogicalHandler[100]
+      Start processing HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=560617946
+info: System.Net.Http.HttpClient.Default.ClientHandler[100]
+      Sending HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=560617946
+dbug: Darci.Core.Awareness[0]
+      Perception: 0 messages, 0 completions, 3 goal events
+dbug: Darci.Brain.ExperienceBuffer[0]
+      Evicted 1 oldest experiences (buffer at capacity)
+dbug: Darci.Core.Decision[0]
+      Neural decision: Rest (confidence: 97.3 %)
+dbug: Darci.Core.Darci[0]
+      Reward: +0.1 for action Rest
+dbug: Darci.Core.Awareness[0]
+      Perception: 0 messages, 0 completions, 3 goal events
+dbug: Darci.Brain.ExperienceBuffer[0]
+      Evicted 1 oldest experiences (buffer at capacity)
+dbug: Darci.Core.Decision[0]
+      Neural decision: Think (confidence: 2.2 %)
+dbug: Darci.Tools.Ollama.OllamaClient[0]
+      Generating with gemma2:9b, prompt length: 42
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:11434/api/generate
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[100]
+      Sending HTTP request POST http://localhost:11434/api/generate
+info: System.Net.Http.HttpClient.Default.ClientHandler[101]
+      Received HTTP response headers after 30142.7546ms - 200
+info: System.Net.Http.HttpClient.Default.LogicalHandler[101]
+      End processing HTTP request after 30142.9596ms - 200
+dbug: Darci.Api.TelegramInboundService[0]
+      Telegram inbound poll completed; offset=560617945, updates=0
+info: System.Net.Http.HttpClient.Default.LogicalHandler[100]
+      Start processing HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=560617946
+info: System.Net.Http.HttpClient.Default.ClientHandler[100]
+      Sending HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=560617946
+info: System.Net.Http.HttpClient.Default.ClientHandler[101]
+      Received HTTP response headers after 30144.4278ms - 200
+info: System.Net.Http.HttpClient.Default.LogicalHandler[101]
+      End processing HTTP request after 30144.5511ms - 200
+dbug: Darci.Api.TelegramInboundService[0]
+      Telegram inbound poll completed; offset=560617945, updates=0
+info: System.Net.Http.HttpClient.Default.LogicalHandler[100]
+      Start processing HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=560617946
+info: System.Net.Http.HttpClient.Default.ClientHandler[100]
+      Sending HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=560617946
+info: System.Net.Http.HttpClient.Default.ClientHandler[101]
+      Received HTTP response headers after 21399.9686ms - 200
+info: System.Net.Http.HttpClient.Default.LogicalHandler[101]
+      End processing HTTP request after 21400.047ms - 200
+info: Darci.Core.Awareness[0]
+      Message received from Tinman: I’m pretty good! Just testing some coding stuff, n...
+info: Darci.Api.TelegramInboundService[0]
+      Accepted Telegram inbound message for DARCI from chat 8587072376
+dbug: Darci.Api.TelegramInboundService[0]
+      Telegram inbound poll completed; offset=560617946, updates=1
+info: System.Net.Http.HttpClient.Default.LogicalHandler[100]
+      Start processing HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=560617947
+info: System.Net.Http.HttpClient.Default.ClientHandler[100]
+      Sending HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=560617947
+info: System.Net.Http.HttpClient.Default.ClientHandler[101]
+      Received HTTP response headers after 30150.7399ms - 200
+info: System.Net.Http.HttpClient.Default.LogicalHandler[101]
+      End processing HTTP request after 30151.0601ms - 200
+dbug: Darci.Api.TelegramInboundService[0]
+      Telegram inbound poll completed; offset=560617946, updates=0
+info: System.Net.Http.HttpClient.Default.LogicalHandler[100]
+      Start processing HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=560617947
+info: System.Net.Http.HttpClient.Default.ClientHandler[100]
+      Sending HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=560617947
+info: System.Net.Http.HttpClient.Default.ClientHandler[101]
+      Received HTTP response headers after 30471.7034ms - 200
+info: System.Net.Http.HttpClient.Default.LogicalHandler[101]
+      End processing HTTP request after 30471.8009ms - 200
+dbug: Darci.Api.TelegramInboundService[0]
+      Telegram inbound poll completed; offset=560617946, updates=0
+info: System.Net.Http.HttpClient.Default.LogicalHandler[100]
+      Start processing HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=560617947
+info: System.Net.Http.HttpClient.Default.ClientHandler[100]
+      Sending HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=560617947
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[101]
+      Received HTTP response headers after 148528.0295ms - 200
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[101]
+      End processing HTTP request after 148528.208ms - 200
+dbug: Darci.Tools.Ollama.OllamaClient[0]
+      Generated 2320 chars
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:11434/api/embed
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[100]
+      Sending HTTP request POST http://localhost:11434/api/embed
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[101]
+      Received HTTP response headers after 1253.8174ms - 200
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[101]
+      End processing HTTP request after 1253.9916ms - 200
+dbug: Darci.Memory.MemoryStore[0]
+      Stored memory: Reflection: As a large language model, my purpose ...
+dbug: Darci.Core.Darci[0]
+      Action Think completed in 149802ms: Neural network initiated self-reflection
+dbug: Darci.Core.Darci[0]
+      Reward: +0.1 for action Think
+dbug: Darci.Core.Awareness[0]
+      Perception: 1 messages, 0 completions, 3 goal events
+dbug: Darci.Brain.ExperienceBuffer[0]
+      Evicted 1 oldest experiences (buffer at capacity)
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:11434/api/embed
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[100]
+      Sending HTTP request POST http://localhost:11434/api/embed
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[101]
+      Received HTTP response headers after 181.4971ms - 200
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[101]
+      End processing HTTP request after 181.6097ms - 200
+dbug: Darci.Memory.MemoryStore[0]
+      Recalled 5 memories for query: I’m pretty good! Just testing some coding stuff, nothing too exciting. Figured I’d drop in and see how you are.
+
+I’m working on some training/new tools to give you. Is there anything in particular that you think would be interesting?
+dbug: Darci.Tools.Ollama.OllamaClient[0]
+      Generating with gemma2:9b, prompt length: 5846
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:11434/api/generate
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[100]
+      Sending HTTP request POST http://localhost:11434/api/generate
+info: System.Net.Http.HttpClient.Default.ClientHandler[101]
+      Received HTTP response headers after 30154.8778ms - 200
+info: System.Net.Http.HttpClient.Default.LogicalHandler[101]
+      End processing HTTP request after 30154.9712ms - 200
+dbug: Darci.Api.TelegramInboundService[0]
+      Telegram inbound poll completed; offset=560617946, updates=0
+info: System.Net.Http.HttpClient.Default.LogicalHandler[100]
+      Start processing HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=560617947
+info: System.Net.Http.HttpClient.Default.ClientHandler[100]
+      Sending HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=560617947
+info: System.Net.Http.HttpClient.Default.ClientHandler[101]
+      Received HTTP response headers after 30144.2766ms - 200
+info: System.Net.Http.HttpClient.Default.LogicalHandler[101]
+      End processing HTTP request after 30144.3639ms - 200
+dbug: Darci.Api.TelegramInboundService[0]
+      Telegram inbound poll completed; offset=560617946, updates=0
+info: System.Net.Http.HttpClient.Default.LogicalHandler[100]
+      Start processing HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=560617947
+info: System.Net.Http.HttpClient.Default.ClientHandler[100]
+      Sending HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=560617947
+info: System.Net.Http.HttpClient.Default.ClientHandler[101]
+      Received HTTP response headers after 30148.8854ms - 200
+info: System.Net.Http.HttpClient.Default.LogicalHandler[101]
+      End processing HTTP request after 30148.9782ms - 200
+dbug: Darci.Api.TelegramInboundService[0]
+      Telegram inbound poll completed; offset=560617946, updates=0
+info: System.Net.Http.HttpClient.Default.LogicalHandler[100]
+      Start processing HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=560617947
+info: System.Net.Http.HttpClient.Default.ClientHandler[100]
+      Sending HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=560617947
+info: System.Net.Http.HttpClient.Default.ClientHandler[101]
+      Received HTTP response headers after 30480.2867ms - 200
+info: System.Net.Http.HttpClient.Default.LogicalHandler[101]
+      End processing HTTP request after 30480.4557ms - 200
+dbug: Darci.Api.TelegramInboundService[0]
+      Telegram inbound poll completed; offset=560617946, updates=0
+info: System.Net.Http.HttpClient.Default.LogicalHandler[100]
+      Start processing HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=560617947
+info: System.Net.Http.HttpClient.Default.ClientHandler[100]
+      Sending HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=560617947
+info: System.Net.Http.HttpClient.Default.ClientHandler[101]
+      Received HTTP response headers after 30146.7753ms - 200
+info: System.Net.Http.HttpClient.Default.LogicalHandler[101]
+      End processing HTTP request after 30146.8743ms - 200
+dbug: Darci.Api.TelegramInboundService[0]
+      Telegram inbound poll completed; offset=560617946, updates=0
+info: System.Net.Http.HttpClient.Default.LogicalHandler[100]
+      Start processing HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=560617947
+info: System.Net.Http.HttpClient.Default.ClientHandler[100]
+      Sending HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=560617947
+info: System.Net.Http.HttpClient.Default.ClientHandler[101]
+      Received HTTP response headers after 30146.2102ms - 200
+info: System.Net.Http.HttpClient.Default.LogicalHandler[101]
+      End processing HTTP request after 30146.3602ms - 200
+dbug: Darci.Api.TelegramInboundService[0]
+      Telegram inbound poll completed; offset=560617946, updates=0
+info: System.Net.Http.HttpClient.Default.LogicalHandler[100]
+      Start processing HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=560617947
+info: System.Net.Http.HttpClient.Default.ClientHandler[100]
+      Sending HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=560617947
+info: System.Net.Http.HttpClient.Default.ClientHandler[101]
+      Received HTTP response headers after 30145.8768ms - 200
+info: System.Net.Http.HttpClient.Default.LogicalHandler[101]
+      End processing HTTP request after 30146.3143ms - 200
+dbug: Darci.Api.TelegramInboundService[0]
+      Telegram inbound poll completed; offset=560617946, updates=0
+info: System.Net.Http.HttpClient.Default.LogicalHandler[100]
+      Start processing HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=560617947
+info: System.Net.Http.HttpClient.Default.ClientHandler[100]
+      Sending HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=560617947
+info: System.Net.Http.HttpClient.Default.ClientHandler[101]
+      Received HTTP response headers after 30472.0127ms - 200
+info: System.Net.Http.HttpClient.Default.LogicalHandler[101]
+      End processing HTTP request after 30472.1206ms - 200
+dbug: Darci.Api.TelegramInboundService[0]
+      Telegram inbound poll completed; offset=560617946, updates=0
+info: System.Net.Http.HttpClient.Default.LogicalHandler[100]
+      Start processing HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=560617947
+info: System.Net.Http.HttpClient.Default.ClientHandler[100]
+      Sending HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=560617947
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[101]
+      Received HTTP response headers after 234955.3745ms - 200
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[101]
+      End processing HTTP request after 234955.4484ms - 200
+dbug: Darci.Tools.Ollama.OllamaClient[0]
+      Generated 254 chars
+dbug: Darci.Core.Decision[0]
+      Neural decision: ReplyToMessage (confidence: 99.2 %)
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:11434/api/embed
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[100]
+      Sending HTTP request POST http://localhost:11434/api/embed
+info: Darci.Tools.Notifications.EmailNotificationProvider[0]
+      Sending EMAIL notification to aroskelley2112@gmail.com
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[101]
+      Received HTTP response headers after 229.1176ms - 200
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[101]
+      End processing HTTP request after 229.249ms - 200
+dbug: Darci.Memory.MemoryStore[0]
+      Stored memory: I said to Tinman: That sounds fascinating! I'm alw...
+info: Darci.Core.Darci[0]
+      Replied to Tinman: That sounds fascinating! I'm always eager to learn...
+dbug: Darci.Core.Darci[0]
+      Action Reply completed in 238ms: Responding to user message
+dbug: Darci.Core.Darci[0]
+      Reward: +1.0 for action Reply
+dbug: Darci.Core.Awareness[0]
+      Perception: 0 messages, 0 completions, 3 goal events
+dbug: Darci.Brain.ExperienceBuffer[0]
+      Evicted 1 oldest experiences (buffer at capacity)
+dbug: Darci.Core.Decision[0]
+      Neural decision: Rest (confidence: 93.5 %)
+dbug: Darci.Core.Darci[0]
+      Reward: +0.1 for action Rest
+info: Darci.Tools.Notifications.TelegramNotificationProvider[0]
+      Sending Telegram notification to chat 8587072376
+info: System.Net.Http.HttpClient.Default.LogicalHandler[100]
+      Start processing HTTP request POST https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/sendMessage        
+info: System.Net.Http.HttpClient.Default.ClientHandler[100]
+      Sending HTTP request POST https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/sendMessage
+info: System.Net.Http.HttpClient.Default.ClientHandler[101]
+      Received HTTP response headers after 576.5232ms - 200
+info: System.Net.Http.HttpClient.Default.LogicalHandler[101]
+      End processing HTTP request after 576.6412ms - 200
+dbug: Darci.Core.Awareness[0]
+      Perception: 0 messages, 0 completions, 3 goal events
+dbug: Darci.Brain.ExperienceBuffer[0]
+      Evicted 1 oldest experiences (buffer at capacity)
+dbug: Darci.Core.Decision[0]
+      Neural decision: Rest (confidence: 94.5 %)
+dbug: Darci.Core.Darci[0]
+      Reward: +0.1 for action Rest
+dbug: Darci.Core.Awareness[0]
+      Perception: 0 messages, 0 completions, 3 goal events
+dbug: Darci.Brain.ExperienceBuffer[0]
+      Evicted 1 oldest experiences (buffer at capacity)
+dbug: Darci.Core.Decision[0]
+      Neural decision: Rest (confidence: 95.3 %)
+dbug: Darci.Core.Darci[0]
+      Reward: +0.1 for action Rest
+dbug: Darci.Core.Awareness[0]
+      Perception: 0 messages, 0 completions, 3 goal events
+dbug: Darci.Brain.ExperienceBuffer[0]
+      Evicted 1 oldest experiences (buffer at capacity)
+dbug: Darci.Core.Decision[0]
+      Neural decision: Rest (confidence: 96.0 %)
+dbug: Darci.Core.Darci[0]
+      Reward: +0.1 for action Rest
+dbug: Darci.Core.Awareness[0]
+      Perception: 0 messages, 0 completions, 3 goal events
+dbug: Darci.Brain.ExperienceBuffer[0]
+      Evicted 1 oldest experiences (buffer at capacity)
+dbug: Darci.Core.Decision[0]
+      Neural decision: Rest (confidence: 96.6 %)
+dbug: Darci.Core.Darci[0]
+      Reward: +0.1 for action Rest
+info: System.Net.Http.HttpClient.Default.ClientHandler[101]
+      Received HTTP response headers after 30150.7141ms - 200
+info: System.Net.Http.HttpClient.Default.LogicalHandler[101]
+      End processing HTTP request after 30150.8483ms - 200
+dbug: Darci.Api.TelegramInboundService[0]
+      Telegram inbound poll completed; offset=560617946, updates=0
+info: System.Net.Http.HttpClient.Default.LogicalHandler[100]
+      Start processing HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=560617947
+info: System.Net.Http.HttpClient.Default.ClientHandler[100]
+      Sending HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=560617947
+dbug: Darci.Core.Awareness[0]
+      Perception: 0 messages, 0 completions, 3 goal events
+dbug: Darci.Brain.ExperienceBuffer[0]
+      Evicted 1 oldest experiences (buffer at capacity)
+dbug: Darci.Core.Decision[0]
+      Neural decision: Rest (confidence: 97.1 %)
+dbug: Darci.Core.Darci[0]
+      Reward: +0.1 for action Rest
+dbug: Darci.Core.Awareness[0]
+      Perception: 0 messages, 0 completions, 3 goal events
+dbug: Darci.Brain.ExperienceBuffer[0]
+      Evicted 1 oldest experiences (buffer at capacity)
+dbug: Darci.Core.Decision[0]
+      Neural decision: Rest (confidence: 97.5 %)
+dbug: Darci.Core.Darci[0]
+      Reward: +0.1 for action Rest
+dbug: Darci.Core.Awareness[0]
+      Perception: 0 messages, 0 completions, 3 goal events
+dbug: Darci.Brain.ExperienceBuffer[0]
+      Evicted 1 oldest experiences (buffer at capacity)
+dbug: Darci.Core.Decision[0]
+      Neural decision: Rest (confidence: 97.7 %)
+dbug: Darci.Core.Darci[0]
+      Reward: +0.1 for action Rest
+dbug: Darci.Core.Awareness[0]
+      Perception: 0 messages, 0 completions, 3 goal events
+dbug: Darci.Brain.ExperienceBuffer[0]
+      Evicted 1 oldest experiences (buffer at capacity)
+dbug: Darci.Core.Decision[0]
+      Neural decision: WorkOnGoal (confidence: 0.2 %)
+dbug: Darci.Core.Darci[0]
+      Reward: +0.1 for action Rest
+dbug: Darci.Core.Awareness[0]
+      Perception: 0 messages, 0 completions, 3 goal events
+dbug: Darci.Brain.ExperienceBuffer[0]
+      Evicted 1 oldest experiences (buffer at capacity)
+dbug: Darci.Core.Decision[0]
+      Neural decision: Rest (confidence: 98.0 %)
+dbug: Darci.Core.Darci[0]
+      Reward: +0.1 for action Rest
+dbug: Darci.Core.Awareness[0]
+      Perception: 0 messages, 0 completions, 3 goal events
+dbug: Darci.Brain.ExperienceBuffer[0]
+      Evicted 1 oldest experiences (buffer at capacity)
+dbug: Darci.Core.Decision[0]
+      Neural decision: Rest (confidence: 98.2 %)
+dbug: Darci.Core.Darci[0]
+      Reward: +0.1 for action Rest
+dbug: Darci.Core.Awareness[0]
+      Perception: 0 messages, 0 completions, 3 goal events
+dbug: Darci.Brain.ExperienceBuffer[0]
+      Evicted 1 oldest experiences (buffer at capacity)
+dbug: Darci.Core.Decision[0]
+      Neural decision: Think (confidence: 1.5 %)
+dbug: Darci.Tools.Ollama.OllamaClient[0]
+      Generating with gemma2:9b, prompt length: 42
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:11434/api/generate
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[100]
+      Sending HTTP request POST http://localhost:11434/api/generate
+info: System.Net.Http.HttpClient.Default.ClientHandler[101]
+      Received HTTP response headers after 30152.7177ms - 200
+info: System.Net.Http.HttpClient.Default.LogicalHandler[101]
+      End processing HTTP request after 30152.797ms - 200
+dbug: Darci.Api.TelegramInboundService[0]
+      Telegram inbound poll completed; offset=560617946, updates=0
+info: System.Net.Http.HttpClient.Default.LogicalHandler[100]
+      Start processing HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=560617947
+info: System.Net.Http.HttpClient.Default.ClientHandler[100]
+      Sending HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=560617947
+info: System.Net.Http.HttpClient.Default.ClientHandler[101]
+      Received HTTP response headers after 30151.8378ms - 200
+info: System.Net.Http.HttpClient.Default.LogicalHandler[101]
+      End processing HTTP request after 30151.9148ms - 200
+dbug: Darci.Api.TelegramInboundService[0]
+      Telegram inbound poll completed; offset=560617946, updates=0
+info: System.Net.Http.HttpClient.Default.LogicalHandler[100]
+      Start processing HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=560617947
+info: System.Net.Http.HttpClient.Default.ClientHandler[100]
+      Sending HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=560617947
+info: System.Net.Http.HttpClient.Default.ClientHandler[101]
+      Received HTTP response headers after 30476.0796ms - 200
+info: System.Net.Http.HttpClient.Default.LogicalHandler[101]
+      End processing HTTP request after 30476.1235ms - 200
+dbug: Darci.Api.TelegramInboundService[0]
+      Telegram inbound poll completed; offset=560617946, updates=0
+info: System.Net.Http.HttpClient.Default.LogicalHandler[100]
+      Start processing HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=560617947
+info: System.Net.Http.HttpClient.Default.ClientHandler[100]
+      Sending HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=560617947
+info: System.Net.Http.HttpClient.Default.ClientHandler[101]
+      Received HTTP response headers after 26640.6384ms - 200
+info: System.Net.Http.HttpClient.Default.LogicalHandler[101]
+      End processing HTTP request after 26640.7809ms - 200
+info: Darci.Core.Awareness[0]
+      Message received from Tinman: I’ve been working on an engineering tool for you f...
+info: Darci.Api.TelegramInboundService[0]
+      Accepted Telegram inbound message for DARCI from chat 8587072376
+dbug: Darci.Api.TelegramInboundService[0]
+      Telegram inbound poll completed; offset=560617947, updates=1
+info: System.Net.Http.HttpClient.Default.LogicalHandler[100]
+      Start processing HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=560617948
+info: System.Net.Http.HttpClient.Default.ClientHandler[100]
+      Sending HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=560617948
+info: System.Net.Http.HttpClient.Default.ClientHandler[101]
+      Received HTTP response headers after 30144.1594ms - 200
+info: System.Net.Http.HttpClient.Default.LogicalHandler[101]
+      End processing HTTP request after 30144.2284ms - 200
+dbug: Darci.Api.TelegramInboundService[0]
+      Telegram inbound poll completed; offset=560617947, updates=0
+info: System.Net.Http.HttpClient.Default.LogicalHandler[100]
+      Start processing HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=560617948
+info: System.Net.Http.HttpClient.Default.ClientHandler[100]
+      Sending HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=560617948
+info: System.Net.Http.HttpClient.Default.ClientHandler[101]
+      Received HTTP response headers after 30142.8349ms - 200
+info: System.Net.Http.HttpClient.Default.LogicalHandler[101]
+      End processing HTTP request after 30142.91ms - 200
+dbug: Darci.Api.TelegramInboundService[0]
+      Telegram inbound poll completed; offset=560617947, updates=0
+info: System.Net.Http.HttpClient.Default.LogicalHandler[100]
+      Start processing HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=560617948
+info: System.Net.Http.HttpClient.Default.ClientHandler[100]
+      Sending HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=560617948
+info: System.Net.Http.HttpClient.Default.ClientHandler[101]
+      Received HTTP response headers after 30145.5971ms - 200
+info: System.Net.Http.HttpClient.Default.LogicalHandler[101]
+      End processing HTTP request after 30145.6952ms - 200
+dbug: Darci.Api.TelegramInboundService[0]
+      Telegram inbound poll completed; offset=560617947, updates=0
+info: System.Net.Http.HttpClient.Default.LogicalHandler[100]
+      Start processing HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=560617948
+info: System.Net.Http.HttpClient.Default.ClientHandler[100]
+      Sending HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=560617948
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[101]
+      Received HTTP response headers after 199606.5503ms - 200
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[101]
+      End processing HTTP request after 199606.6237ms - 200
+dbug: Darci.Tools.Ollama.OllamaClient[0]
+      Generated 2809 chars
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:11434/api/embed
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[100]
+      Sending HTTP request POST http://localhost:11434/api/embed
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[101]
+      Received HTTP response headers after 1828.6915ms - 200
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[101]
+      End processing HTTP request after 1828.7438ms - 200
+dbug: Darci.Memory.MemoryStore[0]
+      Stored memory: Reflection: Being helpful is a multifaceted endeav...
+dbug: Darci.Core.Darci[0]
+      Action Think completed in 201445ms: Neural network initiated self-reflection
+dbug: Darci.Core.Darci[0]
+      Reward: +0.1 for action Think
+dbug: Darci.Core.Awareness[0]
+      Message needs LLM classification: I’ve been working on an engine...
+dbug: Darci.Tools.Ollama.OllamaClient[0]
+      Generating with gemma2:9b, prompt length: 1308
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:11434/api/generate
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[100]
+      Sending HTTP request POST http://localhost:11434/api/generate
+info: System.Net.Http.HttpClient.Default.ClientHandler[101]
+      Received HTTP response headers after 30457.0902ms - 200
+info: System.Net.Http.HttpClient.Default.LogicalHandler[101]
+      End processing HTTP request after 30457.1393ms - 200
+dbug: Darci.Api.TelegramInboundService[0]
+      Telegram inbound poll completed; offset=560617947, updates=0
+info: System.Net.Http.HttpClient.Default.LogicalHandler[100]
+      Start processing HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=560617948
+info: System.Net.Http.HttpClient.Default.ClientHandler[100]
+      Sending HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=560617948
+info: System.Net.Http.HttpClient.Default.ClientHandler[101]
+      Received HTTP response headers after 30161.0703ms - 200
+info: System.Net.Http.HttpClient.Default.LogicalHandler[101]
+      End processing HTTP request after 30161.1407ms - 200
+dbug: Darci.Api.TelegramInboundService[0]
+      Telegram inbound poll completed; offset=560617947, updates=0
+info: System.Net.Http.HttpClient.Default.LogicalHandler[100]
+      Start processing HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=560617948
+info: System.Net.Http.HttpClient.Default.ClientHandler[100]
+      Sending HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=560617948
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[101]
+      Received HTTP response headers after 63575.9427ms - 200
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[101]
+      End processing HTTP request after 63576.0716ms - 200
+dbug: Darci.Tools.Ollama.OllamaClient[0]
+      Generated 12 chars
+dbug: Darci.Tools.Toolkit[0]
+      LLM classified message as: conversation
+dbug: Darci.Core.Awareness[0]
+      Perception: 1 messages, 0 completions, 3 goal events
+dbug: Darci.Personality.PersonalityEngine[0]
+      Saved personality traits
+dbug: Darci.Brain.ExperienceBuffer[0]
+      Evicted 1 oldest experiences (buffer at capacity)
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:11434/api/embed
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[100]
+      Sending HTTP request POST http://localhost:11434/api/embed
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[101]
+      Received HTTP response headers after 312.7015ms - 200
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[101]
+      End processing HTTP request after 312.7551ms - 200
+dbug: Darci.Memory.MemoryStore[0]
+      Recalled 5 memories for query: I’ve been working on an engineering tool for you for a while now, and as much as I’d love to test it I also realize I should probably wait until you’re running on my pc instead of my laptop 😂
+
+But I can definitely look into giving you some language understanding, maybe even give you language understanding natively so you won’t rely on Ollama anymore. Maybe it could help you express yourself more freely
+dbug: Darci.Tools.Ollama.OllamaClient[0]
+      Generating with gemma2:9b, prompt length: 8626
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:11434/api/generate
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[100]
+      Sending HTTP request POST http://localhost:11434/api/generate
+info: System.Net.Http.HttpClient.Default.ClientHandler[101]
+      Received HTTP response headers after 30162.4208ms - 200
+info: System.Net.Http.HttpClient.Default.LogicalHandler[101]
+      End processing HTTP request after 30162.525ms - 200
+dbug: Darci.Api.TelegramInboundService[0]
+      Telegram inbound poll completed; offset=560617947, updates=0
+info: System.Net.Http.HttpClient.Default.LogicalHandler[100]
+      Start processing HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=560617948
+info: System.Net.Http.HttpClient.Default.ClientHandler[100]
+      Sending HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=560617948
+info: System.Net.Http.HttpClient.Default.ClientHandler[101]
+      Received HTTP response headers after 30147.0866ms - 200
+info: System.Net.Http.HttpClient.Default.LogicalHandler[101]
+      End processing HTTP request after 30147.1519ms - 200
+dbug: Darci.Api.TelegramInboundService[0]
+      Telegram inbound poll completed; offset=560617947, updates=0
+info: System.Net.Http.HttpClient.Default.LogicalHandler[100]
+      Start processing HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=560617948
+info: System.Net.Http.HttpClient.Default.ClientHandler[100]
+      Sending HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=560617948
+info: System.Net.Http.HttpClient.Default.ClientHandler[101]
+      Received HTTP response headers after 30524.3987ms - 200
+info: System.Net.Http.HttpClient.Default.LogicalHandler[101]
+      End processing HTTP request after 30524.4881ms - 200
+dbug: Darci.Api.TelegramInboundService[0]
+      Telegram inbound poll completed; offset=560617947, updates=0
+info: System.Net.Http.HttpClient.Default.LogicalHandler[100]
+      Start processing HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=560617948
+info: System.Net.Http.HttpClient.Default.ClientHandler[100]
+      Sending HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=560617948
+info: System.Net.Http.HttpClient.Default.ClientHandler[101]
+      Received HTTP response headers after 30155.8285ms - 200
+info: System.Net.Http.HttpClient.Default.LogicalHandler[101]
+      End processing HTTP request after 30155.9115ms - 200
+dbug: Darci.Api.TelegramInboundService[0]
+      Telegram inbound poll completed; offset=560617947, updates=0
+info: System.Net.Http.HttpClient.Default.LogicalHandler[100]
+      Start processing HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=560617948
+info: System.Net.Http.HttpClient.Default.ClientHandler[100]
+      Sending HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=560617948
+info: System.Net.Http.HttpClient.Default.ClientHandler[101]
+      Received HTTP response headers after 30156.5224ms - 200
+info: System.Net.Http.HttpClient.Default.LogicalHandler[101]
+      End processing HTTP request after 30156.5818ms - 200
+dbug: Darci.Api.TelegramInboundService[0]
+      Telegram inbound poll completed; offset=560617947, updates=0
+info: System.Net.Http.HttpClient.Default.LogicalHandler[100]
+      Start processing HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=560617948
+info: System.Net.Http.HttpClient.Default.ClientHandler[100]
+      Sending HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=560617948
+info: System.Net.Http.HttpClient.Default.ClientHandler[101]
+      Received HTTP response headers after 30155.6843ms - 200
+info: System.Net.Http.HttpClient.Default.LogicalHandler[101]
+      End processing HTTP request after 30155.7735ms - 200
+dbug: Darci.Api.TelegramInboundService[0]
+      Telegram inbound poll completed; offset=560617947, updates=0
+info: System.Net.Http.HttpClient.Default.LogicalHandler[100]
+      Start processing HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=560617948
+info: System.Net.Http.HttpClient.Default.ClientHandler[100]
+      Sending HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=560617948
+info: System.Net.Http.HttpClient.Default.ClientHandler[101]
+      Received HTTP response headers after 30442.3964ms - 200
+info: System.Net.Http.HttpClient.Default.LogicalHandler[101]
+      End processing HTTP request after 30442.4808ms - 200
+dbug: Darci.Api.TelegramInboundService[0]
+      Telegram inbound poll completed; offset=560617947, updates=0
+info: System.Net.Http.HttpClient.Default.LogicalHandler[100]
+      Start processing HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=560617948
+info: System.Net.Http.HttpClient.Default.ClientHandler[100]
+      Sending HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=560617948
+info: System.Net.Http.HttpClient.Default.ClientHandler[101]
+      Received HTTP response headers after 30142.8463ms - 200
+info: System.Net.Http.HttpClient.Default.LogicalHandler[101]
+      End processing HTTP request after 30142.9596ms - 200
+dbug: Darci.Api.TelegramInboundService[0]
+      Telegram inbound poll completed; offset=560617947, updates=0
+info: System.Net.Http.HttpClient.Default.LogicalHandler[100]
+      Start processing HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=560617948
+info: System.Net.Http.HttpClient.Default.ClientHandler[100]
+      Sending HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=560617948
+info: System.Net.Http.HttpClient.Default.ClientHandler[101]
+      Received HTTP response headers after 30148.2583ms - 200
+info: System.Net.Http.HttpClient.Default.LogicalHandler[101]
+      End processing HTTP request after 30148.4507ms - 200
+dbug: Darci.Api.TelegramInboundService[0]
+      Telegram inbound poll completed; offset=560617947, updates=0
+info: System.Net.Http.HttpClient.Default.LogicalHandler[100]
+      Start processing HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=560617948
+info: System.Net.Http.HttpClient.Default.ClientHandler[100]
+      Sending HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=560617948
+info: System.Net.Http.HttpClient.Default.ClientHandler[101]
+      Received HTTP response headers after 30143.0441ms - 200
+info: System.Net.Http.HttpClient.Default.LogicalHandler[101]
+      End processing HTTP request after 30143.0933ms - 200
+dbug: Darci.Api.TelegramInboundService[0]
+      Telegram inbound poll completed; offset=560617947, updates=0
+info: System.Net.Http.HttpClient.Default.LogicalHandler[100]
+      Start processing HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=560617948
+info: System.Net.Http.HttpClient.Default.ClientHandler[100]
+      Sending HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=560617948
+fail: Darci.Tools.Ollama.OllamaClient[0]
+      Ollama generation failed
+      System.Threading.Tasks.TaskCanceledException: The request was canceled due to the configured HttpClient.Timeout of 300 seconds elapsing.
+       ---> System.TimeoutException: The operation was canceled.
+       ---> System.Threading.Tasks.TaskCanceledException: The operation was canceled.
+       ---> System.IO.IOException: Unable to read data from the transport connection: The I/O operation has been aborted because of either a thread exit or an application request..
+       ---> System.Net.Sockets.SocketException (995): The I/O operation has been aborted because of either a thread exit or an application request.
+         --- End of inner exception stack trace ---
+         at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource<System.Int32>.GetResult(Int16 token)
+         at System.Net.Http.HttpConnection.SendAsync(HttpRequestMessage request, Boolean async, CancellationToken cancellationToken)   
+         --- End of inner exception stack trace ---
+         at System.Net.Http.HttpConnection.SendAsync(HttpRequestMessage request, Boolean async, CancellationToken cancellationToken)   
+         at System.Net.Http.HttpConnectionPool.SendWithVersionDetectionAndRetryAsync(HttpRequestMessage request, Boolean async, Boolean doRequestAuth, CancellationToken cancellationToken)
+         at System.Net.Http.RedirectHandler.SendAsync(HttpRequestMessage request, Boolean async, CancellationToken cancellationToken)  
+         at Microsoft.Extensions.Http.Logging.LoggingHttpMessageHandler.<SendCoreAsync>g__Core|5_0(HttpRequestMessage request, Boolean useAsync, CancellationToken cancellationToken)
+         at Microsoft.Extensions.Http.Logging.LoggingScopeHttpMessageHandler.<SendCoreAsync>g__Core|5_0(HttpRequestMessage request, Boolean useAsync, CancellationToken cancellationToken)
+         at System.Net.Http.HttpClient.<SendAsync>g__Core|83_0(HttpRequestMessage request, HttpCompletionOption completionOption, CancellationTokenSource cts, Boolean disposeCts, CancellationTokenSource pendingRequestsCts, CancellationToken originalCancellationToken)   
+         --- End of inner exception stack trace ---
+         --- End of inner exception stack trace ---
+         at System.Net.Http.HttpClient.HandleFailure(Exception e, Boolean telemetryStarted, HttpResponseMessage response, CancellationTokenSource cts, CancellationToken cancellationToken, CancellationTokenSource pendingRequestsCts)
+         at System.Net.Http.HttpClient.<SendAsync>g__Core|83_0(HttpRequestMessage request, HttpCompletionOption completionOption, CancellationTokenSource cts, Boolean disposeCts, CancellationTokenSource pendingRequestsCts, CancellationToken originalCancellationToken)   
+         at Darci.Tools.Ollama.OllamaClient.Generate(String prompt) in C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\darci-v4\Darci.Tools\Ollama\OllamaClient.cs:line 64
+dbug: Darci.Core.Decision[0]
+      Neural decision: ReplyToMessage (confidence: 99.4 %)
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:11434/api/embed
+info: Darci.Tools.Notifications.EmailNotificationProvider[0]
+      Sending EMAIL notification to aroskelley2112@gmail.com
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[100]
+      Sending HTTP request POST http://localhost:11434/api/embed
+info: Darci.Tools.Notifications.TelegramNotificationProvider[0]
+      Sending Telegram notification to chat 8587072376
+info: System.Net.Http.HttpClient.Default.LogicalHandler[100]
+      Start processing HTTP request POST https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/sendMessage        
+info: System.Net.Http.HttpClient.Default.ClientHandler[100]
+      Sending HTTP request POST https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/sendMessage
+info: System.Net.Http.HttpClient.Default.ClientHandler[101]
+      Received HTTP response headers after 587.7836ms - 200
+info: System.Net.Http.HttpClient.Default.LogicalHandler[101]
+      End processing HTTP request after 587.8663ms - 200
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[101]
+      Received HTTP response headers after 2738.3395ms - 200
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[101]
+      End processing HTTP request after 2738.4337ms - 200
+dbug: Darci.Memory.MemoryStore[0]
+      Stored memory: I said to Tinman: [Error generating response]...
+info: Darci.Core.Darci[0]
+      Replied to Tinman: [Error generating response]...
+dbug: Darci.Core.Darci[0]
+      Action Reply completed in 2756ms: Responding to user message
+dbug: Darci.Core.Darci[0]
+      Reward: +1.0 for action Reply
+dbug: Darci.Core.Awareness[0]
+      Perception: 0 messages, 0 completions, 3 goal events
+dbug: Darci.Brain.ExperienceBuffer[0]
+      Evicted 1 oldest experiences (buffer at capacity)
+dbug: Darci.Core.Decision[0]
+      Neural decision: WorkOnGoal (confidence: 2.8 %)
+dbug: Darci.Core.Darci[0]
+      Reward: +0.1 for action Rest
+dbug: Darci.Core.Awareness[0]
+      Perception: 0 messages, 0 completions, 3 goal events
+dbug: Darci.Brain.ExperienceBuffer[0]
+      Evicted 1 oldest experiences (buffer at capacity)
+dbug: Darci.Core.Decision[0]
+      Neural decision: Think (confidence: 6.5 %)
+dbug: Darci.Tools.Ollama.OllamaClient[0]
+      Generating with gemma2:9b, prompt length: 42
+info: System.Net.Http.HttpClient.IOllamaClient.LogicalHandler[100]
+      Start processing HTTP request POST http://localhost:11434/api/generate
+info: System.Net.Http.HttpClient.IOllamaClient.ClientHandler[100]
+      Sending HTTP request POST http://localhost:11434/api/generate
+info: System.Net.Http.HttpClient.Default.ClientHandler[101]
+      Received HTTP response headers after 30504.9028ms - 200
+info: System.Net.Http.HttpClient.Default.LogicalHandler[101]
+      End processing HTTP request after 30504.985ms - 200
+dbug: Darci.Api.TelegramInboundService[0]
+      Telegram inbound poll completed; offset=560617947, updates=0
+info: System.Net.Http.HttpClient.Default.LogicalHandler[100]
+      Start processing HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=560617948
+info: System.Net.Http.HttpClient.Default.ClientHandler[100]
+      Sending HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=560617948
+info: Microsoft.Hosting.Lifetime[0]
+      Application is shutting down...
+info: System.Net.Http.HttpClient.Default.ClientHandler[101]
+      Received HTTP response headers after 30144.9562ms - 200
+info: System.Net.Http.HttpClient.Default.LogicalHandler[101]
+      End processing HTTP request after 30145.0217ms - 200
+dbug: Darci.Api.TelegramInboundService[0]
+      Telegram inbound poll completed; offset=560617947, updates=0
+info: System.Net.Http.HttpClient.Default.LogicalHandler[100]
+      Start processing HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=560617948
+info: System.Net.Http.HttpClient.Default.ClientHandler[100]
+      Sending HTTP request GET https://api.telegram.org/bot8505196152:AAG8_eT_kh-IsdlLsnt0laMnu1FLmgP2Bb4/getUpdates?timeout=30&offset=560617948
