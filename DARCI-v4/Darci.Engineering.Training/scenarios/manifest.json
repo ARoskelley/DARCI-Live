@@ -1,0 +1,3666 @@
+[
+  {
+    "scenario_id": "perturbation_0000",
+    "scenario_type": "perturbation",
+    "description": "Fix tube (Cut with 10.1mm cube at (-4.8,-0.5,-3.9)). Match reference shape.",
+    "start_geometry": "load_stl('scenarios\\references\\perturbation_0000_start.stl')",
+    "reference_stl": "scenarios\\references\\perturbation_0000_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 1.0
+    },
+    "max_steps": 44,
+    "difficulty": "hard"
+  },
+  {
+    "scenario_id": "perturbation_0001",
+    "scenario_type": "perturbation",
+    "description": "Fix l_bracket (Translated by (-5.0, 4.9, 0.7)). Match reference shape.",
+    "start_geometry": "load_stl('scenarios\\references\\perturbation_0001_start.stl')",
+    "reference_stl": "scenarios\\references\\perturbation_0001_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 1.0
+    },
+    "max_steps": 58,
+    "difficulty": "easy"
+  },
+  {
+    "scenario_id": "perturbation_0002",
+    "scenario_type": "perturbation",
+    "description": "Fix stepped_cylinder (Added sphere r=4.6 at (-1.1,-0.4,6.1)). Match reference shape.",
+    "start_geometry": "load_stl('scenarios\\references\\perturbation_0002_start.stl')",
+    "reference_stl": "scenarios\\references\\perturbation_0002_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 1.0
+    },
+    "max_steps": 45,
+    "difficulty": "hard"
+  },
+  {
+    "scenario_id": "perturbation_0003",
+    "scenario_type": "perturbation",
+    "description": "Fix bracket (Cut with 10.3mm cube at (-12.8,3.6,2.2)). Match reference shape.",
+    "start_geometry": "load_stl('scenarios\\references\\perturbation_0003_start.stl')",
+    "reference_stl": "scenarios\\references\\perturbation_0003_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 1.0
+    },
+    "max_steps": 64,
+    "difficulty": "easy"
+  },
+  {
+    "scenario_id": "perturbation_0004",
+    "scenario_type": "perturbation",
+    "description": "Fix wedge (Added sphere r=2.2 at (-0.1,-3.4,3.0)). Match reference shape.",
+    "start_geometry": "load_stl('scenarios\\references\\perturbation_0004_start.stl')",
+    "reference_stl": "scenarios\\references\\perturbation_0004_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 1.0
+    },
+    "max_steps": 47,
+    "difficulty": "medium"
+  },
+  {
+    "scenario_id": "perturbation_0005",
+    "scenario_type": "perturbation",
+    "description": "Fix l_bracket (Added sphere r=8.9 at (7.6,0.7,10.4)). Match reference shape.",
+    "start_geometry": "load_stl('scenarios\\references\\perturbation_0005_start.stl')",
+    "reference_stl": "scenarios\\references\\perturbation_0005_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 1.0
+    },
+    "max_steps": 42,
+    "difficulty": "hard"
+  },
+  {
+    "scenario_id": "perturbation_0006",
+    "scenario_type": "perturbation",
+    "description": "Fix stepped_cylinder (Translated by (0.4, 0.9, 2.8)). Match reference shape.",
+    "start_geometry": "load_stl('scenarios\\references\\perturbation_0006_start.stl')",
+    "reference_stl": "scenarios\\references\\perturbation_0006_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 1.0
+    },
+    "max_steps": 58,
+    "difficulty": "easy"
+  },
+  {
+    "scenario_id": "perturbation_0007",
+    "scenario_type": "perturbation",
+    "description": "Fix stepped_cylinder (Added sphere r=4.6 at (-2.5,-5.8,-5.8)). Match reference shape.",
+    "start_geometry": "load_stl('scenarios\\references\\perturbation_0007_start.stl')",
+    "reference_stl": "scenarios\\references\\perturbation_0007_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 1.0
+    },
+    "max_steps": 61,
+    "difficulty": "hard"
+  },
+  {
+    "scenario_id": "perturbation_0008",
+    "scenario_type": "perturbation",
+    "description": "Fix box (Cut with 11.9mm cube at (10.0,2.8,-0.5)). Match reference shape.",
+    "start_geometry": "load_stl('scenarios\\references\\perturbation_0008_start.stl')",
+    "reference_stl": "scenarios\\references\\perturbation_0008_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 1.0
+    },
+    "max_steps": 42,
+    "difficulty": "hard"
+  },
+  {
+    "scenario_id": "perturbation_0009",
+    "scenario_type": "perturbation",
+    "description": "Fix tube (Added sphere r=5.1 at (6.7,-0.5,-4.3)). Match reference shape.",
+    "start_geometry": "load_stl('scenarios\\references\\perturbation_0009_start.stl')",
+    "reference_stl": "scenarios\\references\\perturbation_0009_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 1.0
+    },
+    "max_steps": 61,
+    "difficulty": "easy"
+  },
+  {
+    "scenario_id": "perturbation_0010",
+    "scenario_type": "perturbation",
+    "description": "Fix shell_box (Cut with 5.0mm cube at (3.4,-4.2,-1.0)). Match reference shape.",
+    "start_geometry": "load_stl('scenarios\\references\\perturbation_0010_start.stl')",
+    "reference_stl": "scenarios\\references\\perturbation_0010_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 1.0
+    },
+    "max_steps": 46,
+    "difficulty": "hard"
+  },
+  {
+    "scenario_id": "perturbation_0011",
+    "scenario_type": "perturbation",
+    "description": "Fix box (Uniformly scaled by 0.85). Match reference shape.",
+    "start_geometry": "load_stl('scenarios\\references\\perturbation_0011_start.stl')",
+    "reference_stl": "scenarios\\references\\perturbation_0011_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 1.0
+    },
+    "max_steps": 46,
+    "difficulty": "hard"
+  },
+  {
+    "scenario_id": "perturbation_0012",
+    "scenario_type": "perturbation",
+    "description": "Fix filleted_box (Translated by (-0.4, -2.8, -0.5)). Match reference shape.",
+    "start_geometry": "load_stl('scenarios\\references\\perturbation_0012_start.stl')",
+    "reference_stl": "scenarios\\references\\perturbation_0012_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 1.0
+    },
+    "max_steps": 66,
+    "difficulty": "medium"
+  },
+  {
+    "scenario_id": "perturbation_0013",
+    "scenario_type": "perturbation",
+    "description": "Fix tube (Uniformly scaled by 0.84). Match reference shape.",
+    "start_geometry": "load_stl('scenarios\\references\\perturbation_0013_start.stl')",
+    "reference_stl": "scenarios\\references\\perturbation_0013_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 1.0
+    },
+    "max_steps": 65,
+    "difficulty": "hard"
+  },
+  {
+    "scenario_id": "perturbation_0014",
+    "scenario_type": "perturbation",
+    "description": "Fix l_bracket (Uniformly scaled by 1.12). Match reference shape.",
+    "start_geometry": "load_stl('scenarios\\references\\perturbation_0014_start.stl')",
+    "reference_stl": "scenarios\\references\\perturbation_0014_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 1.0
+    },
+    "max_steps": 45,
+    "difficulty": "easy"
+  },
+  {
+    "scenario_id": "perturbation_0015",
+    "scenario_type": "perturbation",
+    "description": "Fix bracket (Added sphere r=4.9 at (4.7,3.3,-0.7)). Match reference shape.",
+    "start_geometry": "load_stl('scenarios\\references\\perturbation_0015_start.stl')",
+    "reference_stl": "scenarios\\references\\perturbation_0015_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 1.0
+    },
+    "max_steps": 69,
+    "difficulty": "hard"
+  },
+  {
+    "scenario_id": "perturbation_0016",
+    "scenario_type": "perturbation",
+    "description": "Fix box (Translated by (-4.7, -1.5, 0.8)). Match reference shape.",
+    "start_geometry": "load_stl('scenarios\\references\\perturbation_0016_start.stl')",
+    "reference_stl": "scenarios\\references\\perturbation_0016_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 1.0
+    },
+    "max_steps": 60,
+    "difficulty": "easy"
+  },
+  {
+    "scenario_id": "perturbation_0017",
+    "scenario_type": "perturbation",
+    "description": "Fix wedge (Cut with 8.2mm cube at (-5.2,3.0,-0.3)). Match reference shape.",
+    "start_geometry": "load_stl('scenarios\\references\\perturbation_0017_start.stl')",
+    "reference_stl": "scenarios\\references\\perturbation_0017_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 1.0
+    },
+    "max_steps": 69,
+    "difficulty": "medium"
+  },
+  {
+    "scenario_id": "perturbation_0018",
+    "scenario_type": "perturbation",
+    "description": "Fix box (Uniformly scaled by 1.22). Match reference shape.",
+    "start_geometry": "load_stl('scenarios\\references\\perturbation_0018_start.stl')",
+    "reference_stl": "scenarios\\references\\perturbation_0018_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 1.0
+    },
+    "max_steps": 61,
+    "difficulty": "hard"
+  },
+  {
+    "scenario_id": "perturbation_0019",
+    "scenario_type": "perturbation",
+    "description": "Fix filleted_box (Uniformly scaled by 1.11). Match reference shape.",
+    "start_geometry": "load_stl('scenarios\\references\\perturbation_0019_start.stl')",
+    "reference_stl": "scenarios\\references\\perturbation_0019_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 1.0
+    },
+    "max_steps": 44,
+    "difficulty": "easy"
+  },
+  {
+    "scenario_id": "perturbation_0020",
+    "scenario_type": "perturbation",
+    "description": "Fix stepped_cylinder (Cut with 6.9mm cube at (-3.9,5.8,0.3)). Match reference shape.",
+    "start_geometry": "load_stl('scenarios\\references\\perturbation_0020_start.stl')",
+    "reference_stl": "scenarios\\references\\perturbation_0020_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 1.0
+    },
+    "max_steps": 47,
+    "difficulty": "easy"
+  },
+  {
+    "scenario_id": "perturbation_0021",
+    "scenario_type": "perturbation",
+    "description": "Fix shell_box (Uniformly scaled by 0.87). Match reference shape.",
+    "start_geometry": "load_stl('scenarios\\references\\perturbation_0021_start.stl')",
+    "reference_stl": "scenarios\\references\\perturbation_0021_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 1.0
+    },
+    "max_steps": 65,
+    "difficulty": "medium"
+  },
+  {
+    "scenario_id": "perturbation_0022",
+    "scenario_type": "perturbation",
+    "description": "Fix plate_with_holes (Added sphere r=9.2 at (1.8,-12.8,-1.1)). Match reference shape.",
+    "start_geometry": "load_stl('scenarios\\references\\perturbation_0022_start.stl')",
+    "reference_stl": "scenarios\\references\\perturbation_0022_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 1.0
+    },
+    "max_steps": 59,
+    "difficulty": "easy"
+  },
+  {
+    "scenario_id": "perturbation_0023",
+    "scenario_type": "perturbation",
+    "description": "Fix cylinder (Translated by (-0.5, 4.9, -1.9)). Match reference shape.",
+    "start_geometry": "load_stl('scenarios\\references\\perturbation_0023_start.stl')",
+    "reference_stl": "scenarios\\references\\perturbation_0023_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 1.0
+    },
+    "max_steps": 40,
+    "difficulty": "medium"
+  },
+  {
+    "scenario_id": "perturbation_0024",
+    "scenario_type": "perturbation",
+    "description": "Fix shell_box (Cut with 9.9mm cube at (1.4,-3.5,-1.5)). Match reference shape.",
+    "start_geometry": "load_stl('scenarios\\references\\perturbation_0024_start.stl')",
+    "reference_stl": "scenarios\\references\\perturbation_0024_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 1.0
+    },
+    "max_steps": 47,
+    "difficulty": "medium"
+  },
+  {
+    "scenario_id": "perturbation_0025",
+    "scenario_type": "perturbation",
+    "description": "Fix l_bracket (Added sphere r=7.4 at (4.9,0.0,1.9)). Match reference shape.",
+    "start_geometry": "load_stl('scenarios\\references\\perturbation_0025_start.stl')",
+    "reference_stl": "scenarios\\references\\perturbation_0025_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 1.0
+    },
+    "max_steps": 54,
+    "difficulty": "easy"
+  },
+  {
+    "scenario_id": "perturbation_0026",
+    "scenario_type": "perturbation",
+    "description": "Fix box (Uniformly scaled by 1.30). Match reference shape.",
+    "start_geometry": "load_stl('scenarios\\references\\perturbation_0026_start.stl')",
+    "reference_stl": "scenarios\\references\\perturbation_0026_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 1.0
+    },
+    "max_steps": 66,
+    "difficulty": "easy"
+  },
+  {
+    "scenario_id": "perturbation_0027",
+    "scenario_type": "perturbation",
+    "description": "Fix shell_box (Uniformly scaled by 1.04). Match reference shape.",
+    "start_geometry": "load_stl('scenarios\\references\\perturbation_0027_start.stl')",
+    "reference_stl": "scenarios\\references\\perturbation_0027_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 1.0
+    },
+    "max_steps": 49,
+    "difficulty": "hard"
+  },
+  {
+    "scenario_id": "perturbation_0028",
+    "scenario_type": "perturbation",
+    "description": "Fix box (Translated by (4.4, 2.0, 0.4)). Match reference shape.",
+    "start_geometry": "load_stl('scenarios\\references\\perturbation_0028_start.stl')",
+    "reference_stl": "scenarios\\references\\perturbation_0028_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 1.0
+    },
+    "max_steps": 42,
+    "difficulty": "hard"
+  },
+  {
+    "scenario_id": "perturbation_0029",
+    "scenario_type": "perturbation",
+    "description": "Fix l_bracket (Translated by (2.4, 2.0, 1.2)). Match reference shape.",
+    "start_geometry": "load_stl('scenarios\\references\\perturbation_0029_start.stl')",
+    "reference_stl": "scenarios\\references\\perturbation_0029_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 1.0
+    },
+    "max_steps": 50,
+    "difficulty": "easy"
+  },
+  {
+    "scenario_id": "perturbation_0030",
+    "scenario_type": "perturbation",
+    "description": "Fix wedge (Added sphere r=5.0 at (0.2,0.0,2.0)). Match reference shape.",
+    "start_geometry": "load_stl('scenarios\\references\\perturbation_0030_start.stl')",
+    "reference_stl": "scenarios\\references\\perturbation_0030_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 1.0
+    },
+    "max_steps": 59,
+    "difficulty": "medium"
+  },
+  {
+    "scenario_id": "perturbation_0031",
+    "scenario_type": "perturbation",
+    "description": "Fix filleted_box (Added sphere r=5.4 at (-9.0,-0.5,0.3)). Match reference shape.",
+    "start_geometry": "load_stl('scenarios\\references\\perturbation_0031_start.stl')",
+    "reference_stl": "scenarios\\references\\perturbation_0031_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 1.0
+    },
+    "max_steps": 48,
+    "difficulty": "medium"
+  },
+  {
+    "scenario_id": "perturbation_0032",
+    "scenario_type": "perturbation",
+    "description": "Fix wedge (Cut with 5.4mm cube at (-5.0,0.1,2.0)). Match reference shape.",
+    "start_geometry": "load_stl('scenarios\\references\\perturbation_0032_start.stl')",
+    "reference_stl": "scenarios\\references\\perturbation_0032_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 1.0
+    },
+    "max_steps": 46,
+    "difficulty": "easy"
+  },
+  {
+    "scenario_id": "perturbation_0033",
+    "scenario_type": "perturbation",
+    "description": "Fix tube (Added sphere r=4.9 at (0.5,1.6,4.1)). Match reference shape.",
+    "start_geometry": "load_stl('scenarios\\references\\perturbation_0033_start.stl')",
+    "reference_stl": "scenarios\\references\\perturbation_0033_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 1.0
+    },
+    "max_steps": 69,
+    "difficulty": "medium"
+  },
+  {
+    "scenario_id": "perturbation_0034",
+    "scenario_type": "perturbation",
+    "description": "Fix filleted_box (Translated by (-4.2, -4.7, 2.8)). Match reference shape.",
+    "start_geometry": "load_stl('scenarios\\references\\perturbation_0034_start.stl')",
+    "reference_stl": "scenarios\\references\\perturbation_0034_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 1.0
+    },
+    "max_steps": 65,
+    "difficulty": "easy"
+  },
+  {
+    "scenario_id": "perturbation_0035",
+    "scenario_type": "perturbation",
+    "description": "Fix shell_box (Cut with 4.8mm cube at (0.5,2.7,2.0)). Match reference shape.",
+    "start_geometry": "load_stl('scenarios\\references\\perturbation_0035_start.stl')",
+    "reference_stl": "scenarios\\references\\perturbation_0035_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 1.0
+    },
+    "max_steps": 48,
+    "difficulty": "easy"
+  },
+  {
+    "scenario_id": "perturbation_0036",
+    "scenario_type": "perturbation",
+    "description": "Fix tube (Cut with 9.2mm cube at (-1.9,3.4,-12.0)). Match reference shape.",
+    "start_geometry": "load_stl('scenarios\\references\\perturbation_0036_start.stl')",
+    "reference_stl": "scenarios\\references\\perturbation_0036_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 1.0
+    },
+    "max_steps": 43,
+    "difficulty": "easy"
+  },
+  {
+    "scenario_id": "perturbation_0037",
+    "scenario_type": "perturbation",
+    "description": "Fix box (Added sphere r=4.9 at (-12.6,3.7,3.7)). Match reference shape.",
+    "start_geometry": "load_stl('scenarios\\references\\perturbation_0037_start.stl')",
+    "reference_stl": "scenarios\\references\\perturbation_0037_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 1.0
+    },
+    "max_steps": 50,
+    "difficulty": "medium"
+  },
+  {
+    "scenario_id": "perturbation_0038",
+    "scenario_type": "perturbation",
+    "description": "Fix shell_box (Uniformly scaled by 1.23). Match reference shape.",
+    "start_geometry": "load_stl('scenarios\\references\\perturbation_0038_start.stl')",
+    "reference_stl": "scenarios\\references\\perturbation_0038_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 1.0
+    },
+    "max_steps": 68,
+    "difficulty": "easy"
+  },
+  {
+    "scenario_id": "perturbation_0039",
+    "scenario_type": "perturbation",
+    "description": "Fix plate_with_holes (Uniformly scaled by 1.22). Match reference shape.",
+    "start_geometry": "load_stl('scenarios\\references\\perturbation_0039_start.stl')",
+    "reference_stl": "scenarios\\references\\perturbation_0039_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 1.0
+    },
+    "max_steps": 60,
+    "difficulty": "hard"
+  },
+  {
+    "scenario_id": "perturbation_0040",
+    "scenario_type": "perturbation",
+    "description": "Fix box (Uniformly scaled by 1.08). Match reference shape.",
+    "start_geometry": "load_stl('scenarios\\references\\perturbation_0040_start.stl')",
+    "reference_stl": "scenarios\\references\\perturbation_0040_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 1.0
+    },
+    "max_steps": 46,
+    "difficulty": "easy"
+  },
+  {
+    "scenario_id": "perturbation_0041",
+    "scenario_type": "perturbation",
+    "description": "Fix cylinder (Cut with 7.2mm cube at (1.2,-0.9,3.3)). Match reference shape.",
+    "start_geometry": "load_stl('scenarios\\references\\perturbation_0041_start.stl')",
+    "reference_stl": "scenarios\\references\\perturbation_0041_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 1.0
+    },
+    "max_steps": 50,
+    "difficulty": "hard"
+  },
+  {
+    "scenario_id": "perturbation_0042",
+    "scenario_type": "perturbation",
+    "description": "Fix stepped_cylinder (Translated by (1.3, 3.8, 1.4)). Match reference shape.",
+    "start_geometry": "load_stl('scenarios\\references\\perturbation_0042_start.stl')",
+    "reference_stl": "scenarios\\references\\perturbation_0042_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 1.0
+    },
+    "max_steps": 64,
+    "difficulty": "easy"
+  },
+  {
+    "scenario_id": "perturbation_0043",
+    "scenario_type": "perturbation",
+    "description": "Fix bracket (Uniformly scaled by 1.14). Match reference shape.",
+    "start_geometry": "load_stl('scenarios\\references\\perturbation_0043_start.stl')",
+    "reference_stl": "scenarios\\references\\perturbation_0043_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 1.0
+    },
+    "max_steps": 57,
+    "difficulty": "hard"
+  },
+  {
+    "scenario_id": "perturbation_0044",
+    "scenario_type": "perturbation",
+    "description": "Fix shell_box (Cut with 9.1mm cube at (-6.9,2.7,0.1)). Match reference shape.",
+    "start_geometry": "load_stl('scenarios\\references\\perturbation_0044_start.stl')",
+    "reference_stl": "scenarios\\references\\perturbation_0044_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 1.0
+    },
+    "max_steps": 64,
+    "difficulty": "medium"
+  },
+  {
+    "scenario_id": "perturbation_0045",
+    "scenario_type": "perturbation",
+    "description": "Fix filleted_box (Added sphere r=4.8 at (9.4,1.5,-0.2)). Match reference shape.",
+    "start_geometry": "load_stl('scenarios\\references\\perturbation_0045_start.stl')",
+    "reference_stl": "scenarios\\references\\perturbation_0045_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 1.0
+    },
+    "max_steps": 54,
+    "difficulty": "easy"
+  },
+  {
+    "scenario_id": "perturbation_0046",
+    "scenario_type": "perturbation",
+    "description": "Fix shell_box (Uniformly scaled by 1.15). Match reference shape.",
+    "start_geometry": "load_stl('scenarios\\references\\perturbation_0046_start.stl')",
+    "reference_stl": "scenarios\\references\\perturbation_0046_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 1.0
+    },
+    "max_steps": 42,
+    "difficulty": "medium"
+  },
+  {
+    "scenario_id": "perturbation_0047",
+    "scenario_type": "perturbation",
+    "description": "Fix wedge (Cut with 7.1mm cube at (2.9,7.2,2.1)). Match reference shape.",
+    "start_geometry": "load_stl('scenarios\\references\\perturbation_0047_start.stl')",
+    "reference_stl": "scenarios\\references\\perturbation_0047_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 1.0
+    },
+    "max_steps": 65,
+    "difficulty": "easy"
+  },
+  {
+    "scenario_id": "perturbation_0048",
+    "scenario_type": "perturbation",
+    "description": "Fix l_bracket (Translated by (-1.0, 3.9, -2.1)). Match reference shape.",
+    "start_geometry": "load_stl('scenarios\\references\\perturbation_0048_start.stl')",
+    "reference_stl": "scenarios\\references\\perturbation_0048_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 1.0
+    },
+    "max_steps": 55,
+    "difficulty": "medium"
+  },
+  {
+    "scenario_id": "perturbation_0049",
+    "scenario_type": "perturbation",
+    "description": "Fix filleted_box (Added sphere r=3.4 at (6.0,1.5,-0.8)). Match reference shape.",
+    "start_geometry": "load_stl('scenarios\\references\\perturbation_0049_start.stl')",
+    "reference_stl": "scenarios\\references\\perturbation_0049_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 1.0
+    },
+    "max_steps": 61,
+    "difficulty": "hard"
+  },
+  {
+    "scenario_id": "perturbation_0050",
+    "scenario_type": "perturbation",
+    "description": "Fix l_bracket (Cut with 6.4mm cube at (-0.1,-3.3,-0.6)). Match reference shape.",
+    "start_geometry": "load_stl('scenarios\\references\\perturbation_0050_start.stl')",
+    "reference_stl": "scenarios\\references\\perturbation_0050_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 1.0
+    },
+    "max_steps": 41,
+    "difficulty": "easy"
+  },
+  {
+    "scenario_id": "perturbation_0051",
+    "scenario_type": "perturbation",
+    "description": "Fix stepped_cylinder (Added sphere r=6.1 at (-2.0,-3.4,6.1)). Match reference shape.",
+    "start_geometry": "load_stl('scenarios\\references\\perturbation_0051_start.stl')",
+    "reference_stl": "scenarios\\references\\perturbation_0051_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 1.0
+    },
+    "max_steps": 46,
+    "difficulty": "medium"
+  },
+  {
+    "scenario_id": "perturbation_0052",
+    "scenario_type": "perturbation",
+    "description": "Fix wedge (Uniformly scaled by 0.73). Match reference shape.",
+    "start_geometry": "load_stl('scenarios\\references\\perturbation_0052_start.stl')",
+    "reference_stl": "scenarios\\references\\perturbation_0052_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 1.0
+    },
+    "max_steps": 47,
+    "difficulty": "hard"
+  },
+  {
+    "scenario_id": "perturbation_0053",
+    "scenario_type": "perturbation",
+    "description": "Fix bracket (Translated by (-2.1, 5.0, 1.2)). Match reference shape.",
+    "start_geometry": "load_stl('scenarios\\references\\perturbation_0053_start.stl')",
+    "reference_stl": "scenarios\\references\\perturbation_0053_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 1.0
+    },
+    "max_steps": 51,
+    "difficulty": "hard"
+  },
+  {
+    "scenario_id": "perturbation_0054",
+    "scenario_type": "perturbation",
+    "description": "Fix stepped_cylinder (Added sphere r=6.0 at (-4.5,-6.2,-0.8)). Match reference shape.",
+    "start_geometry": "load_stl('scenarios\\references\\perturbation_0054_start.stl')",
+    "reference_stl": "scenarios\\references\\perturbation_0054_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 1.0
+    },
+    "max_steps": 50,
+    "difficulty": "medium"
+  },
+  {
+    "scenario_id": "perturbation_0055",
+    "scenario_type": "perturbation",
+    "description": "Fix shell_box (Translated by (-4.7, -2.2, -0.5)). Match reference shape.",
+    "start_geometry": "load_stl('scenarios\\references\\perturbation_0055_start.stl')",
+    "reference_stl": "scenarios\\references\\perturbation_0055_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 1.0
+    },
+    "max_steps": 58,
+    "difficulty": "easy"
+  },
+  {
+    "scenario_id": "perturbation_0056",
+    "scenario_type": "perturbation",
+    "description": "Fix filleted_box (Uniformly scaled by 1.07). Match reference shape.",
+    "start_geometry": "load_stl('scenarios\\references\\perturbation_0056_start.stl')",
+    "reference_stl": "scenarios\\references\\perturbation_0056_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 1.0
+    },
+    "max_steps": 65,
+    "difficulty": "easy"
+  },
+  {
+    "scenario_id": "perturbation_0057",
+    "scenario_type": "perturbation",
+    "description": "Fix shell_box (Uniformly scaled by 0.99). Match reference shape.",
+    "start_geometry": "load_stl('scenarios\\references\\perturbation_0057_start.stl')",
+    "reference_stl": "scenarios\\references\\perturbation_0057_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 1.0
+    },
+    "max_steps": 62,
+    "difficulty": "easy"
+  },
+  {
+    "scenario_id": "perturbation_0058",
+    "scenario_type": "perturbation",
+    "description": "Fix l_bracket (Uniformly scaled by 0.95). Match reference shape.",
+    "start_geometry": "load_stl('scenarios\\references\\perturbation_0058_start.stl')",
+    "reference_stl": "scenarios\\references\\perturbation_0058_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 1.0
+    },
+    "max_steps": 65,
+    "difficulty": "easy"
+  },
+  {
+    "scenario_id": "perturbation_0059",
+    "scenario_type": "perturbation",
+    "description": "Fix shell_box (Uniformly scaled by 1.05). Match reference shape.",
+    "start_geometry": "load_stl('scenarios\\references\\perturbation_0059_start.stl')",
+    "reference_stl": "scenarios\\references\\perturbation_0059_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 1.0
+    },
+    "max_steps": 51,
+    "difficulty": "easy"
+  },
+  {
+    "scenario_id": "perturbation_0060",
+    "scenario_type": "perturbation",
+    "description": "Fix stepped_cylinder (Added sphere r=3.6 at (1.6,1.1,-2.6)). Match reference shape.",
+    "start_geometry": "load_stl('scenarios\\references\\perturbation_0060_start.stl')",
+    "reference_stl": "scenarios\\references\\perturbation_0060_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 1.0
+    },
+    "max_steps": 43,
+    "difficulty": "medium"
+  },
+  {
+    "scenario_id": "perturbation_0061",
+    "scenario_type": "perturbation",
+    "description": "Fix wedge (Translated by (3.5, 0.5, 0.4)). Match reference shape.",
+    "start_geometry": "load_stl('scenarios\\references\\perturbation_0061_start.stl')",
+    "reference_stl": "scenarios\\references\\perturbation_0061_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 1.0
+    },
+    "max_steps": 66,
+    "difficulty": "easy"
+  },
+  {
+    "scenario_id": "perturbation_0062",
+    "scenario_type": "perturbation",
+    "description": "Fix box (Cut with 8.9mm cube at (2.3,4.5,3.0)). Match reference shape.",
+    "start_geometry": "load_stl('scenarios\\references\\perturbation_0062_start.stl')",
+    "reference_stl": "scenarios\\references\\perturbation_0062_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 1.0
+    },
+    "max_steps": 58,
+    "difficulty": "medium"
+  },
+  {
+    "scenario_id": "perturbation_0063",
+    "scenario_type": "perturbation",
+    "description": "Fix l_bracket (Cut with 10.6mm cube at (10.0,-0.9,0.3)). Match reference shape.",
+    "start_geometry": "load_stl('scenarios\\references\\perturbation_0063_start.stl')",
+    "reference_stl": "scenarios\\references\\perturbation_0063_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 1.0
+    },
+    "max_steps": 63,
+    "difficulty": "medium"
+  },
+  {
+    "scenario_id": "perturbation_0064",
+    "scenario_type": "perturbation",
+    "description": "Fix tube (Uniformly scaled by 1.18). Match reference shape.",
+    "start_geometry": "load_stl('scenarios\\references\\perturbation_0064_start.stl')",
+    "reference_stl": "scenarios\\references\\perturbation_0064_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 1.0
+    },
+    "max_steps": 63,
+    "difficulty": "easy"
+  },
+  {
+    "scenario_id": "perturbation_0065",
+    "scenario_type": "perturbation",
+    "description": "Fix cylinder (Translated by (-1.7, 1.3, -1.6)). Match reference shape.",
+    "start_geometry": "load_stl('scenarios\\references\\perturbation_0065_start.stl')",
+    "reference_stl": "scenarios\\references\\perturbation_0065_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 1.0
+    },
+    "max_steps": 42,
+    "difficulty": "easy"
+  },
+  {
+    "scenario_id": "constrained_0000",
+    "scenario_type": "constrained",
+    "description": "Modify box to satisfy 5 engineering constraints.",
+    "start_geometry": "box(17.6, 12.3, 6.4)",
+    "reference_stl": null,
+    "constraints": {
+      "target_volume": {
+        "type": "tolerance",
+        "measurement": "volume",
+        "target": 4434.429221844877,
+        "tolerance": 306.09442194568436
+      },
+      "max_bbox_x": {
+        "type": "dimensional",
+        "measurement": "bbox_x",
+        "min": 0,
+        "max": 49.19331047810313
+      },
+      "min_wall": {
+        "type": "printability",
+        "min_wall": 1.5223224746491524
+      },
+      "has_hole": {
+        "type": "feature",
+        "feature_type": "hole"
+      },
+      "max_bbox_z": {
+        "type": "dimensional",
+        "measurement": "bbox_z",
+        "min": 6.119245329531603,
+        "max": 27.32685955266674
+      }
+    },
+    "targets": {},
+    "max_steps": 67,
+    "difficulty": "medium"
+  },
+  {
+    "scenario_id": "constrained_0001",
+    "scenario_type": "constrained",
+    "description": "Modify box to satisfy 5 engineering constraints.",
+    "start_geometry": "box(15.6, 18.2, 10.3)",
+    "reference_stl": null,
+    "constraints": {
+      "max_bbox_x": {
+        "type": "dimensional",
+        "measurement": "bbox_x",
+        "min": 0,
+        "max": 35.10251812564571
+      },
+      "min_wall": {
+        "type": "printability",
+        "min_wall": 1.6284737943552385
+      },
+      "max_bbox_z": {
+        "type": "dimensional",
+        "measurement": "bbox_z",
+        "min": 5.196560699205495,
+        "max": 26.99115598363564
+      },
+      "has_hole": {
+        "type": "feature",
+        "feature_type": "hole"
+      },
+      "target_volume": {
+        "type": "tolerance",
+        "measurement": "volume",
+        "target": 3325.551752709085,
+        "tolerance": 132.70361277954876
+      }
+    },
+    "targets": {},
+    "max_steps": 93,
+    "difficulty": "hard"
+  },
+  {
+    "scenario_id": "constrained_0002",
+    "scenario_type": "constrained",
+    "description": "Modify cylinder to satisfy 2 engineering constraints.",
+    "start_geometry": "cylinder(5.6, 15.5)",
+    "reference_stl": null,
+    "constraints": {
+      "max_bbox_z": {
+        "type": "dimensional",
+        "measurement": "bbox_z",
+        "min": 6.046746616683551,
+        "max": 20.55708154187073
+      },
+      "target_volume": {
+        "type": "tolerance",
+        "measurement": "volume",
+        "target": 2680.353433359596,
+        "tolerance": 347.3019086121184
+      }
+    },
+    "targets": {},
+    "max_steps": 68,
+    "difficulty": "medium"
+  },
+  {
+    "scenario_id": "constrained_0003",
+    "scenario_type": "constrained",
+    "description": "Modify box to satisfy 4 engineering constraints.",
+    "start_geometry": "box(16.2, 12.2, 6.3)",
+    "reference_stl": null,
+    "constraints": {
+      "max_bbox_z": {
+        "type": "dimensional",
+        "measurement": "bbox_z",
+        "min": 7.237061834117274,
+        "max": 22.98925899682535
+      },
+      "target_volume": {
+        "type": "tolerance",
+        "measurement": "volume",
+        "target": 1591.1172663562834,
+        "tolerance": 207.69729237975238
+      },
+      "min_wall": {
+        "type": "printability",
+        "min_wall": 1.252740995725547
+      },
+      "has_hole": {
+        "type": "feature",
+        "feature_type": "hole"
+      }
+    },
+    "targets": {},
+    "max_steps": 51,
+    "difficulty": "easy"
+  },
+  {
+    "scenario_id": "constrained_0004",
+    "scenario_type": "constrained",
+    "description": "Modify box to satisfy 2 engineering constraints.",
+    "start_geometry": "box(19.2, 14.9, 6.2)",
+    "reference_stl": null,
+    "constraints": {
+      "max_bbox_x": {
+        "type": "dimensional",
+        "measurement": "bbox_x",
+        "min": 0,
+        "max": 30.653129098379143
+      },
+      "target_volume": {
+        "type": "tolerance",
+        "measurement": "volume",
+        "target": 3419.702781312092,
+        "tolerance": 291.8328407017001
+      }
+    },
+    "targets": {},
+    "max_steps": 79,
+    "difficulty": "medium"
+  },
+  {
+    "scenario_id": "constrained_0005",
+    "scenario_type": "constrained",
+    "description": "Modify cylinder to satisfy 5 engineering constraints.",
+    "start_geometry": "cylinder(10.6, 21.7)",
+    "reference_stl": null,
+    "constraints": {
+      "max_bbox_z": {
+        "type": "dimensional",
+        "measurement": "bbox_z",
+        "min": 6.815411481993175,
+        "max": 24.688758619974017
+      },
+      "has_hole": {
+        "type": "feature",
+        "feature_type": "hole"
+      },
+      "min_wall": {
+        "type": "printability",
+        "min_wall": 1.4849339656026943
+      },
+      "target_volume": {
+        "type": "tolerance",
+        "measurement": "volume",
+        "target": 2102.435266540308,
+        "tolerance": 494.60609951719186
+      },
+      "max_bbox_x": {
+        "type": "dimensional",
+        "measurement": "bbox_x",
+        "min": 0,
+        "max": 38.173244580706616
+      }
+    },
+    "targets": {},
+    "max_steps": 61,
+    "difficulty": "medium"
+  },
+  {
+    "scenario_id": "constrained_0006",
+    "scenario_type": "constrained",
+    "description": "Modify box to satisfy 4 engineering constraints.",
+    "start_geometry": "box(18.1, 13.7, 6.6)",
+    "reference_stl": null,
+    "constraints": {
+      "target_volume": {
+        "type": "tolerance",
+        "measurement": "volume",
+        "target": 582.0911664276247,
+        "tolerance": 378.7845849465686
+      },
+      "has_hole": {
+        "type": "feature",
+        "feature_type": "hole"
+      },
+      "max_bbox_z": {
+        "type": "dimensional",
+        "measurement": "bbox_z",
+        "min": 9.986277673841972,
+        "max": 28.449153944610313
+      },
+      "max_bbox_x": {
+        "type": "dimensional",
+        "measurement": "bbox_x",
+        "min": 0,
+        "max": 37.279952534169794
+      }
+    },
+    "targets": {},
+    "max_steps": 95,
+    "difficulty": "hard"
+  },
+  {
+    "scenario_id": "constrained_0007",
+    "scenario_type": "constrained",
+    "description": "Modify cylinder to satisfy 3 engineering constraints.",
+    "start_geometry": "cylinder(14.8, 19.8)",
+    "reference_stl": null,
+    "constraints": {
+      "has_hole": {
+        "type": "feature",
+        "feature_type": "hole"
+      },
+      "max_bbox_z": {
+        "type": "dimensional",
+        "measurement": "bbox_z",
+        "min": 7.783814465069649,
+        "max": 23.574190342048496
+      },
+      "min_wall": {
+        "type": "printability",
+        "min_wall": 1.135974912392341
+      }
+    },
+    "targets": {},
+    "max_steps": 88,
+    "difficulty": "medium"
+  },
+  {
+    "scenario_id": "constrained_0008",
+    "scenario_type": "constrained",
+    "description": "Modify cylinder to satisfy 2 engineering constraints.",
+    "start_geometry": "cylinder(8.2, 18.5)",
+    "reference_stl": null,
+    "constraints": {
+      "target_volume": {
+        "type": "tolerance",
+        "measurement": "volume",
+        "target": 3247.7901909873467,
+        "tolerance": 215.45222129610232
+      },
+      "has_hole": {
+        "type": "feature",
+        "feature_type": "hole"
+      }
+    },
+    "targets": {},
+    "max_steps": 79,
+    "difficulty": "hard"
+  },
+  {
+    "scenario_id": "constrained_0009",
+    "scenario_type": "constrained",
+    "description": "Modify box to satisfy 3 engineering constraints.",
+    "start_geometry": "box(24.6, 18.0, 5.5)",
+    "reference_stl": null,
+    "constraints": {
+      "max_bbox_z": {
+        "type": "dimensional",
+        "measurement": "bbox_z",
+        "min": 9.949801161949726,
+        "max": 19.835307674620843
+      },
+      "has_hole": {
+        "type": "feature",
+        "feature_type": "hole"
+      },
+      "max_bbox_x": {
+        "type": "dimensional",
+        "measurement": "bbox_x",
+        "min": 0,
+        "max": 44.29623337563905
+      }
+    },
+    "targets": {},
+    "max_steps": 62,
+    "difficulty": "easy"
+  },
+  {
+    "scenario_id": "constrained_0010",
+    "scenario_type": "constrained",
+    "description": "Modify box to satisfy 4 engineering constraints.",
+    "start_geometry": "box(30.2, 18.9, 9.7)",
+    "reference_stl": null,
+    "constraints": {
+      "max_bbox_z": {
+        "type": "dimensional",
+        "measurement": "bbox_z",
+        "min": 9.253637300082273,
+        "max": 26.189617883230774
+      },
+      "min_wall": {
+        "type": "printability",
+        "min_wall": 1.2902219515231004
+      },
+      "has_hole": {
+        "type": "feature",
+        "feature_type": "hole"
+      },
+      "target_volume": {
+        "type": "tolerance",
+        "measurement": "volume",
+        "target": 4698.221301949796,
+        "tolerance": 496.37179058295624
+      }
+    },
+    "targets": {},
+    "max_steps": 60,
+    "difficulty": "hard"
+  },
+  {
+    "scenario_id": "constrained_0011",
+    "scenario_type": "constrained",
+    "description": "Modify box to satisfy 2 engineering constraints.",
+    "start_geometry": "box(33.5, 20.8, 5.5)",
+    "reference_stl": null,
+    "constraints": {
+      "has_hole": {
+        "type": "feature",
+        "feature_type": "hole"
+      },
+      "target_volume": {
+        "type": "tolerance",
+        "measurement": "volume",
+        "target": 4097.91708913782,
+        "tolerance": 430.0530706771189
+      }
+    },
+    "targets": {},
+    "max_steps": 59,
+    "difficulty": "hard"
+  },
+  {
+    "scenario_id": "constrained_0012",
+    "scenario_type": "constrained",
+    "description": "Modify box to satisfy 3 engineering constraints.",
+    "start_geometry": "box(27.7, 23.6, 8.2)",
+    "reference_stl": null,
+    "constraints": {
+      "has_hole": {
+        "type": "feature",
+        "feature_type": "hole"
+      },
+      "max_bbox_z": {
+        "type": "dimensional",
+        "measurement": "bbox_z",
+        "min": 6.884722147124538,
+        "max": 21.940196785044098
+      },
+      "max_bbox_x": {
+        "type": "dimensional",
+        "measurement": "bbox_x",
+        "min": 0,
+        "max": 29.04133622492426
+      }
+    },
+    "targets": {},
+    "max_steps": 87,
+    "difficulty": "hard"
+  },
+  {
+    "scenario_id": "constrained_0013",
+    "scenario_type": "constrained",
+    "description": "Modify box to satisfy 3 engineering constraints.",
+    "start_geometry": "box(19.6, 23.5, 8.8)",
+    "reference_stl": null,
+    "constraints": {
+      "target_volume": {
+        "type": "tolerance",
+        "measurement": "volume",
+        "target": 1026.0411831876384,
+        "tolerance": 475.93284944539005
+      },
+      "min_wall": {
+        "type": "printability",
+        "min_wall": 1.5532496636857016
+      },
+      "max_bbox_x": {
+        "type": "dimensional",
+        "measurement": "bbox_x",
+        "min": 0,
+        "max": 30.047168439712586
+      }
+    },
+    "targets": {},
+    "max_steps": 56,
+    "difficulty": "hard"
+  },
+  {
+    "scenario_id": "constrained_0014",
+    "scenario_type": "constrained",
+    "description": "Modify box to satisfy 5 engineering constraints.",
+    "start_geometry": "box(27.4, 18.0, 13.9)",
+    "reference_stl": null,
+    "constraints": {
+      "max_bbox_z": {
+        "type": "dimensional",
+        "measurement": "bbox_z",
+        "min": 8.534902306217296,
+        "max": 26.678579085761264
+      },
+      "max_bbox_x": {
+        "type": "dimensional",
+        "measurement": "bbox_x",
+        "min": 0,
+        "max": 24.29383956645409
+      },
+      "min_wall": {
+        "type": "printability",
+        "min_wall": 1.0454535118033559
+      },
+      "target_volume": {
+        "type": "tolerance",
+        "measurement": "volume",
+        "target": 3713.288370006264,
+        "tolerance": 297.5925948523451
+      },
+      "has_hole": {
+        "type": "feature",
+        "feature_type": "hole"
+      }
+    },
+    "targets": {},
+    "max_steps": 87,
+    "difficulty": "medium"
+  },
+  {
+    "scenario_id": "constrained_0015",
+    "scenario_type": "constrained",
+    "description": "Modify cylinder to satisfy 2 engineering constraints.",
+    "start_geometry": "cylinder(10.4, 17.6)",
+    "reference_stl": null,
+    "constraints": {
+      "target_volume": {
+        "type": "tolerance",
+        "measurement": "volume",
+        "target": 2929.3728670077653,
+        "tolerance": 294.5429927982431
+      },
+      "min_wall": {
+        "type": "printability",
+        "min_wall": 1.290746212502592
+      }
+    },
+    "targets": {},
+    "max_steps": 88,
+    "difficulty": "hard"
+  },
+  {
+    "scenario_id": "constrained_0016",
+    "scenario_type": "constrained",
+    "description": "Modify box to satisfy 4 engineering constraints.",
+    "start_geometry": "box(27.0, 18.5, 12.2)",
+    "reference_stl": null,
+    "constraints": {
+      "min_wall": {
+        "type": "printability",
+        "min_wall": 1.890140673600354
+      },
+      "target_volume": {
+        "type": "tolerance",
+        "measurement": "volume",
+        "target": 3125.263076447542,
+        "tolerance": 260.34056670545596
+      },
+      "max_bbox_x": {
+        "type": "dimensional",
+        "measurement": "bbox_x",
+        "min": 0,
+        "max": 33.86017410932398
+      },
+      "max_bbox_z": {
+        "type": "dimensional",
+        "measurement": "bbox_z",
+        "min": 9.736416698059077,
+        "max": 17.3002710467412
+      }
+    },
+    "targets": {},
+    "max_steps": 79,
+    "difficulty": "medium"
+  },
+  {
+    "scenario_id": "constrained_0017",
+    "scenario_type": "constrained",
+    "description": "Modify cylinder to satisfy 5 engineering constraints.",
+    "start_geometry": "cylinder(11.1, 10.4)",
+    "reference_stl": null,
+    "constraints": {
+      "has_hole": {
+        "type": "feature",
+        "feature_type": "hole"
+      },
+      "target_volume": {
+        "type": "tolerance",
+        "measurement": "volume",
+        "target": 603.6017215443688,
+        "tolerance": 360.54688439529843
+      },
+      "min_wall": {
+        "type": "printability",
+        "min_wall": 1.7254960022236856
+      },
+      "max_bbox_z": {
+        "type": "dimensional",
+        "measurement": "bbox_z",
+        "min": 6.87217684860211,
+        "max": 16.03382309050828
+      },
+      "max_bbox_x": {
+        "type": "dimensional",
+        "measurement": "bbox_x",
+        "min": 0,
+        "max": 22.319631964663618
+      }
+    },
+    "targets": {},
+    "max_steps": 55,
+    "difficulty": "easy"
+  },
+  {
+    "scenario_id": "constrained_0018",
+    "scenario_type": "constrained",
+    "description": "Modify cylinder to satisfy 2 engineering constraints.",
+    "start_geometry": "cylinder(14.1, 12.5)",
+    "reference_stl": null,
+    "constraints": {
+      "min_wall": {
+        "type": "printability",
+        "min_wall": 0.9495952174439203
+      },
+      "max_bbox_x": {
+        "type": "dimensional",
+        "measurement": "bbox_x",
+        "min": 0,
+        "max": 47.625256478521166
+      }
+    },
+    "targets": {},
+    "max_steps": 93,
+    "difficulty": "hard"
+  },
+  {
+    "scenario_id": "constrained_0019",
+    "scenario_type": "constrained",
+    "description": "Modify box to satisfy 2 engineering constraints.",
+    "start_geometry": "box(26.8, 16.0, 5.5)",
+    "reference_stl": null,
+    "constraints": {
+      "has_hole": {
+        "type": "feature",
+        "feature_type": "hole"
+      },
+      "max_bbox_x": {
+        "type": "dimensional",
+        "measurement": "bbox_x",
+        "min": 0,
+        "max": 38.111645951904165
+      }
+    },
+    "targets": {},
+    "max_steps": 55,
+    "difficulty": "easy"
+  },
+  {
+    "scenario_id": "constrained_0020",
+    "scenario_type": "constrained",
+    "description": "Modify cylinder to satisfy 3 engineering constraints.",
+    "start_geometry": "cylinder(14.2, 16.9)",
+    "reference_stl": null,
+    "constraints": {
+      "max_bbox_z": {
+        "type": "dimensional",
+        "measurement": "bbox_z",
+        "min": 7.935341120682836,
+        "max": 15.492700053651575
+      },
+      "min_wall": {
+        "type": "printability",
+        "min_wall": 1.8952993554549546
+      },
+      "has_hole": {
+        "type": "feature",
+        "feature_type": "hole"
+      }
+    },
+    "targets": {},
+    "max_steps": 62,
+    "difficulty": "easy"
+  },
+  {
+    "scenario_id": "constrained_0021",
+    "scenario_type": "constrained",
+    "description": "Modify box to satisfy 2 engineering constraints.",
+    "start_geometry": "box(18.3, 10.5, 8.1)",
+    "reference_stl": null,
+    "constraints": {
+      "min_wall": {
+        "type": "printability",
+        "min_wall": 1.0552169412094716
+      },
+      "has_hole": {
+        "type": "feature",
+        "feature_type": "hole"
+      }
+    },
+    "targets": {},
+    "max_steps": 75,
+    "difficulty": "easy"
+  },
+  {
+    "scenario_id": "constrained_0022",
+    "scenario_type": "constrained",
+    "description": "Modify cylinder to satisfy 3 engineering constraints.",
+    "start_geometry": "cylinder(9.6, 21.1)",
+    "reference_stl": null,
+    "constraints": {
+      "has_hole": {
+        "type": "feature",
+        "feature_type": "hole"
+      },
+      "target_volume": {
+        "type": "tolerance",
+        "measurement": "volume",
+        "target": 2759.8775464905916,
+        "tolerance": 338.1540069280175
+      },
+      "min_wall": {
+        "type": "printability",
+        "min_wall": 0.880491772866113
+      }
+    },
+    "targets": {},
+    "max_steps": 87,
+    "difficulty": "hard"
+  },
+  {
+    "scenario_id": "constrained_0023",
+    "scenario_type": "constrained",
+    "description": "Modify cylinder to satisfy 2 engineering constraints.",
+    "start_geometry": "cylinder(14.0, 14.1)",
+    "reference_stl": null,
+    "constraints": {
+      "max_bbox_x": {
+        "type": "dimensional",
+        "measurement": "bbox_x",
+        "min": 0,
+        "max": 45.09694439876999
+      },
+      "target_volume": {
+        "type": "tolerance",
+        "measurement": "volume",
+        "target": 3143.5412190533343,
+        "tolerance": 217.61787168838862
+      }
+    },
+    "targets": {},
+    "max_steps": 85,
+    "difficulty": "medium"
+  },
+  {
+    "scenario_id": "constrained_0024",
+    "scenario_type": "constrained",
+    "description": "Modify cylinder to satisfy 3 engineering constraints.",
+    "start_geometry": "cylinder(10.3, 19.6)",
+    "reference_stl": null,
+    "constraints": {
+      "max_bbox_z": {
+        "type": "dimensional",
+        "measurement": "bbox_z",
+        "min": 9.308928105067587,
+        "max": 29.19173193200449
+      },
+      "target_volume": {
+        "type": "tolerance",
+        "measurement": "volume",
+        "target": 2179.8919232588883,
+        "tolerance": 208.2978692574215
+      },
+      "min_wall": {
+        "type": "printability",
+        "min_wall": 1.572799451886819
+      }
+    },
+    "targets": {},
+    "max_steps": 70,
+    "difficulty": "hard"
+  },
+  {
+    "scenario_id": "constrained_0025",
+    "scenario_type": "constrained",
+    "description": "Modify box to satisfy 2 engineering constraints.",
+    "start_geometry": "box(18.1, 20.7, 11.6)",
+    "reference_stl": null,
+    "constraints": {
+      "has_hole": {
+        "type": "feature",
+        "feature_type": "hole"
+      },
+      "target_volume": {
+        "type": "tolerance",
+        "measurement": "volume",
+        "target": 1382.5089486205375,
+        "tolerance": 302.2031516424135
+      }
+    },
+    "targets": {},
+    "max_steps": 79,
+    "difficulty": "easy"
+  },
+  {
+    "scenario_id": "constrained_0026",
+    "scenario_type": "constrained",
+    "description": "Modify box to satisfy 5 engineering constraints.",
+    "start_geometry": "box(26.4, 23.3, 10.6)",
+    "reference_stl": null,
+    "constraints": {
+      "min_wall": {
+        "type": "printability",
+        "min_wall": 1.8268357617275428
+      },
+      "max_bbox_z": {
+        "type": "dimensional",
+        "measurement": "bbox_z",
+        "min": 9.151099322834959,
+        "max": 20.957752944276823
+      },
+      "has_hole": {
+        "type": "feature",
+        "feature_type": "hole"
+      },
+      "max_bbox_x": {
+        "type": "dimensional",
+        "measurement": "bbox_x",
+        "min": 0,
+        "max": 40.042554097119385
+      },
+      "target_volume": {
+        "type": "tolerance",
+        "measurement": "volume",
+        "target": 1422.4293293711944,
+        "tolerance": 217.2590921044053
+      }
+    },
+    "targets": {},
+    "max_steps": 94,
+    "difficulty": "hard"
+  },
+  {
+    "scenario_id": "constrained_0027",
+    "scenario_type": "constrained",
+    "description": "Modify cylinder to satisfy 4 engineering constraints.",
+    "start_geometry": "cylinder(5.9, 14.2)",
+    "reference_stl": null,
+    "constraints": {
+      "max_bbox_z": {
+        "type": "dimensional",
+        "measurement": "bbox_z",
+        "min": 8.519730675692546,
+        "max": 28.659360053104557
+      },
+      "target_volume": {
+        "type": "tolerance",
+        "measurement": "volume",
+        "target": 3311.42571969463,
+        "tolerance": 234.34634285993403
+      },
+      "min_wall": {
+        "type": "printability",
+        "min_wall": 1.7901287977071918
+      },
+      "max_bbox_x": {
+        "type": "dimensional",
+        "measurement": "bbox_x",
+        "min": 0,
+        "max": 30.891776365852714
+      }
+    },
+    "targets": {},
+    "max_steps": 51,
+    "difficulty": "easy"
+  },
+  {
+    "scenario_id": "constrained_0028",
+    "scenario_type": "constrained",
+    "description": "Modify box to satisfy 5 engineering constraints.",
+    "start_geometry": "box(23.2, 18.3, 9.4)",
+    "reference_stl": null,
+    "constraints": {
+      "min_wall": {
+        "type": "printability",
+        "min_wall": 1.735710529745637
+      },
+      "has_hole": {
+        "type": "feature",
+        "feature_type": "hole"
+      },
+      "target_volume": {
+        "type": "tolerance",
+        "measurement": "volume",
+        "target": 1014.0706666417857,
+        "tolerance": 326.3106479866242
+      },
+      "max_bbox_z": {
+        "type": "dimensional",
+        "measurement": "bbox_z",
+        "min": 9.926836561208674,
+        "max": 22.065981790407214
+      },
+      "max_bbox_x": {
+        "type": "dimensional",
+        "measurement": "bbox_x",
+        "min": 0,
+        "max": 25.463214164647496
+      }
+    },
+    "targets": {},
+    "max_steps": 74,
+    "difficulty": "easy"
+  },
+  {
+    "scenario_id": "constrained_0029",
+    "scenario_type": "constrained",
+    "description": "Modify cylinder to satisfy 2 engineering constraints.",
+    "start_geometry": "cylinder(12.4, 24.0)",
+    "reference_stl": null,
+    "constraints": {
+      "max_bbox_x": {
+        "type": "dimensional",
+        "measurement": "bbox_x",
+        "min": 0,
+        "max": 32.651118036598454
+      },
+      "has_hole": {
+        "type": "feature",
+        "feature_type": "hole"
+      }
+    },
+    "targets": {},
+    "max_steps": 56,
+    "difficulty": "easy"
+  },
+  {
+    "scenario_id": "constrained_0030",
+    "scenario_type": "constrained",
+    "description": "Modify box to satisfy 5 engineering constraints.",
+    "start_geometry": "box(28.8, 20.2, 13.2)",
+    "reference_stl": null,
+    "constraints": {
+      "max_bbox_x": {
+        "type": "dimensional",
+        "measurement": "bbox_x",
+        "min": 0,
+        "max": 22.015261997471303
+      },
+      "max_bbox_z": {
+        "type": "dimensional",
+        "measurement": "bbox_z",
+        "min": 7.0262404401384435,
+        "max": 22.46197340969836
+      },
+      "min_wall": {
+        "type": "printability",
+        "min_wall": 1.6642430979587548
+      },
+      "target_volume": {
+        "type": "tolerance",
+        "measurement": "volume",
+        "target": 979.6042855790347,
+        "tolerance": 156.0074154641796
+      },
+      "has_hole": {
+        "type": "feature",
+        "feature_type": "hole"
+      }
+    },
+    "targets": {},
+    "max_steps": 63,
+    "difficulty": "hard"
+  },
+  {
+    "scenario_id": "constrained_0031",
+    "scenario_type": "constrained",
+    "description": "Modify cylinder to satisfy 2 engineering constraints.",
+    "start_geometry": "cylinder(12.3, 15.0)",
+    "reference_stl": null,
+    "constraints": {
+      "max_bbox_z": {
+        "type": "dimensional",
+        "measurement": "bbox_z",
+        "min": 9.5720597296248,
+        "max": 21.281557873381097
+      },
+      "target_volume": {
+        "type": "tolerance",
+        "measurement": "volume",
+        "target": 2224.1233771227385,
+        "tolerance": 307.56708211313503
+      }
+    },
+    "targets": {},
+    "max_steps": 52,
+    "difficulty": "medium"
+  },
+  {
+    "scenario_id": "constrained_0032",
+    "scenario_type": "constrained",
+    "description": "Modify box to satisfy 2 engineering constraints.",
+    "start_geometry": "box(18.7, 11.4, 12.7)",
+    "reference_stl": null,
+    "constraints": {
+      "min_wall": {
+        "type": "printability",
+        "min_wall": 1.898616412750297
+      },
+      "target_volume": {
+        "type": "tolerance",
+        "measurement": "volume",
+        "target": 3746.8978750485753,
+        "tolerance": 344.16186680318305
+      }
+    },
+    "targets": {},
+    "max_steps": 97,
+    "difficulty": "hard"
+  },
+  {
+    "scenario_id": "constrained_0033",
+    "scenario_type": "constrained",
+    "description": "Modify box to satisfy 3 engineering constraints.",
+    "start_geometry": "box(34.1, 12.0, 9.8)",
+    "reference_stl": null,
+    "constraints": {
+      "target_volume": {
+        "type": "tolerance",
+        "measurement": "volume",
+        "target": 4286.883471395195,
+        "tolerance": 438.5631397258229
+      },
+      "min_wall": {
+        "type": "printability",
+        "min_wall": 1.9462835752681749
+      },
+      "has_hole": {
+        "type": "feature",
+        "feature_type": "hole"
+      }
+    },
+    "targets": {},
+    "max_steps": 57,
+    "difficulty": "easy"
+  },
+  {
+    "scenario_id": "constrained_0034",
+    "scenario_type": "constrained",
+    "description": "Modify cylinder to satisfy 5 engineering constraints.",
+    "start_geometry": "cylinder(9.7, 16.9)",
+    "reference_stl": null,
+    "constraints": {
+      "target_volume": {
+        "type": "tolerance",
+        "measurement": "volume",
+        "target": 3597.8107839248123,
+        "tolerance": 273.9309354414985
+      },
+      "max_bbox_x": {
+        "type": "dimensional",
+        "measurement": "bbox_x",
+        "min": 0,
+        "max": 27.392060997173203
+      },
+      "max_bbox_z": {
+        "type": "dimensional",
+        "measurement": "bbox_z",
+        "min": 9.095511588370998,
+        "max": 26.991238184534687
+      },
+      "has_hole": {
+        "type": "feature",
+        "feature_type": "hole"
+      },
+      "min_wall": {
+        "type": "printability",
+        "min_wall": 1.6336357650253122
+      }
+    },
+    "targets": {},
+    "max_steps": 63,
+    "difficulty": "medium"
+  },
+  {
+    "scenario_id": "constrained_0035",
+    "scenario_type": "constrained",
+    "description": "Modify cylinder to satisfy 4 engineering constraints.",
+    "start_geometry": "cylinder(8.6, 11.8)",
+    "reference_stl": null,
+    "constraints": {
+      "max_bbox_x": {
+        "type": "dimensional",
+        "measurement": "bbox_x",
+        "min": 0,
+        "max": 40.716806973369216
+      },
+      "target_volume": {
+        "type": "tolerance",
+        "measurement": "volume",
+        "target": 2845.8530033610623,
+        "tolerance": 134.68208474487344
+      },
+      "max_bbox_z": {
+        "type": "dimensional",
+        "measurement": "bbox_z",
+        "min": 9.790853965019652,
+        "max": 26.37588620918522
+      },
+      "has_hole": {
+        "type": "feature",
+        "feature_type": "hole"
+      }
+    },
+    "targets": {},
+    "max_steps": 81,
+    "difficulty": "easy"
+  },
+  {
+    "scenario_id": "constrained_0036",
+    "scenario_type": "constrained",
+    "description": "Modify box to satisfy 3 engineering constraints.",
+    "start_geometry": "box(29.5, 19.6, 14.8)",
+    "reference_stl": null,
+    "constraints": {
+      "target_volume": {
+        "type": "tolerance",
+        "measurement": "volume",
+        "target": 4944.506035984911,
+        "tolerance": 477.6237358746453
+      },
+      "has_hole": {
+        "type": "feature",
+        "feature_type": "hole"
+      },
+      "max_bbox_x": {
+        "type": "dimensional",
+        "measurement": "bbox_x",
+        "min": 0,
+        "max": 21.182804341055178
+      }
+    },
+    "targets": {},
+    "max_steps": 85,
+    "difficulty": "hard"
+  },
+  {
+    "scenario_id": "constrained_0037",
+    "scenario_type": "constrained",
+    "description": "Modify box to satisfy 3 engineering constraints.",
+    "start_geometry": "box(18.6, 18.5, 14.2)",
+    "reference_stl": null,
+    "constraints": {
+      "target_volume": {
+        "type": "tolerance",
+        "measurement": "volume",
+        "target": 4659.782879194387,
+        "tolerance": 488.4232980661471
+      },
+      "max_bbox_z": {
+        "type": "dimensional",
+        "measurement": "bbox_z",
+        "min": 9.72133244556717,
+        "max": 22.113213249861957
+      },
+      "min_wall": {
+        "type": "printability",
+        "min_wall": 1.8344511811871762
+      }
+    },
+    "targets": {},
+    "max_steps": 92,
+    "difficulty": "medium"
+  },
+  {
+    "scenario_id": "constrained_0038",
+    "scenario_type": "constrained",
+    "description": "Modify box to satisfy 4 engineering constraints.",
+    "start_geometry": "box(31.6, 10.6, 11.0)",
+    "reference_stl": null,
+    "constraints": {
+      "max_bbox_x": {
+        "type": "dimensional",
+        "measurement": "bbox_x",
+        "min": 0,
+        "max": 46.54995069569843
+      },
+      "target_volume": {
+        "type": "tolerance",
+        "measurement": "volume",
+        "target": 2886.193096857051,
+        "tolerance": 276.4128646992647
+      },
+      "min_wall": {
+        "type": "printability",
+        "min_wall": 1.285382539618221
+      },
+      "has_hole": {
+        "type": "feature",
+        "feature_type": "hole"
+      }
+    },
+    "targets": {},
+    "max_steps": 78,
+    "difficulty": "easy"
+  },
+  {
+    "scenario_id": "constrained_0039",
+    "scenario_type": "constrained",
+    "description": "Modify cylinder to satisfy 3 engineering constraints.",
+    "start_geometry": "cylinder(12.9, 16.4)",
+    "reference_stl": null,
+    "constraints": {
+      "max_bbox_x": {
+        "type": "dimensional",
+        "measurement": "bbox_x",
+        "min": 0,
+        "max": 46.29996133587348
+      },
+      "target_volume": {
+        "type": "tolerance",
+        "measurement": "volume",
+        "target": 2378.7773781255146,
+        "tolerance": 284.77714023023503
+      },
+      "has_hole": {
+        "type": "feature",
+        "feature_type": "hole"
+      }
+    },
+    "targets": {},
+    "max_steps": 99,
+    "difficulty": "hard"
+  },
+  {
+    "scenario_id": "constrained_0040",
+    "scenario_type": "constrained",
+    "description": "Modify box to satisfy 4 engineering constraints.",
+    "start_geometry": "box(18.7, 15.8, 14.3)",
+    "reference_stl": null,
+    "constraints": {
+      "max_bbox_x": {
+        "type": "dimensional",
+        "measurement": "bbox_x",
+        "min": 0,
+        "max": 32.057927408277266
+      },
+      "has_hole": {
+        "type": "feature",
+        "feature_type": "hole"
+      },
+      "target_volume": {
+        "type": "tolerance",
+        "measurement": "volume",
+        "target": 2659.44029136759,
+        "tolerance": 351.002185287348
+      },
+      "min_wall": {
+        "type": "printability",
+        "min_wall": 1.8484125370236064
+      }
+    },
+    "targets": {},
+    "max_steps": 99,
+    "difficulty": "medium"
+  },
+  {
+    "scenario_id": "constrained_0041",
+    "scenario_type": "constrained",
+    "description": "Modify cylinder to satisfy 2 engineering constraints.",
+    "start_geometry": "cylinder(9.2, 18.4)",
+    "reference_stl": null,
+    "constraints": {
+      "max_bbox_z": {
+        "type": "dimensional",
+        "measurement": "bbox_z",
+        "min": 7.336553832688263,
+        "max": 19.455043146823233
+      },
+      "max_bbox_x": {
+        "type": "dimensional",
+        "measurement": "bbox_x",
+        "min": 0,
+        "max": 45.584654650757045
+      }
+    },
+    "targets": {},
+    "max_steps": 85,
+    "difficulty": "easy"
+  },
+  {
+    "scenario_id": "constrained_0042",
+    "scenario_type": "constrained",
+    "description": "Modify box to satisfy 4 engineering constraints.",
+    "start_geometry": "box(20.5, 23.7, 5.5)",
+    "reference_stl": null,
+    "constraints": {
+      "max_bbox_z": {
+        "type": "dimensional",
+        "measurement": "bbox_z",
+        "min": 8.989946610716917,
+        "max": 18.884739774027203
+      },
+      "target_volume": {
+        "type": "tolerance",
+        "measurement": "volume",
+        "target": 3148.4940303796043,
+        "tolerance": 492.93220603203264
+      },
+      "max_bbox_x": {
+        "type": "dimensional",
+        "measurement": "bbox_x",
+        "min": 0,
+        "max": 46.52596934394509
+      },
+      "has_hole": {
+        "type": "feature",
+        "feature_type": "hole"
+      }
+    },
+    "targets": {},
+    "max_steps": 80,
+    "difficulty": "medium"
+  },
+  {
+    "scenario_id": "constrained_0043",
+    "scenario_type": "constrained",
+    "description": "Modify box to satisfy 5 engineering constraints.",
+    "start_geometry": "box(34.8, 21.2, 5.6)",
+    "reference_stl": null,
+    "constraints": {
+      "has_hole": {
+        "type": "feature",
+        "feature_type": "hole"
+      },
+      "target_volume": {
+        "type": "tolerance",
+        "measurement": "volume",
+        "target": 3234.815576954866,
+        "tolerance": 305.0754044066034
+      },
+      "max_bbox_x": {
+        "type": "dimensional",
+        "measurement": "bbox_x",
+        "min": 0,
+        "max": 26.92009435153276
+      },
+      "min_wall": {
+        "type": "printability",
+        "min_wall": 1.01183363840661
+      },
+      "max_bbox_z": {
+        "type": "dimensional",
+        "measurement": "bbox_z",
+        "min": 6.102431045350877,
+        "max": 17.796573932163817
+      }
+    },
+    "targets": {},
+    "max_steps": 88,
+    "difficulty": "medium"
+  },
+  {
+    "scenario_id": "constrained_0044",
+    "scenario_type": "constrained",
+    "description": "Modify box to satisfy 4 engineering constraints.",
+    "start_geometry": "box(16.2, 24.5, 13.8)",
+    "reference_stl": null,
+    "constraints": {
+      "has_hole": {
+        "type": "feature",
+        "feature_type": "hole"
+      },
+      "max_bbox_x": {
+        "type": "dimensional",
+        "measurement": "bbox_x",
+        "min": 0,
+        "max": 27.80700103854582
+      },
+      "min_wall": {
+        "type": "printability",
+        "min_wall": 1.418297509177671
+      },
+      "target_volume": {
+        "type": "tolerance",
+        "measurement": "volume",
+        "target": 2710.3385339088195,
+        "tolerance": 498.5343103226897
+      }
+    },
+    "targets": {},
+    "max_steps": 94,
+    "difficulty": "hard"
+  },
+  {
+    "scenario_id": "constrained_0045",
+    "scenario_type": "constrained",
+    "description": "Modify cylinder to satisfy 2 engineering constraints.",
+    "start_geometry": "cylinder(11.2, 25.0)",
+    "reference_stl": null,
+    "constraints": {
+      "max_bbox_x": {
+        "type": "dimensional",
+        "measurement": "bbox_x",
+        "min": 0,
+        "max": 22.744605121932647
+      },
+      "has_hole": {
+        "type": "feature",
+        "feature_type": "hole"
+      }
+    },
+    "targets": {},
+    "max_steps": 93,
+    "difficulty": "hard"
+  },
+  {
+    "scenario_id": "constrained_0046",
+    "scenario_type": "constrained",
+    "description": "Modify box to satisfy 5 engineering constraints.",
+    "start_geometry": "box(17.6, 23.3, 14.6)",
+    "reference_stl": null,
+    "constraints": {
+      "max_bbox_z": {
+        "type": "dimensional",
+        "measurement": "bbox_z",
+        "min": 9.657947441594949,
+        "max": 26.02818981785179
+      },
+      "has_hole": {
+        "type": "feature",
+        "feature_type": "hole"
+      },
+      "max_bbox_x": {
+        "type": "dimensional",
+        "measurement": "bbox_x",
+        "min": 0,
+        "max": 28.441728817325803
+      },
+      "min_wall": {
+        "type": "printability",
+        "min_wall": 1.1031789127530622
+      },
+      "target_volume": {
+        "type": "tolerance",
+        "measurement": "volume",
+        "target": 522.8696291811168,
+        "tolerance": 378.28571713990004
+      }
+    },
+    "targets": {},
+    "max_steps": 52,
+    "difficulty": "medium"
+  },
+  {
+    "scenario_id": "constrained_0047",
+    "scenario_type": "constrained",
+    "description": "Modify cylinder to satisfy 5 engineering constraints.",
+    "start_geometry": "cylinder(14.6, 12.2)",
+    "reference_stl": null,
+    "constraints": {
+      "max_bbox_x": {
+        "type": "dimensional",
+        "measurement": "bbox_x",
+        "min": 0,
+        "max": 34.854395810419234
+      },
+      "target_volume": {
+        "type": "tolerance",
+        "measurement": "volume",
+        "target": 2662.639597969916,
+        "tolerance": 336.96311386380705
+      },
+      "max_bbox_z": {
+        "type": "dimensional",
+        "measurement": "bbox_z",
+        "min": 9.123404829625745,
+        "max": 20.217138118532894
+      },
+      "min_wall": {
+        "type": "printability",
+        "min_wall": 1.6136193830708763
+      },
+      "has_hole": {
+        "type": "feature",
+        "feature_type": "hole"
+      }
+    },
+    "targets": {},
+    "max_steps": 78,
+    "difficulty": "easy"
+  },
+  {
+    "scenario_id": "constrained_0048",
+    "scenario_type": "constrained",
+    "description": "Modify box to satisfy 2 engineering constraints.",
+    "start_geometry": "box(32.6, 22.0, 11.6)",
+    "reference_stl": null,
+    "constraints": {
+      "target_volume": {
+        "type": "tolerance",
+        "measurement": "volume",
+        "target": 4266.559977636524,
+        "tolerance": 378.98858466771344
+      },
+      "max_bbox_z": {
+        "type": "dimensional",
+        "measurement": "bbox_z",
+        "min": 8.400703858801503,
+        "max": 24.279170673227764
+      }
+    },
+    "targets": {},
+    "max_steps": 87,
+    "difficulty": "hard"
+  },
+  {
+    "scenario_id": "constrained_0049",
+    "scenario_type": "constrained",
+    "description": "Modify box to satisfy 4 engineering constraints.",
+    "start_geometry": "box(32.6, 23.1, 5.3)",
+    "reference_stl": null,
+    "constraints": {
+      "max_bbox_z": {
+        "type": "dimensional",
+        "measurement": "bbox_z",
+        "min": 8.71754128145804,
+        "max": 17.411398440724625
+      },
+      "min_wall": {
+        "type": "printability",
+        "min_wall": 1.7815604289428746
+      },
+      "max_bbox_x": {
+        "type": "dimensional",
+        "measurement": "bbox_x",
+        "min": 0,
+        "max": 44.964025338732256
+      },
+      "has_hole": {
+        "type": "feature",
+        "feature_type": "hole"
+      }
+    },
+    "targets": {},
+    "max_steps": 75,
+    "difficulty": "hard"
+  },
+  {
+    "scenario_id": "constrained_0050",
+    "scenario_type": "constrained",
+    "description": "Modify cylinder to satisfy 2 engineering constraints.",
+    "start_geometry": "cylinder(7.9, 22.3)",
+    "reference_stl": null,
+    "constraints": {
+      "max_bbox_z": {
+        "type": "dimensional",
+        "measurement": "bbox_z",
+        "min": 8.170028515498057,
+        "max": 23.099780695737834
+      },
+      "target_volume": {
+        "type": "tolerance",
+        "measurement": "volume",
+        "target": 4009.304278180146,
+        "tolerance": 142.79225553078336
+      }
+    },
+    "targets": {},
+    "max_steps": 88,
+    "difficulty": "medium"
+  },
+  {
+    "scenario_id": "constrained_0051",
+    "scenario_type": "constrained",
+    "description": "Modify box to satisfy 3 engineering constraints.",
+    "start_geometry": "box(34.3, 15.1, 11.3)",
+    "reference_stl": null,
+    "constraints": {
+      "max_bbox_z": {
+        "type": "dimensional",
+        "measurement": "bbox_z",
+        "min": 5.868767376537834,
+        "max": 26.562811628114847
+      },
+      "max_bbox_x": {
+        "type": "dimensional",
+        "measurement": "bbox_x",
+        "min": 0,
+        "max": 48.41893664769014
+      },
+      "target_volume": {
+        "type": "tolerance",
+        "measurement": "volume",
+        "target": 1248.6991411952254,
+        "tolerance": 408.3937170128542
+      }
+    },
+    "targets": {},
+    "max_steps": 85,
+    "difficulty": "medium"
+  },
+  {
+    "scenario_id": "constrained_0052",
+    "scenario_type": "constrained",
+    "description": "Modify box to satisfy 3 engineering constraints.",
+    "start_geometry": "box(16.2, 11.1, 13.5)",
+    "reference_stl": null,
+    "constraints": {
+      "target_volume": {
+        "type": "tolerance",
+        "measurement": "volume",
+        "target": 3174.781366528454,
+        "tolerance": 253.44490416224872
+      },
+      "min_wall": {
+        "type": "printability",
+        "min_wall": 0.8787513734888156
+      },
+      "max_bbox_x": {
+        "type": "dimensional",
+        "measurement": "bbox_x",
+        "min": 0,
+        "max": 44.64538842222323
+      }
+    },
+    "targets": {},
+    "max_steps": 68,
+    "difficulty": "hard"
+  },
+  {
+    "scenario_id": "constrained_0053",
+    "scenario_type": "constrained",
+    "description": "Modify box to satisfy 2 engineering constraints.",
+    "start_geometry": "box(28.7, 16.7, 7.7)",
+    "reference_stl": null,
+    "constraints": {
+      "target_volume": {
+        "type": "tolerance",
+        "measurement": "volume",
+        "target": 4343.943985077047,
+        "tolerance": 310.8096384847448
+      },
+      "has_hole": {
+        "type": "feature",
+        "feature_type": "hole"
+      }
+    },
+    "targets": {},
+    "max_steps": 91,
+    "difficulty": "hard"
+  },
+  {
+    "scenario_id": "constrained_0054",
+    "scenario_type": "constrained",
+    "description": "Modify cylinder to satisfy 5 engineering constraints.",
+    "start_geometry": "cylinder(13.4, 25.5)",
+    "reference_stl": null,
+    "constraints": {
+      "target_volume": {
+        "type": "tolerance",
+        "measurement": "volume",
+        "target": 4834.564940480594,
+        "tolerance": 112.5209254990065
+      },
+      "min_wall": {
+        "type": "printability",
+        "min_wall": 1.6775240803684226
+      },
+      "max_bbox_z": {
+        "type": "dimensional",
+        "measurement": "bbox_z",
+        "min": 9.547622554739092,
+        "max": 27.86040138138748
+      },
+      "has_hole": {
+        "type": "feature",
+        "feature_type": "hole"
+      },
+      "max_bbox_x": {
+        "type": "dimensional",
+        "measurement": "bbox_x",
+        "min": 0,
+        "max": 48.935614168106255
+      }
+    },
+    "targets": {},
+    "max_steps": 88,
+    "difficulty": "easy"
+  },
+  {
+    "scenario_id": "constrained_0055",
+    "scenario_type": "constrained",
+    "description": "Modify box to satisfy 3 engineering constraints.",
+    "start_geometry": "box(21.2, 14.8, 12.2)",
+    "reference_stl": null,
+    "constraints": {
+      "target_volume": {
+        "type": "tolerance",
+        "measurement": "volume",
+        "target": 3717.1581809101144,
+        "tolerance": 325.1001145373531
+      },
+      "max_bbox_z": {
+        "type": "dimensional",
+        "measurement": "bbox_z",
+        "min": 7.357662300512564,
+        "max": 23.148492086849373
+      },
+      "min_wall": {
+        "type": "printability",
+        "min_wall": 0.9910948859351174
+      }
+    },
+    "targets": {},
+    "max_steps": 60,
+    "difficulty": "easy"
+  },
+  {
+    "scenario_id": "constrained_0056",
+    "scenario_type": "constrained",
+    "description": "Modify box to satisfy 4 engineering constraints.",
+    "start_geometry": "box(18.1, 16.8, 10.3)",
+    "reference_stl": null,
+    "constraints": {
+      "has_hole": {
+        "type": "feature",
+        "feature_type": "hole"
+      },
+      "target_volume": {
+        "type": "tolerance",
+        "measurement": "volume",
+        "target": 4643.815315170591,
+        "tolerance": 346.6601258082952
+      },
+      "max_bbox_z": {
+        "type": "dimensional",
+        "measurement": "bbox_z",
+        "min": 8.98268645488088,
+        "max": 22.22283527268825
+      },
+      "min_wall": {
+        "type": "printability",
+        "min_wall": 0.9407698267548734
+      }
+    },
+    "targets": {},
+    "max_steps": 56,
+    "difficulty": "easy"
+  },
+  {
+    "scenario_id": "constrained_0057",
+    "scenario_type": "constrained",
+    "description": "Modify cylinder to satisfy 3 engineering constraints.",
+    "start_geometry": "cylinder(7.3, 13.2)",
+    "reference_stl": null,
+    "constraints": {
+      "max_bbox_z": {
+        "type": "dimensional",
+        "measurement": "bbox_z",
+        "min": 7.166233744858278,
+        "max": 29.76527111104356
+      },
+      "max_bbox_x": {
+        "type": "dimensional",
+        "measurement": "bbox_x",
+        "min": 0,
+        "max": 24.487419280026973
+      },
+      "target_volume": {
+        "type": "tolerance",
+        "measurement": "volume",
+        "target": 2590.693684861146,
+        "tolerance": 372.1826505437301
+      }
+    },
+    "targets": {},
+    "max_steps": 69,
+    "difficulty": "hard"
+  },
+  {
+    "scenario_id": "constrained_0058",
+    "scenario_type": "constrained",
+    "description": "Modify box to satisfy 5 engineering constraints.",
+    "start_geometry": "box(29.4, 19.9, 12.6)",
+    "reference_stl": null,
+    "constraints": {
+      "has_hole": {
+        "type": "feature",
+        "feature_type": "hole"
+      },
+      "target_volume": {
+        "type": "tolerance",
+        "measurement": "volume",
+        "target": 3871.227375955774,
+        "tolerance": 158.3688296140582
+      },
+      "max_bbox_x": {
+        "type": "dimensional",
+        "measurement": "bbox_x",
+        "min": 0,
+        "max": 23.08377213477997
+      },
+      "max_bbox_z": {
+        "type": "dimensional",
+        "measurement": "bbox_z",
+        "min": 7.854522509220821,
+        "max": 15.2755145541081
+      },
+      "min_wall": {
+        "type": "printability",
+        "min_wall": 1.3788276578619099
+      }
+    },
+    "targets": {},
+    "max_steps": 60,
+    "difficulty": "easy"
+  },
+  {
+    "scenario_id": "constrained_0059",
+    "scenario_type": "constrained",
+    "description": "Modify cylinder to satisfy 2 engineering constraints.",
+    "start_geometry": "cylinder(12.8, 28.8)",
+    "reference_stl": null,
+    "constraints": {
+      "has_hole": {
+        "type": "feature",
+        "feature_type": "hole"
+      },
+      "max_bbox_x": {
+        "type": "dimensional",
+        "measurement": "bbox_x",
+        "min": 0,
+        "max": 30.518807936275422
+      }
+    },
+    "targets": {},
+    "max_steps": 51,
+    "difficulty": "medium"
+  },
+  {
+    "scenario_id": "constrained_0060",
+    "scenario_type": "constrained",
+    "description": "Modify cylinder to satisfy 3 engineering constraints.",
+    "start_geometry": "cylinder(8.2, 29.5)",
+    "reference_stl": null,
+    "constraints": {
+      "min_wall": {
+        "type": "printability",
+        "min_wall": 0.849420194335126
+      },
+      "max_bbox_z": {
+        "type": "dimensional",
+        "measurement": "bbox_z",
+        "min": 8.35192729177206,
+        "max": 29.273249615329902
+      },
+      "max_bbox_x": {
+        "type": "dimensional",
+        "measurement": "bbox_x",
+        "min": 0,
+        "max": 23.72659900184178
+      }
+    },
+    "targets": {},
+    "max_steps": 94,
+    "difficulty": "easy"
+  },
+  {
+    "scenario_id": "constrained_0061",
+    "scenario_type": "constrained",
+    "description": "Modify cylinder to satisfy 2 engineering constraints.",
+    "start_geometry": "cylinder(11.2, 22.3)",
+    "reference_stl": null,
+    "constraints": {
+      "min_wall": {
+        "type": "printability",
+        "min_wall": 1.76207369968375
+      },
+      "max_bbox_x": {
+        "type": "dimensional",
+        "measurement": "bbox_x",
+        "min": 0,
+        "max": 30.183505776284182
+      }
+    },
+    "targets": {},
+    "max_steps": 90,
+    "difficulty": "hard"
+  },
+  {
+    "scenario_id": "constrained_0062",
+    "scenario_type": "constrained",
+    "description": "Modify box to satisfy 3 engineering constraints.",
+    "start_geometry": "box(32.9, 18.2, 13.2)",
+    "reference_stl": null,
+    "constraints": {
+      "max_bbox_z": {
+        "type": "dimensional",
+        "measurement": "bbox_z",
+        "min": 8.65794760877666,
+        "max": 16.224449730458844
+      },
+      "target_volume": {
+        "type": "tolerance",
+        "measurement": "volume",
+        "target": 771.5843779575371,
+        "tolerance": 198.8412936040586
+      },
+      "min_wall": {
+        "type": "printability",
+        "min_wall": 0.991453616135826
+      }
+    },
+    "targets": {},
+    "max_steps": 93,
+    "difficulty": "medium"
+  },
+  {
+    "scenario_id": "constrained_0063",
+    "scenario_type": "constrained",
+    "description": "Modify box to satisfy 4 engineering constraints.",
+    "start_geometry": "box(34.5, 15.1, 6.8)",
+    "reference_stl": null,
+    "constraints": {
+      "min_wall": {
+        "type": "printability",
+        "min_wall": 1.4664362611251573
+      },
+      "target_volume": {
+        "type": "tolerance",
+        "measurement": "volume",
+        "target": 3736.4080022251874,
+        "tolerance": 191.38189653251948
+      },
+      "max_bbox_z": {
+        "type": "dimensional",
+        "measurement": "bbox_z",
+        "min": 9.98166958028371,
+        "max": 29.62189743220175
+      },
+      "max_bbox_x": {
+        "type": "dimensional",
+        "measurement": "bbox_x",
+        "min": 0,
+        "max": 39.50977059040811
+      }
+    },
+    "targets": {},
+    "max_steps": 59,
+    "difficulty": "hard"
+  },
+  {
+    "scenario_id": "constrained_0064",
+    "scenario_type": "constrained",
+    "description": "Modify box to satisfy 5 engineering constraints.",
+    "start_geometry": "box(16.4, 10.5, 7.6)",
+    "reference_stl": null,
+    "constraints": {
+      "max_bbox_z": {
+        "type": "dimensional",
+        "measurement": "bbox_z",
+        "min": 7.079536830734704,
+        "max": 27.69367938028574
+      },
+      "max_bbox_x": {
+        "type": "dimensional",
+        "measurement": "bbox_x",
+        "min": 0,
+        "max": 38.862944546178355
+      },
+      "has_hole": {
+        "type": "feature",
+        "feature_type": "hole"
+      },
+      "target_volume": {
+        "type": "tolerance",
+        "measurement": "volume",
+        "target": 3809.076343995887,
+        "tolerance": 407.0895552267121
+      },
+      "min_wall": {
+        "type": "printability",
+        "min_wall": 1.4058138582716215
+      }
+    },
+    "targets": {},
+    "max_steps": 77,
+    "difficulty": "hard"
+  },
+  {
+    "scenario_id": "constrained_0065",
+    "scenario_type": "constrained",
+    "description": "Modify cylinder to satisfy 3 engineering constraints.",
+    "start_geometry": "cylinder(10.9, 10.6)",
+    "reference_stl": null,
+    "constraints": {
+      "min_wall": {
+        "type": "printability",
+        "min_wall": 1.7515473135267579
+      },
+      "has_hole": {
+        "type": "feature",
+        "feature_type": "hole"
+      },
+      "max_bbox_x": {
+        "type": "dimensional",
+        "measurement": "bbox_x",
+        "min": 0,
+        "max": 39.650280164963256
+      }
+    },
+    "targets": {},
+    "max_steps": 99,
+    "difficulty": "medium"
+  },
+  {
+    "scenario_id": "matching_0000",
+    "scenario_type": "matching",
+    "description": "Transform box into l_bracket with params {'length': 31, 'width': 10, 'height': 32, 'thickness': 3}.",
+    "start_geometry": "box(31.0, 10.0, 32.0)",
+    "reference_stl": "scenarios\\references\\matching_0000_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 2.0
+    },
+    "max_steps": 85,
+    "difficulty": "medium"
+  },
+  {
+    "scenario_id": "matching_0001",
+    "scenario_type": "matching",
+    "description": "Transform box into box with params {'length': 12, 'width': 15, 'height': 8}.",
+    "start_geometry": "box(12.0, 15.0, 8.0)",
+    "reference_stl": "scenarios\\references\\matching_0001_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 2.0
+    },
+    "max_steps": 96,
+    "difficulty": "medium"
+  },
+  {
+    "scenario_id": "matching_0002",
+    "scenario_type": "matching",
+    "description": "Transform box into wedge with params {'length': 26, 'width': 23, 'height': 9, 'taper': 0.37239078108379586}.",
+    "start_geometry": "box(26.0, 23.0, 9.0)",
+    "reference_stl": "scenarios\\references\\matching_0002_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 2.0
+    },
+    "max_steps": 94,
+    "difficulty": "medium"
+  },
+  {
+    "scenario_id": "matching_0003",
+    "scenario_type": "matching",
+    "description": "Transform box into stepped_cylinder with params {'r1': 11, 'h1': 12, 'r2': 9, 'h2': 16}.",
+    "start_geometry": "box(22.0, 22.0, 28.0)",
+    "reference_stl": "scenarios\\references\\matching_0003_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 2.0
+    },
+    "max_steps": 86,
+    "difficulty": "medium"
+  },
+  {
+    "scenario_id": "matching_0004",
+    "scenario_type": "matching",
+    "description": "Transform box into l_bracket with params {'length': 36, 'width': 10, 'height': 21, 'thickness': 4}.",
+    "start_geometry": "box(36.0, 10.0, 21.0)",
+    "reference_stl": "scenarios\\references\\matching_0004_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 2.0
+    },
+    "max_steps": 86,
+    "difficulty": "medium"
+  },
+  {
+    "scenario_id": "matching_0005",
+    "scenario_type": "matching",
+    "description": "Transform box into box with params {'length': 17, 'width': 19, 'height': 12}.",
+    "start_geometry": "box(17.0, 19.0, 12.0)",
+    "reference_stl": "scenarios\\references\\matching_0005_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 2.0
+    },
+    "max_steps": 75,
+    "difficulty": "medium"
+  },
+  {
+    "scenario_id": "matching_0006",
+    "scenario_type": "matching",
+    "description": "Transform box into wedge with params {'length': 17, 'width': 15, 'height': 17, 'taper': 0.4795110295325612}.",
+    "start_geometry": "box(17.0, 15.0, 17.0)",
+    "reference_stl": "scenarios\\references\\matching_0006_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 2.0
+    },
+    "max_steps": 86,
+    "difficulty": "medium"
+  },
+  {
+    "scenario_id": "matching_0007",
+    "scenario_type": "matching",
+    "description": "Transform box into box with params {'length': 14, 'width': 27, 'height': 12}.",
+    "start_geometry": "box(14.0, 27.0, 12.0)",
+    "reference_stl": "scenarios\\references\\matching_0007_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 2.0
+    },
+    "max_steps": 84,
+    "difficulty": "medium"
+  },
+  {
+    "scenario_id": "matching_0008",
+    "scenario_type": "matching",
+    "description": "Transform box into stepped_cylinder with params {'r1': 11, 'h1': 8, 'r2': 6, 'h2': 16}.",
+    "start_geometry": "box(22.0, 22.0, 24.0)",
+    "reference_stl": "scenarios\\references\\matching_0008_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 2.0
+    },
+    "max_steps": 84,
+    "difficulty": "medium"
+  },
+  {
+    "scenario_id": "matching_0009",
+    "scenario_type": "matching",
+    "description": "Transform box into shell_box with params {'length': 26, 'width': 14, 'height': 10, 'wall': 1}.",
+    "start_geometry": "box(26.0, 14.0, 10.0)",
+    "reference_stl": "scenarios\\references\\matching_0009_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 2.0
+    },
+    "max_steps": 88,
+    "difficulty": "hard"
+  },
+  {
+    "scenario_id": "matching_0010",
+    "scenario_type": "matching",
+    "description": "Transform box into l_bracket with params {'length': 31, 'width': 10, 'height': 39, 'thickness': 3}.",
+    "start_geometry": "box(31.0, 10.0, 39.0)",
+    "reference_stl": "scenarios\\references\\matching_0010_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 2.0
+    },
+    "max_steps": 99,
+    "difficulty": "medium"
+  },
+  {
+    "scenario_id": "matching_0011",
+    "scenario_type": "matching",
+    "description": "Transform box into shell_box with params {'length': 18, 'width': 19, 'height': 22, 'wall': 1}.",
+    "start_geometry": "box(18.0, 19.0, 22.0)",
+    "reference_stl": "scenarios\\references\\matching_0011_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 2.0
+    },
+    "max_steps": 64,
+    "difficulty": "hard"
+  },
+  {
+    "scenario_id": "matching_0012",
+    "scenario_type": "matching",
+    "description": "Transform box into shell_box with params {'length': 19, 'width': 20, 'height': 14, 'wall': 1}.",
+    "start_geometry": "box(19.0, 20.0, 14.0)",
+    "reference_stl": "scenarios\\references\\matching_0012_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 2.0
+    },
+    "max_steps": 80,
+    "difficulty": "hard"
+  },
+  {
+    "scenario_id": "matching_0013",
+    "scenario_type": "matching",
+    "description": "Transform box into wedge with params {'length': 18, 'width': 14, 'height': 9, 'taper': 0.6860474785744182}.",
+    "start_geometry": "box(18.0, 14.0, 9.0)",
+    "reference_stl": "scenarios\\references\\matching_0013_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 2.0
+    },
+    "max_steps": 60,
+    "difficulty": "hard"
+  },
+  {
+    "scenario_id": "matching_0014",
+    "scenario_type": "matching",
+    "description": "Transform box into stepped_cylinder with params {'r1': 7, 'h1': 13, 'r2': 9, 'h2': 15}.",
+    "start_geometry": "box(18.0, 18.0, 28.0)",
+    "reference_stl": "scenarios\\references\\matching_0014_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 2.0
+    },
+    "max_steps": 80,
+    "difficulty": "hard"
+  },
+  {
+    "scenario_id": "matching_0015",
+    "scenario_type": "matching",
+    "description": "Transform box into tube with params {'outer_r': 11, 'inner_r': 6, 'height': 37}.",
+    "start_geometry": "box(22.0, 22.0, 37.0)",
+    "reference_stl": "scenarios\\references\\matching_0015_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 2.0
+    },
+    "max_steps": 61,
+    "difficulty": "medium"
+  },
+  {
+    "scenario_id": "matching_0016",
+    "scenario_type": "matching",
+    "description": "Transform box into bracket with params {'length': 35, 'width': 11, 'height': 4, 'hole_d': 6}.",
+    "start_geometry": "box(35.0, 11.0, 4.0)",
+    "reference_stl": "scenarios\\references\\matching_0016_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 2.0
+    },
+    "max_steps": 86,
+    "difficulty": "hard"
+  },
+  {
+    "scenario_id": "matching_0017",
+    "scenario_type": "matching",
+    "description": "Transform box into shell_box with params {'length': 15, 'width': 16, 'height': 17, 'wall': 1}.",
+    "start_geometry": "box(15.0, 16.0, 17.0)",
+    "reference_stl": "scenarios\\references\\matching_0017_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 2.0
+    },
+    "max_steps": 77,
+    "difficulty": "medium"
+  },
+  {
+    "scenario_id": "matching_0018",
+    "scenario_type": "matching",
+    "description": "Transform box into l_bracket with params {'length': 34, 'width': 9, 'height': 20, 'thickness': 4}.",
+    "start_geometry": "box(34.0, 9.0, 20.0)",
+    "reference_stl": "scenarios\\references\\matching_0018_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 2.0
+    },
+    "max_steps": 99,
+    "difficulty": "medium"
+  },
+  {
+    "scenario_id": "matching_0019",
+    "scenario_type": "matching",
+    "description": "Transform box into wedge with params {'length': 28, 'width': 11, 'height': 9, 'taper': 0.5471388960804855}.",
+    "start_geometry": "box(28.0, 11.0, 9.0)",
+    "reference_stl": "scenarios\\references\\matching_0019_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 2.0
+    },
+    "max_steps": 94,
+    "difficulty": "hard"
+  },
+  {
+    "scenario_id": "matching_0020",
+    "scenario_type": "matching",
+    "description": "Transform box into box with params {'length': 21, 'width': 15, 'height': 13}.",
+    "start_geometry": "box(21.0, 15.0, 13.0)",
+    "reference_stl": "scenarios\\references\\matching_0020_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 2.0
+    },
+    "max_steps": 87,
+    "difficulty": "medium"
+  },
+  {
+    "scenario_id": "matching_0021",
+    "scenario_type": "matching",
+    "description": "Transform box into box with params {'length': 28, 'width': 23, 'height': 18}.",
+    "start_geometry": "box(28.0, 23.0, 18.0)",
+    "reference_stl": "scenarios\\references\\matching_0021_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 2.0
+    },
+    "max_steps": 75,
+    "difficulty": "medium"
+  },
+  {
+    "scenario_id": "matching_0022",
+    "scenario_type": "matching",
+    "description": "Transform box into stepped_cylinder with params {'r1': 15, 'h1': 6, 'r2': 4, 'h2': 13}.",
+    "start_geometry": "box(30.0, 30.0, 19.0)",
+    "reference_stl": "scenarios\\references\\matching_0022_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 2.0
+    },
+    "max_steps": 72,
+    "difficulty": "medium"
+  },
+  {
+    "scenario_id": "matching_0023",
+    "scenario_type": "matching",
+    "description": "Transform box into stepped_cylinder with params {'r1': 14, 'h1': 13, 'r2': 7, 'h2': 20}.",
+    "start_geometry": "box(28.0, 28.0, 33.0)",
+    "reference_stl": "scenarios\\references\\matching_0023_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 2.0
+    },
+    "max_steps": 71,
+    "difficulty": "medium"
+  },
+  {
+    "scenario_id": "matching_0024",
+    "scenario_type": "matching",
+    "description": "Transform box into bracket with params {'length': 21, 'width': 22, 'height': 8, 'hole_d': 8}.",
+    "start_geometry": "box(21.0, 22.0, 8.0)",
+    "reference_stl": "scenarios\\references\\matching_0024_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 2.0
+    },
+    "max_steps": 97,
+    "difficulty": "medium"
+  },
+  {
+    "scenario_id": "matching_0025",
+    "scenario_type": "matching",
+    "description": "Transform box into l_bracket with params {'length': 21, 'width': 9, 'height': 32, 'thickness': 2}.",
+    "start_geometry": "box(21.0, 9.0, 32.0)",
+    "reference_stl": "scenarios\\references\\matching_0025_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 2.0
+    },
+    "max_steps": 72,
+    "difficulty": "medium"
+  },
+  {
+    "scenario_id": "matching_0026",
+    "scenario_type": "matching",
+    "description": "Transform box into box with params {'length': 33, 'width': 29, 'height': 11}.",
+    "start_geometry": "box(33.0, 29.0, 11.0)",
+    "reference_stl": "scenarios\\references\\matching_0026_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 2.0
+    },
+    "max_steps": 60,
+    "difficulty": "medium"
+  },
+  {
+    "scenario_id": "matching_0027",
+    "scenario_type": "matching",
+    "description": "Transform box into box with params {'length': 21, 'width': 14, 'height': 19}.",
+    "start_geometry": "box(21.0, 14.0, 19.0)",
+    "reference_stl": "scenarios\\references\\matching_0027_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 2.0
+    },
+    "max_steps": 87,
+    "difficulty": "hard"
+  },
+  {
+    "scenario_id": "matching_0028",
+    "scenario_type": "matching",
+    "description": "Transform box into stepped_cylinder with params {'r1': 6, 'h1': 5, 'r2': 10, 'h2': 8}.",
+    "start_geometry": "box(20.0, 20.0, 13.0)",
+    "reference_stl": "scenarios\\references\\matching_0028_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 2.0
+    },
+    "max_steps": 77,
+    "difficulty": "hard"
+  },
+  {
+    "scenario_id": "matching_0029",
+    "scenario_type": "matching",
+    "description": "Transform box into wedge with params {'length': 25, 'width': 12, 'height': 15, 'taper': 0.5672851194220065}.",
+    "start_geometry": "box(25.0, 12.0, 15.0)",
+    "reference_stl": "scenarios\\references\\matching_0029_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 2.0
+    },
+    "max_steps": 84,
+    "difficulty": "hard"
+  },
+  {
+    "scenario_id": "matching_0030",
+    "scenario_type": "matching",
+    "description": "Transform box into stepped_cylinder with params {'r1': 8, 'h1': 9, 'r2': 4, 'h2': 15}.",
+    "start_geometry": "box(16.0, 16.0, 24.0)",
+    "reference_stl": "scenarios\\references\\matching_0030_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 2.0
+    },
+    "max_steps": 80,
+    "difficulty": "hard"
+  },
+  {
+    "scenario_id": "matching_0031",
+    "scenario_type": "matching",
+    "description": "Transform box into shell_box with params {'length': 27, 'width': 19, 'height': 18, 'wall': 1}.",
+    "start_geometry": "box(27.0, 19.0, 18.0)",
+    "reference_stl": "scenarios\\references\\matching_0031_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 2.0
+    },
+    "max_steps": 75,
+    "difficulty": "medium"
+  },
+  {
+    "scenario_id": "matching_0032",
+    "scenario_type": "matching",
+    "description": "Transform box into bracket with params {'length': 34, 'width': 20, 'height': 8, 'hole_d': 8}.",
+    "start_geometry": "box(34.0, 20.0, 8.0)",
+    "reference_stl": "scenarios\\references\\matching_0032_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 2.0
+    },
+    "max_steps": 88,
+    "difficulty": "medium"
+  },
+  {
+    "scenario_id": "matching_0033",
+    "scenario_type": "matching",
+    "description": "Transform box into shell_box with params {'length': 21, 'width': 20, 'height': 16, 'wall': 3}.",
+    "start_geometry": "box(21.0, 20.0, 16.0)",
+    "reference_stl": "scenarios\\references\\matching_0033_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 2.0
+    },
+    "max_steps": 62,
+    "difficulty": "medium"
+  },
+  {
+    "scenario_id": "matching_0034",
+    "scenario_type": "matching",
+    "description": "Transform box into stepped_cylinder with params {'r1': 9, 'h1': 15, 'r2': 5, 'h2': 11}.",
+    "start_geometry": "box(18.0, 18.0, 26.0)",
+    "reference_stl": "scenarios\\references\\matching_0034_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 2.0
+    },
+    "max_steps": 97,
+    "difficulty": "hard"
+  },
+  {
+    "scenario_id": "matching_0035",
+    "scenario_type": "matching",
+    "description": "Transform box into filleted_box with params {'length': 16, 'width': 23, 'height': 11, 'fillet': 4}.",
+    "start_geometry": "box(16.0, 23.0, 11.0)",
+    "reference_stl": "scenarios\\references\\matching_0035_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 2.0
+    },
+    "max_steps": 80,
+    "difficulty": "hard"
+  },
+  {
+    "scenario_id": "matching_0036",
+    "scenario_type": "matching",
+    "description": "Transform box into filleted_box with params {'length': 22, 'width': 25, 'height': 17, 'fillet': 4}.",
+    "start_geometry": "box(22.0, 25.0, 17.0)",
+    "reference_stl": "scenarios\\references\\matching_0036_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 2.0
+    },
+    "max_steps": 88,
+    "difficulty": "hard"
+  },
+  {
+    "scenario_id": "matching_0037",
+    "scenario_type": "matching",
+    "description": "Transform box into box with params {'length': 22, 'width': 11, 'height': 14}.",
+    "start_geometry": "box(22.0, 11.0, 14.0)",
+    "reference_stl": "scenarios\\references\\matching_0037_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 2.0
+    },
+    "max_steps": 64,
+    "difficulty": "medium"
+  },
+  {
+    "scenario_id": "matching_0038",
+    "scenario_type": "matching",
+    "description": "Transform box into tube with params {'outer_r': 15, 'inner_r': 9, 'height': 27}.",
+    "start_geometry": "box(30.0, 30.0, 27.0)",
+    "reference_stl": "scenarios\\references\\matching_0038_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 2.0
+    },
+    "max_steps": 67,
+    "difficulty": "medium"
+  },
+  {
+    "scenario_id": "matching_0039",
+    "scenario_type": "matching",
+    "description": "Transform box into plate_with_holes with params {'length': 41, 'width': 29, 'height': 2, 'n_holes': 3, 'hole_d': 6}.",
+    "start_geometry": "box(41.0, 29.0, 2.0)",
+    "reference_stl": "scenarios\\references\\matching_0039_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 2.0
+    },
+    "max_steps": 98,
+    "difficulty": "hard"
+  },
+  {
+    "scenario_id": "matching_0040",
+    "scenario_type": "matching",
+    "description": "Transform box into l_bracket with params {'length': 26, 'width': 13, 'height': 20, 'thickness': 5}.",
+    "start_geometry": "box(26.0, 13.0, 20.0)",
+    "reference_stl": "scenarios\\references\\matching_0040_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 2.0
+    },
+    "max_steps": 61,
+    "difficulty": "hard"
+  },
+  {
+    "scenario_id": "matching_0041",
+    "scenario_type": "matching",
+    "description": "Transform box into tube with params {'outer_r': 11, 'inner_r': 8, 'height': 35}.",
+    "start_geometry": "box(22.0, 22.0, 35.0)",
+    "reference_stl": "scenarios\\references\\matching_0041_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 2.0
+    },
+    "max_steps": 95,
+    "difficulty": "medium"
+  },
+  {
+    "scenario_id": "matching_0042",
+    "scenario_type": "matching",
+    "description": "Transform box into wedge with params {'length': 23, 'width': 24, 'height': 17, 'taper': 0.36990937713095084}.",
+    "start_geometry": "box(23.0, 24.0, 17.0)",
+    "reference_stl": "scenarios\\references\\matching_0042_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 2.0
+    },
+    "max_steps": 74,
+    "difficulty": "hard"
+  },
+  {
+    "scenario_id": "matching_0043",
+    "scenario_type": "matching",
+    "description": "Transform box into plate_with_holes with params {'length': 48, 'width': 35, 'height': 2, 'n_holes': 3, 'hole_d': 5}.",
+    "start_geometry": "box(48.0, 35.0, 2.0)",
+    "reference_stl": "scenarios\\references\\matching_0043_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 2.0
+    },
+    "max_steps": 91,
+    "difficulty": "hard"
+  },
+  {
+    "scenario_id": "matching_0044",
+    "scenario_type": "matching",
+    "description": "Transform box into plate_with_holes with params {'length': 43, 'width': 23, 'height': 5, 'n_holes': 4, 'hole_d': 4}.",
+    "start_geometry": "box(43.0, 23.0, 5.0)",
+    "reference_stl": "scenarios\\references\\matching_0044_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 2.0
+    },
+    "max_steps": 92,
+    "difficulty": "medium"
+  },
+  {
+    "scenario_id": "matching_0045",
+    "scenario_type": "matching",
+    "description": "Transform box into bracket with params {'length': 29, 'width': 10, 'height': 4, 'hole_d': 7}.",
+    "start_geometry": "box(29.0, 10.0, 4.0)",
+    "reference_stl": "scenarios\\references\\matching_0045_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 2.0
+    },
+    "max_steps": 66,
+    "difficulty": "medium"
+  },
+  {
+    "scenario_id": "matching_0046",
+    "scenario_type": "matching",
+    "description": "Transform box into cylinder with params {'radius': 4, 'height': 32}.",
+    "start_geometry": "box(8.0, 8.0, 32.0)",
+    "reference_stl": "scenarios\\references\\matching_0046_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 2.0
+    },
+    "max_steps": 81,
+    "difficulty": "hard"
+  },
+  {
+    "scenario_id": "matching_0047",
+    "scenario_type": "matching",
+    "description": "Transform box into shell_box with params {'length': 29, 'width': 12, 'height': 21, 'wall': 3}.",
+    "start_geometry": "box(29.0, 12.0, 21.0)",
+    "reference_stl": "scenarios\\references\\matching_0047_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 2.0
+    },
+    "max_steps": 81,
+    "difficulty": "hard"
+  },
+  {
+    "scenario_id": "matching_0048",
+    "scenario_type": "matching",
+    "description": "Transform box into stepped_cylinder with params {'r1': 14, 'h1': 13, 'r2': 4, 'h2': 10}.",
+    "start_geometry": "box(28.0, 28.0, 23.0)",
+    "reference_stl": "scenarios\\references\\matching_0048_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 2.0
+    },
+    "max_steps": 83,
+    "difficulty": "hard"
+  },
+  {
+    "scenario_id": "matching_0049",
+    "scenario_type": "matching",
+    "description": "Transform box into filleted_box with params {'length': 24, 'width': 15, 'height': 14, 'fillet': 1}.",
+    "start_geometry": "box(24.0, 15.0, 14.0)",
+    "reference_stl": "scenarios\\references\\matching_0049_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 2.0
+    },
+    "max_steps": 87,
+    "difficulty": "medium"
+  },
+  {
+    "scenario_id": "matching_0050",
+    "scenario_type": "matching",
+    "description": "Transform box into plate_with_holes with params {'length': 38, 'width': 38, 'height': 5, 'n_holes': 3, 'hole_d': 4}.",
+    "start_geometry": "box(38.0, 38.0, 5.0)",
+    "reference_stl": "scenarios\\references\\matching_0050_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 2.0
+    },
+    "max_steps": 83,
+    "difficulty": "medium"
+  },
+  {
+    "scenario_id": "matching_0051",
+    "scenario_type": "matching",
+    "description": "Transform box into bracket with params {'length': 27, 'width': 14, 'height': 3, 'hole_d': 6}.",
+    "start_geometry": "box(27.0, 14.0, 3.0)",
+    "reference_stl": "scenarios\\references\\matching_0051_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 2.0
+    },
+    "max_steps": 67,
+    "difficulty": "hard"
+  },
+  {
+    "scenario_id": "matching_0052",
+    "scenario_type": "matching",
+    "description": "Transform box into box with params {'length': 36, 'width': 13, 'height': 13}.",
+    "start_geometry": "box(36.0, 13.0, 13.0)",
+    "reference_stl": "scenarios\\references\\matching_0052_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 2.0
+    },
+    "max_steps": 84,
+    "difficulty": "medium"
+  },
+  {
+    "scenario_id": "matching_0053",
+    "scenario_type": "matching",
+    "description": "Transform box into box with params {'length': 37, 'width': 9, 'height': 16}.",
+    "start_geometry": "box(37.0, 9.0, 16.0)",
+    "reference_stl": "scenarios\\references\\matching_0053_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 2.0
+    },
+    "max_steps": 92,
+    "difficulty": "medium"
+  },
+  {
+    "scenario_id": "matching_0054",
+    "scenario_type": "matching",
+    "description": "Transform box into shell_box with params {'length': 22, 'width': 15, 'height': 17, 'wall': 2}.",
+    "start_geometry": "box(22.0, 15.0, 17.0)",
+    "reference_stl": "scenarios\\references\\matching_0054_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 2.0
+    },
+    "max_steps": 87,
+    "difficulty": "hard"
+  },
+  {
+    "scenario_id": "matching_0055",
+    "scenario_type": "matching",
+    "description": "Transform box into wedge with params {'length': 17, 'width': 15, 'height': 13, 'taper': 0.3209355503146033}.",
+    "start_geometry": "box(17.0, 15.0, 13.0)",
+    "reference_stl": "scenarios\\references\\matching_0055_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 2.0
+    },
+    "max_steps": 75,
+    "difficulty": "hard"
+  },
+  {
+    "scenario_id": "matching_0056",
+    "scenario_type": "matching",
+    "description": "Transform box into box with params {'length': 12, 'width': 9, 'height': 11}.",
+    "start_geometry": "box(12.0, 9.0, 11.0)",
+    "reference_stl": "scenarios\\references\\matching_0056_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 2.0
+    },
+    "max_steps": 78,
+    "difficulty": "hard"
+  },
+  {
+    "scenario_id": "matching_0057",
+    "scenario_type": "matching",
+    "description": "Transform box into l_bracket with params {'length': 31, 'width': 9, 'height': 23, 'thickness': 2}.",
+    "start_geometry": "box(31.0, 9.0, 23.0)",
+    "reference_stl": "scenarios\\references\\matching_0057_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 2.0
+    },
+    "max_steps": 67,
+    "difficulty": "medium"
+  },
+  {
+    "scenario_id": "matching_0058",
+    "scenario_type": "matching",
+    "description": "Transform box into stepped_cylinder with params {'r1': 12, 'h1': 14, 'r2': 8, 'h2': 16}.",
+    "start_geometry": "box(24.0, 24.0, 30.0)",
+    "reference_stl": "scenarios\\references\\matching_0058_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 2.0
+    },
+    "max_steps": 92,
+    "difficulty": "hard"
+  },
+  {
+    "scenario_id": "matching_0059",
+    "scenario_type": "matching",
+    "description": "Transform box into box with params {'length': 25, 'width': 19, 'height': 12}.",
+    "start_geometry": "box(25.0, 19.0, 12.0)",
+    "reference_stl": "scenarios\\references\\matching_0059_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 2.0
+    },
+    "max_steps": 91,
+    "difficulty": "hard"
+  },
+  {
+    "scenario_id": "matching_0060",
+    "scenario_type": "matching",
+    "description": "Transform box into tube with params {'outer_r': 8, 'inner_r': 5.6, 'height': 36}.",
+    "start_geometry": "box(16.0, 16.0, 36.0)",
+    "reference_stl": "scenarios\\references\\matching_0060_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 2.0
+    },
+    "max_steps": 99,
+    "difficulty": "hard"
+  },
+  {
+    "scenario_id": "matching_0061",
+    "scenario_type": "matching",
+    "description": "Transform box into plate_with_holes with params {'length': 36, 'width': 20, 'height': 2, 'n_holes': 3, 'hole_d': 3}.",
+    "start_geometry": "box(36.0, 20.0, 2.0)",
+    "reference_stl": "scenarios\\references\\matching_0061_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 2.0
+    },
+    "max_steps": 63,
+    "difficulty": "hard"
+  },
+  {
+    "scenario_id": "matching_0062",
+    "scenario_type": "matching",
+    "description": "Transform box into cylinder with params {'radius': 11, 'height': 16}.",
+    "start_geometry": "box(22.0, 22.0, 16.0)",
+    "reference_stl": "scenarios\\references\\matching_0062_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 2.0
+    },
+    "max_steps": 94,
+    "difficulty": "medium"
+  },
+  {
+    "scenario_id": "matching_0063",
+    "scenario_type": "matching",
+    "description": "Transform box into l_bracket with params {'length': 39, 'width': 9, 'height': 33, 'thickness': 5}.",
+    "start_geometry": "box(39.0, 9.0, 33.0)",
+    "reference_stl": "scenarios\\references\\matching_0063_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 2.0
+    },
+    "max_steps": 72,
+    "difficulty": "hard"
+  },
+  {
+    "scenario_id": "matching_0064",
+    "scenario_type": "matching",
+    "description": "Transform box into cylinder with params {'radius': 12, 'height': 30}.",
+    "start_geometry": "box(24.0, 24.0, 30.0)",
+    "reference_stl": "scenarios\\references\\matching_0064_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 2.0
+    },
+    "max_steps": 73,
+    "difficulty": "medium"
+  },
+  {
+    "scenario_id": "matching_0065",
+    "scenario_type": "matching",
+    "description": "Transform box into stepped_cylinder with params {'r1': 6, 'h1': 15, 'r2': 5, 'h2': 11}.",
+    "start_geometry": "box(12.0, 12.0, 26.0)",
+    "reference_stl": "scenarios\\references\\matching_0065_ref.stl",
+    "constraints": {},
+    "targets": {
+      "hausdorff_target": 2.0
+    },
+    "max_steps": 71,
+    "difficulty": "hard"
+  }
+]

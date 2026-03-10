@@ -242,7 +242,7 @@ class GeometryEngine:
 
         if analyzer:
             metrics.update(analyzer.basic_metrics())
-            metrics.update(analyzer.wall_thickness_analysis())
+            metrics.update(analyzer.wall_thickness_analysis(n_samples=100))
             metrics.update(analyzer.printability_analysis())
             metrics.update(analyzer.mesh_quality())
 
