@@ -10,3 +10,15 @@ C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Shared
 C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Shared\obj\Debug\net8.0\refint\Darci.Shared.dll
 C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Shared\obj\Debug\net8.0\Darci.Shared.pdb
 C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Shared\obj\Debug\net8.0\ref\Darci.Shared.dll
+C:\Users\ROG\Documents\GitHub\DARCI-Live\darci-v4\Darci.Shared\bin\Debug\net8.0\Darci.Shared.deps.json
+C:\Users\ROG\Documents\GitHub\DARCI-Live\darci-v4\Darci.Shared\bin\Debug\net8.0\Darci.Shared.dll
+C:\Users\ROG\Documents\GitHub\DARCI-Live\darci-v4\Darci.Shared\bin\Debug\net8.0\Darci.Shared.pdb
+C:\Users\ROG\Documents\GitHub\DARCI-Live\darci-v4\Darci.Shared\obj\Debug\net8.0\Darci.Shared.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\ROG\Documents\GitHub\DARCI-Live\darci-v4\Darci.Shared\obj\Debug\net8.0\Darci.Shared.AssemblyInfoInputs.cache
+C:\Users\ROG\Documents\GitHub\DARCI-Live\darci-v4\Darci.Shared\obj\Debug\net8.0\Darci.Shared.AssemblyInfo.cs
+C:\Users\ROG\Documents\GitHub\DARCI-Live\darci-v4\Darci.Shared\obj\Debug\net8.0\Darci.Shared.csproj.CoreCompileInputs.cache
+C:\Users\ROG\Documents\GitHub\DARCI-Live\darci-v4\Darci.Shared\obj\Debug\net8.0\Darci.Shared.sourcelink.json
+C:\Users\ROG\Documents\GitHub\DARCI-Live\darci-v4\Darci.Shared\obj\Debug\net8.0\Darci.Shared.dll
+C:\Users\ROG\Documents\GitHub\DARCI-Live\darci-v4\Darci.Shared\obj\Debug\net8.0\refint\Darci.Shared.dll
+C:\Users\ROG\Documents\GitHub\DARCI-Live\darci-v4\Darci.Shared\obj\Debug\net8.0\Darci.Shared.pdb
+C:\Users\ROG\Documents\GitHub\DARCI-Live\darci-v4\Darci.Shared\obj\Debug\net8.0\ref\Darci.Shared.dll

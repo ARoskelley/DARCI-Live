@@ -118,8 +118,11 @@ class GeometryActor(nn.Module):
         """
         logits, all_params = self.forward(state, action_mask)
 
-        # Discrete action sampling
+        # Guard against all-masked (all -inf) logits
+        if torch.all(logits == float("-inf")):
+            logits = torch.zeros_like(logits)
         probs = F.softmax(logits, dim=-1)
+        probs = probs.clamp(min=1e-8)  # prevent zero probabilities
         dist = Categorical(probs)
 
         if deterministic:

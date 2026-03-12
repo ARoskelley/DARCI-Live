@@ -1,1 +1,11 @@
-{"Version":1,"Hash":"DWkZgRjcQooKIXqMLjUDXS4IAI3uyYRp4sWJiggxCDM=","Source":"Darci.Api","BasePath":"/","Mode":"Root","ManifestType":"Build","ReferencedProjectsConfiguration":[],"DiscoveryPatterns":[],"Assets":[],"Endpoints":[]}
+{
+  "Version": 1,
+  "Hash": "Lll00u8bTEXlGO3GH+5tdkemVb7eOQF51eltxKUoJIw=",
+  "Source": "Darci.Api",
+  "BasePath": "_content/Darci.Api",
+  "Mode": "Default",
+  "ManifestType": "Build",
+  "ReferencedProjectsConfiguration": [],
+  "DiscoveryPatterns": [],
+  "Assets": []
+}

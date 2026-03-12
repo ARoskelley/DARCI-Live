@@ -326,6 +326,7 @@ def train(
     print("-" * 75)
 
     start_time = time.time()
+    train_metrics_accum = []
 
     for episode in range(1, n_episodes + 1):
         # Pick a random scenario

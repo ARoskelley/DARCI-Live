@@ -81,6 +81,9 @@ class StateEncoder:
         self._encode_task_context(state, engine)
         self._encode_constraints(state, engine)
 
+         # Guard against NaN from degenerate geometry
+        state = np.nan_to_num(state, nan=0.0, posinf=1.0, neginf=-1.0)
+
         return state
 
     # ------------------------------------------------------------------ #

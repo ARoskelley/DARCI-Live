@@ -1,20 +1,20 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\darci-v4\\Darci.Tools\\Darci.Tools.csproj": {}
+    "C:\\Users\\ROG\\Documents\\GitHub\\DARCI-Live\\DARCI-v4\\Darci.Tools\\Darci.Tools.csproj": {}
   },
   "projects": {
-    "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\darci-v4\\Darci.Goals\\Darci.Goals.csproj": {
+    "C:\\Users\\ROG\\Documents\\GitHub\\DARCI-Live\\DARCI-v4\\Darci.Goals\\Darci.Goals.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\darci-v4\\Darci.Goals\\Darci.Goals.csproj",
+        "projectUniqueName": "C:\\Users\\ROG\\Documents\\GitHub\\DARCI-Live\\DARCI-v4\\Darci.Goals\\Darci.Goals.csproj",
         "projectName": "Darci.Goals",
-        "projectPath": "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\darci-v4\\Darci.Goals\\Darci.Goals.csproj",
-        "packagesPath": "C:\\Users\\aiden\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\darci-v4\\Darci.Goals\\obj\\",
+        "projectPath": "C:\\Users\\ROG\\Documents\\GitHub\\DARCI-Live\\DARCI-v4\\Darci.Goals\\Darci.Goals.csproj",
+        "packagesPath": "C:\\Users\\ROG\\.nuget\\packages\\",
+        "outputPath": "C:\\Users\\ROG\\Documents\\GitHub\\DARCI-Live\\DARCI-v4\\Darci.Goals\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
-          "C:\\Users\\aiden\\AppData\\Roaming\\NuGet\\NuGet.Config"
+          "C:\\Users\\ROG\\AppData\\Roaming\\NuGet\\NuGet.Config"
         ],
         "originalTargetFrameworks": [
           "net8.0"
@@ -26,8 +26,8 @@
           "net8.0": {
             "targetAlias": "net8.0",
             "projectReferences": {
-              "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\darci-v4\\Darci.Shared\\Darci.Shared.csproj": {
-                "projectPath": "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\darci-v4\\Darci.Shared\\Darci.Shared.csproj"
+              "C:\\Users\\ROG\\Documents\\GitHub\\DARCI-Live\\DARCI-v4\\Darci.Shared\\Darci.Shared.csproj": {
+                "projectPath": "C:\\Users\\ROG\\Documents\\GitHub\\DARCI-Live\\DARCI-v4\\Darci.Shared\\Darci.Shared.csproj"
               }
             }
           }
@@ -41,8 +41,7 @@
           "enableAudit": "true",
           "auditLevel": "low",
           "auditMode": "direct"
-        },
-        "SdkAnalysisLevel": "10.0.100"
+        }
       },
       "frameworks": {
         "net8.0": {
@@ -72,40 +71,26 @@
           ],
           "assetTargetFallback": true,
           "warn": true,
-          "downloadDependencies": [
-            {
-              "name": "Microsoft.AspNetCore.App.Ref",
-              "version": "[8.0.22, 8.0.22]"
-            },
-            {
-              "name": "Microsoft.NETCore.App.Ref",
-              "version": "[8.0.22, 8.0.22]"
-            },
-            {
-              "name": "Microsoft.WindowsDesktop.App.Ref",
-              "version": "[8.0.22, 8.0.22]"
-            }
-          ],
           "frameworkReferences": {
             "Microsoft.NETCore.App": {
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.101/PortableRuntimeIdentifierGraph.json"
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\8.0.204/PortableRuntimeIdentifierGraph.json"
         }
       }
     },
-    "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\darci-v4\\Darci.Memory\\Darci.Memory.csproj": {
+    "C:\\Users\\ROG\\Documents\\GitHub\\DARCI-Live\\DARCI-v4\\Darci.Memory\\Darci.Memory.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\darci-v4\\Darci.Memory\\Darci.Memory.csproj",
+        "projectUniqueName": "C:\\Users\\ROG\\Documents\\GitHub\\DARCI-Live\\DARCI-v4\\Darci.Memory\\Darci.Memory.csproj",
         "projectName": "Darci.Memory",
-        "projectPath": "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\darci-v4\\Darci.Memory\\Darci.Memory.csproj",
-        "packagesPath": "C:\\Users\\aiden\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\darci-v4\\Darci.Memory\\obj\\",
+        "projectPath": "C:\\Users\\ROG\\Documents\\GitHub\\DARCI-Live\\DARCI-v4\\Darci.Memory\\Darci.Memory.csproj",
+        "packagesPath": "C:\\Users\\ROG\\.nuget\\packages\\",
+        "outputPath": "C:\\Users\\ROG\\Documents\\GitHub\\DARCI-Live\\DARCI-v4\\Darci.Memory\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
-          "C:\\Users\\aiden\\AppData\\Roaming\\NuGet\\NuGet.Config"
+          "C:\\Users\\ROG\\AppData\\Roaming\\NuGet\\NuGet.Config"
         ],
         "originalTargetFrameworks": [
           "net8.0"
@@ -117,8 +102,8 @@
           "net8.0": {
             "targetAlias": "net8.0",
             "projectReferences": {
-              "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\darci-v4\\Darci.Shared\\Darci.Shared.csproj": {
-                "projectPath": "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\darci-v4\\Darci.Shared\\Darci.Shared.csproj"
+              "C:\\Users\\ROG\\Documents\\GitHub\\DARCI-Live\\DARCI-v4\\Darci.Shared\\Darci.Shared.csproj": {
+                "projectPath": "C:\\Users\\ROG\\Documents\\GitHub\\DARCI-Live\\DARCI-v4\\Darci.Shared\\Darci.Shared.csproj"
               }
             }
           }
@@ -132,8 +117,7 @@
           "enableAudit": "true",
           "auditLevel": "low",
           "auditMode": "direct"
-        },
-        "SdkAnalysisLevel": "10.0.100"
+        }
       },
       "frameworks": {
         "net8.0": {
@@ -163,40 +147,26 @@
           ],
           "assetTargetFallback": true,
           "warn": true,
-          "downloadDependencies": [
-            {
-              "name": "Microsoft.AspNetCore.App.Ref",
-              "version": "[8.0.22, 8.0.22]"
-            },
-            {
-              "name": "Microsoft.NETCore.App.Ref",
-              "version": "[8.0.22, 8.0.22]"
-            },
-            {
-              "name": "Microsoft.WindowsDesktop.App.Ref",
-              "version": "[8.0.22, 8.0.22]"
-            }
-          ],
           "frameworkReferences": {
             "Microsoft.NETCore.App": {
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.101/PortableRuntimeIdentifierGraph.json"
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\8.0.204/PortableRuntimeIdentifierGraph.json"
         }
       }
     },
-    "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\darci-v4\\Darci.Shared\\Darci.Shared.csproj": {
+    "C:\\Users\\ROG\\Documents\\GitHub\\DARCI-Live\\DARCI-v4\\Darci.Shared\\Darci.Shared.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\darci-v4\\Darci.Shared\\Darci.Shared.csproj",
+        "projectUniqueName": "C:\\Users\\ROG\\Documents\\GitHub\\DARCI-Live\\DARCI-v4\\Darci.Shared\\Darci.Shared.csproj",
         "projectName": "Darci.Shared",
-        "projectPath": "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\darci-v4\\Darci.Shared\\Darci.Shared.csproj",
-        "packagesPath": "C:\\Users\\aiden\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\darci-v4\\Darci.Shared\\obj\\",
+        "projectPath": "C:\\Users\\ROG\\Documents\\GitHub\\DARCI-Live\\DARCI-v4\\Darci.Shared\\Darci.Shared.csproj",
+        "packagesPath": "C:\\Users\\ROG\\.nuget\\packages\\",
+        "outputPath": "C:\\Users\\ROG\\Documents\\GitHub\\DARCI-Live\\DARCI-v4\\Darci.Shared\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
-          "C:\\Users\\aiden\\AppData\\Roaming\\NuGet\\NuGet.Config"
+          "C:\\Users\\ROG\\AppData\\Roaming\\NuGet\\NuGet.Config"
         ],
         "originalTargetFrameworks": [
           "net8.0"
@@ -219,8 +189,7 @@
           "enableAudit": "true",
           "auditLevel": "low",
           "auditMode": "direct"
-        },
-        "SdkAnalysisLevel": "10.0.100"
+        }
       },
       "frameworks": {
         "net8.0": {
@@ -236,40 +205,26 @@
           ],
           "assetTargetFallback": true,
           "warn": true,
-          "downloadDependencies": [
-            {
-              "name": "Microsoft.AspNetCore.App.Ref",
-              "version": "[8.0.22, 8.0.22]"
-            },
-            {
-              "name": "Microsoft.NETCore.App.Ref",
-              "version": "[8.0.22, 8.0.22]"
-            },
-            {
-              "name": "Microsoft.WindowsDesktop.App.Ref",
-              "version": "[8.0.22, 8.0.22]"
-            }
-          ],
           "frameworkReferences": {
             "Microsoft.NETCore.App": {
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.101/PortableRuntimeIdentifierGraph.json"
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\8.0.204/PortableRuntimeIdentifierGraph.json"
         }
       }
     },
-    "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\darci-v4\\Darci.Tools\\Darci.Tools.csproj": {
+    "C:\\Users\\ROG\\Documents\\GitHub\\DARCI-Live\\DARCI-v4\\Darci.Tools\\Darci.Tools.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\darci-v4\\Darci.Tools\\Darci.Tools.csproj",
+        "projectUniqueName": "C:\\Users\\ROG\\Documents\\GitHub\\DARCI-Live\\DARCI-v4\\Darci.Tools\\Darci.Tools.csproj",
         "projectName": "Darci.Tools",
-        "projectPath": "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\darci-v4\\Darci.Tools\\Darci.Tools.csproj",
-        "packagesPath": "C:\\Users\\aiden\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\darci-v4\\Darci.Tools\\obj\\",
+        "projectPath": "C:\\Users\\ROG\\Documents\\GitHub\\DARCI-Live\\DARCI-v4\\Darci.Tools\\Darci.Tools.csproj",
+        "packagesPath": "C:\\Users\\ROG\\.nuget\\packages\\",
+        "outputPath": "C:\\Users\\ROG\\Documents\\GitHub\\DARCI-Live\\DARCI-v4\\Darci.Tools\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
-          "C:\\Users\\aiden\\AppData\\Roaming\\NuGet\\NuGet.Config"
+          "C:\\Users\\ROG\\AppData\\Roaming\\NuGet\\NuGet.Config"
         ],
         "originalTargetFrameworks": [
           "net8.0"
@@ -281,14 +236,14 @@
           "net8.0": {
             "targetAlias": "net8.0",
             "projectReferences": {
-              "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\darci-v4\\Darci.Goals\\Darci.Goals.csproj": {
-                "projectPath": "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\darci-v4\\Darci.Goals\\Darci.Goals.csproj"
+              "C:\\Users\\ROG\\Documents\\GitHub\\DARCI-Live\\DARCI-v4\\Darci.Goals\\Darci.Goals.csproj": {
+                "projectPath": "C:\\Users\\ROG\\Documents\\GitHub\\DARCI-Live\\DARCI-v4\\Darci.Goals\\Darci.Goals.csproj"
               },
-              "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\darci-v4\\Darci.Memory\\Darci.Memory.csproj": {
-                "projectPath": "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\darci-v4\\Darci.Memory\\Darci.Memory.csproj"
+              "C:\\Users\\ROG\\Documents\\GitHub\\DARCI-Live\\DARCI-v4\\Darci.Memory\\Darci.Memory.csproj": {
+                "projectPath": "C:\\Users\\ROG\\Documents\\GitHub\\DARCI-Live\\DARCI-v4\\Darci.Memory\\Darci.Memory.csproj"
               },
-              "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\darci-v4\\Darci.Shared\\Darci.Shared.csproj": {
-                "projectPath": "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\darci-v4\\Darci.Shared\\Darci.Shared.csproj"
+              "C:\\Users\\ROG\\Documents\\GitHub\\DARCI-Live\\DARCI-v4\\Darci.Shared\\Darci.Shared.csproj": {
+                "projectPath": "C:\\Users\\ROG\\Documents\\GitHub\\DARCI-Live\\DARCI-v4\\Darci.Shared\\Darci.Shared.csproj"
               }
             }
           }
@@ -302,8 +257,7 @@
           "enableAudit": "true",
           "auditLevel": "low",
           "auditMode": "direct"
-        },
-        "SdkAnalysisLevel": "10.0.100"
+        }
       },
       "frameworks": {
         "net8.0": {
@@ -329,26 +283,12 @@
           ],
           "assetTargetFallback": true,
           "warn": true,
-          "downloadDependencies": [
-            {
-              "name": "Microsoft.AspNetCore.App.Ref",
-              "version": "[8.0.22, 8.0.22]"
-            },
-            {
-              "name": "Microsoft.NETCore.App.Ref",
-              "version": "[8.0.22, 8.0.22]"
-            },
-            {
-              "name": "Microsoft.WindowsDesktop.App.Ref",
-              "version": "[8.0.22, 8.0.22]"
-            }
-          ],
           "frameworkReferences": {
             "Microsoft.NETCore.App": {
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.101/PortableRuntimeIdentifierGraph.json"
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\8.0.204/PortableRuntimeIdentifierGraph.json"
         }
       }
     }
