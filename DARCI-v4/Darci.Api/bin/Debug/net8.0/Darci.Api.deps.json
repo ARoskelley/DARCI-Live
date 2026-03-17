@@ -11,6 +11,7 @@
           "Darci.Brain": "1.0.0",
           "Darci.Cloud": "1.0.0",
           "Darci.Core": "1.0.0",
+          "Darci.Engineering": "1.0.0",
           "Darci.Research": "1.0.0",
           "Swashbuckle.AspNetCore": "6.6.2"
         },
@@ -399,6 +400,7 @@
       "Darci.Core/1.0.0": {
         "dependencies": {
           "Darci.Brain": "1.0.0",
+          "Darci.Engineering": "1.0.0",
           "Darci.Goals": "1.0.0",
           "Darci.Memory": "1.0.0",
           "Darci.Personality": "1.0.0",
@@ -407,6 +409,18 @@
         },
         "runtime": {
           "Darci.Core.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        }
+      },
+      "Darci.Engineering/1.0.0": {
+        "dependencies": {
+          "Darci.Shared": "1.0.0",
+          "Microsoft.ML.OnnxRuntime": "1.19.2"
+        },
+        "runtime": {
+          "Darci.Engineering.dll": {
             "assemblyVersion": "1.0.0.0",
             "fileVersion": "1.0.0.0"
           }
@@ -623,6 +637,11 @@
       "sha512": ""
     },
     "Darci.Core/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "Darci.Engineering/1.0.0": {
       "type": "project",
       "serviceable": false,
       "sha512": ""

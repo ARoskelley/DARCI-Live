@@ -33,6 +33,9 @@ public enum ActionType
     GenerateCAD,
     Engineer,
 
+    // Neural Engineering (geometry workbench + ONNX network)
+    Engineering,
+
     // Meta
     Rest,
     Observe,
@@ -297,10 +300,13 @@ public class DarciAction
     public float? CadHeightMm { get; init; }
     public int CadMaxIterations { get; init; } = 5;
 
-    // Engineering-specific fields
+    // Engineering-specific fields (v3 LLM path)
     public string? EngineeringDescription { get; init; }
     public int EngineeringMaxIterations { get; init; } = 3;
     public bool EngineeringRunCollection { get; init; } = false;
+
+    // Neural Engineering fields (v4 workbench + ONNX path)
+    public EngineeringGoalSpec? EngineeringSpec { get; init; }
 
     public static DarciAction Rest(TimeSpan? duration = null, string? reason = null) => new()
     {
@@ -491,6 +497,25 @@ public enum TraitType
     Confidence,
     Trust,
     Curiosity
+}
+
+// ============================================================
+// ENGINEERING GOAL SPEC — used by DarciAction.EngineeringSpec
+// Lives in Darci.Shared so DarciAction and Decision can reference it
+// without a dependency on Darci.Engineering.
+// ============================================================
+
+/// <summary>
+/// Specification for a neural-engineering task.
+/// Extracted from a DARCI goal by EngineeringGoalDetector.
+/// </summary>
+public record EngineeringGoalSpec
+{
+    public string Description { get; init; } = "";
+    public string? ReferencePath { get; init; }
+    public Dictionary<string, object>? Constraints { get; init; }
+    public Dictionary<string, float>? Targets { get; init; }
+    public string ToolId { get; init; } = "geometry_workbench";
 }
 
 // ============================================================

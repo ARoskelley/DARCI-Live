@@ -20,6 +20,7 @@
     <ProjectReference Include="..\Darci.Goals\Darci.Goals.csproj" />
     <ProjectReference Include="..\Darci.Personality\Darci.Personality.csproj" />
     <ProjectReference Include="..\Darci.Brain\Darci.Brain.csproj" />
+    <ProjectReference Include="..\Darci.Engineering\Darci.Engineering.csproj" />
   </ItemGroup>
 
 </Project>

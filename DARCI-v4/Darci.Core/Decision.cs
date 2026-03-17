@@ -1,4 +1,5 @@
 using Darci.Brain;
+using Darci.Engineering;
 using Darci.Shared;
 using Darci.Tools;
 using Darci.Goals;
@@ -25,6 +26,7 @@ public class Decision
     private readonly IStateEncoder _encoder;
     private readonly ExperienceBuffer _buffer;
     private readonly IDecisionNetwork _network;
+    private readonly EngineeringGoalDetector? _engineeringDetector;
 
     public Decision(
         ILogger<Decision> logger,
@@ -32,14 +34,16 @@ public class Decision
         IGoalManager goals,
         IStateEncoder encoder,
         ExperienceBuffer buffer,
-        IDecisionNetwork network)
+        IDecisionNetwork network,
+        EngineeringGoalDetector? engineeringDetector = null)
     {
-        _logger  = logger;
-        _tools   = tools;
-        _goals   = goals;
-        _encoder = encoder;
-        _buffer  = buffer;
-        _network = network;
+        _logger               = logger;
+        _tools                = tools;
+        _goals                = goals;
+        _encoder              = encoder;
+        _buffer               = buffer;
+        _network              = network;
+        _engineeringDetector  = engineeringDetector;
     }
 
     /// <summary>
@@ -170,13 +174,31 @@ public class Decision
             {
                 if (state.CurrentGoalId.HasValue)
                     return await ContinueGoalWork(state.CurrentGoalId.Value, state);
+
                 var goal = await _goals.GetNextActionableGoal();
-                if (goal != null)
+                if (goal == null)
+                    return DarciAction.Rest(TimeSpan.FromSeconds(1), "Network chose WorkOnGoal but no goals available");
+
+                // Check if this is an engineering goal — delegate to neural workbench if so
+                if (_engineeringDetector != null)
                 {
-                    state.StartActivity($"Working on: {goal.Title}", goal.Id);
-                    return DarciAction.WorkOn(goal.Id, "Neural network chose to work on goal");
+                    var engineeringSpec = _engineeringDetector.Detect(goal.Title, goal.Description);
+                    if (engineeringSpec != null)
+                    {
+                        state.StartActivity($"Engineering: {goal.Title}", goal.Id);
+                        return new DarciAction
+                        {
+                            Type                   = ActionType.Engineering,
+                            EngineeringDescription = $"Neural engineering: {goal.Title}",
+                            GoalId                 = goal.Id,
+                            EngineeringSpec        = engineeringSpec,
+                            Reasoning              = "Goal detected as engineering task by keyword detector",
+                        };
+                    }
                 }
-                return DarciAction.Rest(TimeSpan.FromSeconds(1), "Network chose WorkOnGoal but no goals available");
+
+                state.StartActivity($"Working on: {goal.Title}", goal.Id);
+                return DarciAction.WorkOn(goal.Id, "Neural network chose to work on goal");
             }
 
             case BrainAction.StoreMemory:
