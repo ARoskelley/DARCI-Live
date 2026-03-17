@@ -195,3 +195,11 @@ C:\Users\ROG\Documents\GitHub\DARCI-Live\darci-v4\Darci.Api\obj\Debug\net8.0\ref
 C:\Users\ROG\Documents\GitHub\DARCI-Live\darci-v4\Darci.Api\obj\Debug\net8.0\Darci.Api.pdb
 C:\Users\ROG\Documents\GitHub\DARCI-Live\darci-v4\Darci.Api\obj\Debug\net8.0\Darci.Api.genruntimeconfig.cache
 C:\Users\ROG\Documents\GitHub\DARCI-Live\darci-v4\Darci.Api\obj\Debug\net8.0\ref\Darci.Api.dll
+C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Api\bin\Debug\net8.0\Darci.Research.dll
+C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Api\bin\Debug\net8.0\Darci.Research.pdb
+C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Api\bin\Debug\net8.0\AWSSDK.Core.dll
+C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Api\bin\Debug\net8.0\AWSSDK.S3.dll
+C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Api\bin\Debug\net8.0\AWSSDK.SQS.dll
+C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Api\bin\Debug\net8.0\Darci.Cloud.dll
+C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Api\bin\Debug\net8.0\Darci.Cloud.pdb
+C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Api\bin\Debug\net8.0\Darci.Api.staticwebassets.runtime.json

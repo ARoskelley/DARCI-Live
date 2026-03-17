@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Base theme required by the manifest; actual styling is Compose -->
+    <style name="Theme.DarciApp" parent="android:Theme.Material.NoTitleBar" />
+</resources>

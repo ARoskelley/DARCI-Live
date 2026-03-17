@@ -1,8 +1,11 @@
 """Geometry Engine — manages the live CadQuery workplane and mesh."""
 
+import concurrent
+
 import cadquery as cq
 import trimesh
 import numpy as np
+import concurrent.futures
 from threading import Lock
 from typing import Optional
 
@@ -65,7 +68,14 @@ class GeometryEngine:
         with self._lock:
             self._push_history()
 
-            success, error = self.action_executor.execute(action_id, parameters, self)
+            try:
+                with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                    future = executor.submit(self.action_executor.execute, action_id, parameters, self)
+                    success, error = future.result(timeout=10)  # 10 second max per action
+            except concurrent.futures.TimeoutError:
+                success, error = False, "Action timed out (geometry kernel hung)"
+            except Exception as e:
+                success, error = False, str(e)
 
             if success:
                 self._update_mesh()

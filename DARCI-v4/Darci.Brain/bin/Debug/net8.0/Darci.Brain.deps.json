@@ -170,9 +170,6 @@
         }
       },
       "Microsoft.ML.OnnxRuntime.Managed/1.19.2": {
-        "dependencies": {
-          "System.Memory": "4.5.5"
-        },
         "runtime": {
           "lib/net6.0/Microsoft.ML.OnnxRuntime.dll": {
             "assemblyVersion": "1.19.2.0",
@@ -193,9 +190,6 @@
         }
       },
       "SQLitePCLRaw.core/2.1.6": {
-        "dependencies": {
-          "System.Memory": "4.5.5"
-        },
         "runtime": {
           "lib/netstandard2.0/SQLitePCLRaw.core.dll": {
             "assemblyVersion": "2.1.6.2060",
@@ -318,10 +312,12 @@
           }
         }
       },
-      "System.Memory/4.5.5": {},
       "Darci.Shared/1.0.0": {
         "runtime": {
-          "Darci.Shared.dll": {}
+          "Darci.Shared.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.0.0"
+          }
         }
       }
     }
@@ -408,13 +404,6 @@
       "sha512": "sha512-PQ2Oq3yepLY4P7ll145P3xtx2bX8xF4PzaKPRpw9jZlKvfe4LE/saAV82inND9usn1XRpmxXk7Lal3MTI+6CNg==",
       "path": "sqlitepclraw.provider.e_sqlite3/2.1.6",
       "hashPath": "sqlitepclraw.provider.e_sqlite3.2.1.6.nupkg.sha512"
-    },
-    "System.Memory/4.5.5": {
-      "type": "package",
-      "serviceable": true,
-      "sha512": "sha512-XIWiDvKPXaTveaB7HVganDlOCRoj03l+jrwNvcge/t8vhGYKvqV+dMv6G4SAX2NoNmN0wZfVPTAlFwZcZvVOUw==",
-      "path": "system.memory/4.5.5",
-      "hashPath": "system.memory.4.5.5.nupkg.sha512"
     },
     "Darci.Shared/1.0.0": {
       "type": "project",
