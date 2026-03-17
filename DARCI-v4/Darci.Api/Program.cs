@@ -1,6 +1,7 @@
 using Darci.Brain;
 using Darci.Cloud;
 using Darci.Core;
+using Darci.Engineering;
 using Darci.Api;
 using Darci.Research;
 using Darci.Shared;
@@ -122,7 +123,7 @@ builder.Services.AddSingleton<IDecisionNetwork>(sp =>
 // Core DARCI components (singletons - one consciousness)
 builder.Services.AddSingleton<Awareness>();
 builder.Services.AddSingleton<State>();
-// Constructor: (ILogger, IToolkit, IGoalManager, IStateEncoder, ExperienceBuffer, IDecisionNetwork)
+// Constructor: (ILogger, IToolkit, IGoalManager, IStateEncoder, ExperienceBuffer, IDecisionNetwork, EngineeringGoalDetector?)
 builder.Services.AddSingleton<Decision>(sp =>
     new Decision(
         sp.GetRequiredService<ILogger<Decision>>(),
@@ -130,10 +131,11 @@ builder.Services.AddSingleton<Decision>(sp =>
         sp.GetRequiredService<IGoalManager>(),
         sp.GetRequiredService<IStateEncoder>(),
         sp.GetRequiredService<ExperienceBuffer>(),
-        sp.GetRequiredService<IDecisionNetwork>()));
+        sp.GetRequiredService<IDecisionNetwork>(),
+        sp.GetRequiredService<EngineeringGoalDetector>()));
 
 // DARCI herself - the background service
-// Constructor: (ILogger, Awareness, Decision, State, IToolkit, IStateEncoder, ExperienceBuffer)
+// Constructor: (ILogger, Awareness, Decision, State, IToolkit, IStateEncoder, ExperienceBuffer, EngineeringOrchestrator?)
 builder.Services.AddSingleton<Darci.Core.Darci>(sp =>
     new Darci.Core.Darci(
         sp.GetRequiredService<ILogger<Darci.Core.Darci>>(),
@@ -142,7 +144,8 @@ builder.Services.AddSingleton<Darci.Core.Darci>(sp =>
         sp.GetRequiredService<State>(),
         sp.GetRequiredService<IToolkit>(),
         sp.GetRequiredService<IStateEncoder>(),
-        sp.GetRequiredService<ExperienceBuffer>()));
+        sp.GetRequiredService<ExperienceBuffer>(),
+        sp.GetRequiredService<EngineeringOrchestrator>()));
 builder.Services.AddHostedService(sp => sp.GetRequiredService<Darci.Core.Darci>());
 
 // Controllers
@@ -153,6 +156,28 @@ builder.Services.AddSingleton<IResearchStore>(sp =>
     new ResearchStore(
         connectionString,
         sp.GetRequiredService<ILogger<ResearchStore>>()));
+
+// === Engineering Services ===
+
+// HTTP client for the Python geometry workbench on port 8001
+builder.Services.AddHttpClient<IEngineeringTool, GeometryWorkbenchClient>();
+
+// Geometry ONNX network (falls back to random exploration if model not present)
+var geometryModelPath = Path.Combine(AppContext.BaseDirectory, "Models", "geometry_policy.onnx");
+builder.Services.AddSingleton<IEngineeringNetwork>(sp =>
+    new OnnxGeometryNetwork(
+        sp.GetRequiredService<ILogger<OnnxGeometryNetwork>>(),
+        geometryModelPath));
+
+// Engineering goal detector (keyword-based)
+builder.Services.AddSingleton<EngineeringGoalDetector>();
+
+// Engineering orchestrator — wires workbench + network together
+builder.Services.AddSingleton<EngineeringOrchestrator>(sp =>
+    new EngineeringOrchestrator(
+        sp.GetRequiredService<ILogger<EngineeringOrchestrator>>(),
+        sp.GetRequiredService<IEngineeringTool>(),
+        sp.GetRequiredService<IEngineeringNetwork>()));
 
 // === AWS Cloud Relay (optional — off when credentials not set) ===
 var cloudConfig = CloudConfig.FromEnvironment();
@@ -785,6 +810,41 @@ app.MapDelete("/research/files/{id}", async (IResearchStore store, string id) =>
 {
     var ok = await store.DeleteFileAsync(id);
     return ok ? Results.Ok(new { deleted = id }) : Results.NotFound();
+});
+
+// === Engineering Neural Endpoints ===
+
+// Neural engineering status
+app.MapGet("/engineering/neural/status", async (IEngineeringTool workbench, IEngineeringNetwork network) =>
+{
+    var healthy = await workbench.IsHealthyAsync();
+    return Results.Ok(new
+    {
+        workbenchHealthy = healthy,
+        networkAvailable = network.IsAvailable,
+        toolId           = workbench.ToolId,
+        stateDimensions  = workbench.StateDimensions,
+        actionCount      = workbench.ActionCount,
+    });
+});
+
+// Run a neural engineering task manually (testing / direct dispatch)
+app.MapPost("/engineering/neural/run", async (
+    EngineeringGoalSpec spec, EngineeringOrchestrator orchestrator, CancellationToken ct) =>
+{
+    var result = await orchestrator.RunAsync(spec, ct);
+    return result.Success ? Results.Ok(result) : Results.UnprocessableEntity(result);
+});
+
+// Hot-swap geometry ONNX model without restart
+app.MapPost("/engineering/neural/load-model", async (IEngineeringNetwork network) =>
+{
+    var path = Path.Combine(AppContext.BaseDirectory, "Models", "geometry_policy.onnx");
+    if (!File.Exists(path))
+        return Results.NotFound(new { error = "geometry_policy.onnx not found at expected path", path });
+
+    await network.LoadModelAsync(path);
+    return Results.Ok(new { loaded = true, available = network.IsAvailable });
 });
 
 // === Cloud / AWS Endpoints ===

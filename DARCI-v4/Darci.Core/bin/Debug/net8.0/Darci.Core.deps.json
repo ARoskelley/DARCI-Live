@@ -9,6 +9,7 @@
       "Darci.Core/1.0.0": {
         "dependencies": {
           "Darci.Brain": "1.0.0",
+          "Darci.Engineering": "1.0.0",
           "Darci.Goals": "1.0.0",
           "Darci.Memory": "1.0.0",
           "Darci.Personality": "1.0.0",
@@ -490,6 +491,20 @@
           }
         }
       },
+      "Darci.Engineering/1.0.0": {
+        "dependencies": {
+          "Darci.Shared": "1.0.0",
+          "Microsoft.Extensions.Http": "8.0.0",
+          "Microsoft.Extensions.Logging.Abstractions": "8.0.0",
+          "Microsoft.ML.OnnxRuntime": "1.19.2"
+        },
+        "runtime": {
+          "Darci.Engineering.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        }
+      },
       "Darci.Goals/1.0.0": {
         "dependencies": {
           "Dapper": "2.1.66",
@@ -732,6 +747,11 @@
       "hashPath": "sqlitepclraw.provider.e_sqlite3.2.1.6.nupkg.sha512"
     },
     "Darci.Brain/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "Darci.Engineering/1.0.0": {
       "type": "project",
       "serviceable": false,
       "sha512": ""

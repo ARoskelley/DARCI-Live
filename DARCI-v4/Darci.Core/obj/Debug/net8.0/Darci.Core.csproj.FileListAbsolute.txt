@@ -50,3 +50,5 @@ C:\Users\ROG\Documents\GitHub\DARCI-Live\darci-v4\Darci.Core\obj\Debug\net8.0\Da
 C:\Users\ROG\Documents\GitHub\DARCI-Live\darci-v4\Darci.Core\obj\Debug\net8.0\refint\Darci.Core.dll
 C:\Users\ROG\Documents\GitHub\DARCI-Live\darci-v4\Darci.Core\obj\Debug\net8.0\Darci.Core.pdb
 C:\Users\ROG\Documents\GitHub\DARCI-Live\darci-v4\Darci.Core\obj\Debug\net8.0\ref\Darci.Core.dll
+C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Core\bin\Debug\net8.0\Darci.Engineering.dll
+C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Core\bin\Debug\net8.0\Darci.Engineering.pdb

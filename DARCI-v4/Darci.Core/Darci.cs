@@ -1,4 +1,5 @@
 using Darci.Brain;
+using Darci.Engineering;
 using Darci.Shared;
 using Darci.Tools;
 using Darci.Tools.Cad;
@@ -35,6 +36,7 @@ public class Darci : BackgroundService
     private readonly IToolkit _tools;
     private readonly IStateEncoder _encoder;
     private readonly ExperienceBuffer _buffer;
+    private readonly EngineeringOrchestrator? _engineeringOrchestrator;
 
     private long _cycleCount = 0;
     private readonly Stopwatch _uptime = new();
@@ -55,15 +57,17 @@ public class Darci : BackgroundService
         State state,
         IToolkit tools,
         IStateEncoder encoder,
-        ExperienceBuffer buffer)
+        ExperienceBuffer buffer,
+        EngineeringOrchestrator? engineeringOrchestrator = null)
     {
-        _logger = logger;
-        _awareness = awareness;
-        _decision = decision;
-        _state = state;
-        _tools = tools;
-        _encoder = encoder;
-        _buffer = buffer;
+        _logger                   = logger;
+        _awareness                = awareness;
+        _decision                 = decision;
+        _state                    = state;
+        _tools                    = tools;
+        _encoder                  = encoder;
+        _buffer                   = buffer;
+        _engineeringOrchestrator  = engineeringOrchestrator;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -344,9 +348,10 @@ public class Darci : BackgroundService
                 ActionType.CreateGoal => await DoCreateGoal(action),
                 ActionType.ReadFile   => await DoReadFile(action),
                 ActionType.WriteFile  => await DoWriteFile(action),
-                ActionType.GenerateCAD => await DoCADWork(action),
-                ActionType.Engineer   => await DoEngineerWork(action),
-                ActionType.Rest       => null,
+                ActionType.GenerateCAD  => await DoCADWork(action),
+                ActionType.Engineer    => await DoEngineerWork(action),
+                ActionType.Engineering => await DoNeuralEngineeringWork(action, ct),
+                ActionType.Rest        => null,
                 ActionType.Observe    => null,
                 _ => null
             };
@@ -604,6 +609,60 @@ public class Darci : BackgroundService
                 userId,
                 $"Engineering step failed: {result.Error ?? "unknown error"}",
                 externalNotify: false);
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Handles ActionType.Engineering — runs the neural geometry workbench loop.
+    /// Degrades gracefully if the orchestrator is not registered.
+    /// </summary>
+    private async Task<object?> DoNeuralEngineeringWork(DarciAction action, CancellationToken ct)
+    {
+        if (_engineeringOrchestrator == null)
+        {
+            _logger.LogWarning("Engineering action received but EngineeringOrchestrator is not configured");
+            return null;
+        }
+
+        var spec   = action.EngineeringSpec;
+        var userId = action.RecipientId ?? "Tinman";
+
+        if (spec == null)
+        {
+            _logger.LogWarning("Engineering action has no EngineeringSpec — skipping");
+            return null;
+        }
+
+        _logger.LogInformation("Neural engineering starting: {Description}", spec.Description);
+
+        var result = await _engineeringOrchestrator.RunAsync(spec, ct);
+
+        if (result.Success)
+        {
+            await _tools.StoreMemory(
+                $"Neural engineering succeeded for '{spec.Description}': score {result.FinalScore:F2}, {result.StepsTaken} steps",
+                new[] { "engineering", "neural", "success", userId });
+
+            await _tools.SendMessage(
+                userId,
+                $"Engineering complete.\n  Score: {result.FinalScore:P0}  Steps: {result.StepsTaken}  Passed: {result.ValidationPassed}",
+                externalNotify: true);
+        }
+        else
+        {
+            await _tools.StoreMemory(
+                $"Neural engineering failed for '{spec.Description}': {result.ErrorMessage}",
+                new[] { "engineering", "neural", "failure", userId });
+
+            if (!string.IsNullOrEmpty(result.ErrorMessage))
+            {
+                await _tools.SendMessage(
+                    userId,
+                    $"Engineering task couldn't complete: {result.ErrorMessage}",
+                    externalNotify: false);
+            }
         }
 
         return result;

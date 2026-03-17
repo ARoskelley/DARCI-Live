@@ -1,0 +1,16 @@
+C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Engineering\bin\Debug\net8.0\Darci.Engineering.deps.json
+C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Engineering\bin\Debug\net8.0\Darci.Engineering.dll
+C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Engineering\bin\Debug\net8.0\Darci.Engineering.pdb
+C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Engineering\bin\Debug\net8.0\Darci.Shared.dll
+C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Engineering\bin\Debug\net8.0\Darci.Shared.pdb
+C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Engineering\obj\Debug\net8.0\Darci.Engineering.csproj.AssemblyReference.cache
+C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Engineering\obj\Debug\net8.0\Darci.Engineering.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Engineering\obj\Debug\net8.0\Darci.Engineering.AssemblyInfoInputs.cache
+C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Engineering\obj\Debug\net8.0\Darci.Engineering.AssemblyInfo.cs
+C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Engineering\obj\Debug\net8.0\Darci.Engineering.csproj.CoreCompileInputs.cache
+C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Engineering\obj\Debug\net8.0\Darci.Engineering.sourcelink.json
+C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Engineering\obj\Debug\net8.0\Darci.En.A1808746.Up2Date
+C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Engineering\obj\Debug\net8.0\Darci.Engineering.dll
+C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Engineering\obj\Debug\net8.0\refint\Darci.Engineering.dll
+C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Engineering\obj\Debug\net8.0\Darci.Engineering.pdb
+C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Engineering\obj\Debug\net8.0\ref\Darci.Engineering.dll
