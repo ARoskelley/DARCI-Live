@@ -1,0 +1,51 @@
+[versions]
+agp             = "8.3.0"
+kotlin          = "1.9.22"
+coreKtx         = "1.12.0"
+lifecycle       = "2.7.0"
+activityCompose = "1.8.2"
+composeBom      = "2024.02.01"
+retrofit        = "2.9.0"
+okhttp          = "4.12.0"
+awsSdk          = "2.75.1"
+gson            = "2.10.1"
+coroutines      = "1.7.3"
+coil            = "2.5.0"
+navigation      = "2.7.7"
+
+[libraries]
+# AndroidX
+androidx-core-ktx             = { group = "androidx.core",             name = "core-ktx",               version.ref = "coreKtx" }
+androidx-lifecycle-runtime    = { group = "androidx.lifecycle",        name = "lifecycle-runtime-ktx",  version.ref = "lifecycle" }
+androidx-lifecycle-viewmodel  = { group = "androidx.lifecycle",        name = "lifecycle-viewmodel-ktx", version.ref = "lifecycle" }
+androidx-activity-compose     = { group = "androidx.activity",         name = "activity-compose",        version.ref = "activityCompose" }
+androidx-navigation-compose   = { group = "androidx.navigation",       name = "navigation-compose",      version.ref = "navigation" }
+
+# Compose BOM (pins all compose versions)
+androidx-compose-bom          = { group = "androidx.compose",          name = "compose-bom",             version.ref = "composeBom" }
+androidx-ui                   = { group = "androidx.compose.ui",       name = "ui" }
+androidx-ui-graphics          = { group = "androidx.compose.ui",       name = "ui-graphics" }
+androidx-ui-tooling-preview   = { group = "androidx.compose.ui",       name = "ui-tooling-preview" }
+androidx-material3            = { group = "androidx.compose.material3", name = "material3" }
+androidx-ui-tooling           = { group = "androidx.compose.ui",       name = "ui-tooling" }
+
+# Networking
+retrofit                      = { group = "com.squareup.retrofit2",    name = "retrofit",                version.ref = "retrofit" }
+retrofit-gson                 = { group = "com.squareup.retrofit2",    name = "converter-gson",          version.ref = "retrofit" }
+okhttp                        = { group = "com.squareup.okhttp3",      name = "okhttp",                  version.ref = "okhttp" }
+okhttp-logging                = { group = "com.squareup.okhttp3",      name = "logging-interceptor",     version.ref = "okhttp" }
+gson                          = { group = "com.google.code.gson",      name = "gson",                    version.ref = "gson" }
+
+# AWS Android SDK (SQS + S3)
+aws-sqs                       = { group = "com.amazonaws",             name = "aws-android-sdk-sqs",     version.ref = "awsSdk" }
+aws-s3                        = { group = "com.amazonaws",             name = "aws-android-sdk-s3",      version.ref = "awsSdk" }
+
+# Coroutines
+kotlinx-coroutines-android    = { group = "org.jetbrains.kotlinx",     name = "kotlinx-coroutines-android", version.ref = "coroutines" }
+
+# Image loading
+coil-compose                  = { group = "io.coil-kt",                name = "coil-compose",            version.ref = "coil" }
+
+[plugins]
+android-application           = { id = "com.android.application",      version.ref = "agp" }
+kotlin-android                = { id = "org.jetbrains.kotlin.android",  version.ref = "kotlin" }

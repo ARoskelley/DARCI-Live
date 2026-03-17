@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- FileProvider paths — used for opening downloaded research files -->
+<paths>
+    <cache-path name="darci_files" path="darci_files/" />
+</paths>

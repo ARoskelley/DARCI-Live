@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="theme-color" content="#121212" />
+  <title>DARCI</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.min.js"></script>
+  <style>
+    /* ── Reset + Variables ─────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #121212;
+      --surface:   #1e1e1e;
+      --surface2:  #2a2a2a;
+      --border:    #333;
+      --accent:    #7e57c2;
+      --accent2:   #26a69a;
+      --text:      #e0e0e0;
+      --text-dim:  #888;
+      --danger:    #e57373;
+      --safe:      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 15px;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 15px;
+      display: flex;
+      flex-direction: column;
+      height: 100dvh;           /* dynamic viewport height — works on iPhone */
+      overflow: hidden;
+    }
+
+    /* ── Header ────────────────────────────────────────────────── */
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 16px env(safe-area-inset-top, 0) 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-shrink: 0;
+    }
+    header h1 { font-size: 18px; font-weight: 700; letter-spacing: 0.5px; }
+    #status-pill {
+      margin-left: auto;
+      font-size: 12px;
+      padding: 3px 8px;
+      border-radius: 99px;
+      background: var(--surface2);
+      color: var(--text-dim);
+      white-space: nowrap;
+    }
+    #status-pill.live { background: #1b3a2d; color: #66bb6a; }
+    #status-pill.error { background: #3a1b1b; color: var(--danger); }
+
+    /* ── Status bar ────────────────────────────────────────────── */
+    #status-bar {
+      background: var(--surface2);
+      border-bottom: 1px solid var(--border);
+      padding: 6px 16px;
+      display: flex;
+      gap: 16px;
+      overflow-x: auto;
+      flex-shrink: 0;
+      font-size: 12px;
+      color: var(--text-dim);
+      scrollbar-width: none;
+    }
+    #status-bar::-webkit-scrollbar { display: none; }
+    .stat { white-space: nowrap; }
+    .stat span { color: var(--text); font-weight: 500; }
+
+    /* ── Tabs ──────────────────────────────────────────────────── */
+    nav {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      flex-shrink: 0;
+    }
+    .tab-btn {
+      flex: 1;
+      padding: 10px 0;
+      border: none;
+      background: none;
+      color: var(--text-dim);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+    /* ── Tab panels ────────────────────────────────────────────── */
+    .panel { display: none; flex: 1; flex-direction: column; overflow: hidden; }
+    .panel.active { display: flex; }
+
+    /* ── Chat ──────────────────────────────────────────────────── */
+    #messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .bubble-row { display: flex; }
+    .bubble-row.from-darci { justify-content: flex-start; }
+    .bubble-row.from-user  { justify-content: flex-end; }
+    .bubble {
+      max-width: 78%;
+      padding: 9px 13px;
+      border-radius: 16px;
+      font-size: 14px;
+      line-height: 1.45;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .bubble-row.from-darci .bubble {
+      background: var(--surface2);
+      border-bottom-left-radius: 4px;
+    }
+    .bubble-row.from-user .bubble {
+      background: var(--accent);
+      color: #fff;
+      border-bottom-right-radius: 4px;
+    }
+    .bubble-ts {
+      font-size: 10px;
+      color: var(--text-dim);
+      margin-top: 2px;
+      padding: 0 4px;
+    }
+    .bubble-row.from-user .bubble-ts { text-align: right; }
+
+    /* ── Message input ─────────────────────────────────────────── */
+    #input-area {
+      border-top: 1px solid var(--border);
+      padding: 10px 12px env(safe-area-inset-bottom, 10px) 12px;
+      background: var(--surface);
+      display: flex;
+      gap: 8px;
+      align-items: flex-end;
+      flex-shrink: 0;
+    }
+    #msg-input {
+      flex: 1;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 9px 14px;
+      color: var(--text);
+      font-size: 14px;
+      font-family: inherit;
+      resize: none;
+      max-height: 120px;
+      outline: none;
+      line-height: 1.4;
+    }
+    #msg-input:focus { border-color: var(--accent); }
+    #urgent-wrap {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 12px;
+      color: var(--text-dim);
+      white-space: nowrap;
+    }
+    #send-btn {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 50%;
+      width: 38px;
+      height: 38px;
+      font-size: 18px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: opacity 0.15s;
+    }
+    #send-btn:disabled { opacity: 0.4; cursor: default; }
+
+    /* ── Files panel ───────────────────────────────────────────── */
+    #files-panel {
+      display: flex;
+      flex-direction: column;
+    }
+    #files-toolbar {
+      padding: 10px 16px;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    #files-toolbar select {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 6px 10px;
+      border-radius: 8px;
+      font-size: 13px;
+      flex: 1;
+    }
+    .icon-btn {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 8px;
+      padding: 6px 12px;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    #files-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .file-card {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .file-icon { font-size: 24px; flex-shrink: 0; }
+    .file-info { flex: 1; min-width: 0; }
+    .file-name {
+      font-weight: 500;
+      font-size: 14px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .file-meta { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
+    .dl-btn {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 7px 12px;
+      font-size: 13px;
+      cursor: pointer;
+      white-space: nowrap;
+      text-decoration: none;
+      display: inline-block;
+    }
+    .empty-msg {
+      text-align: center;
+      color: var(--text-dim);
+      padding: 40px 0;
+      font-size: 14px;
+    }
+
+    /* ── Toast ─────────────────────────────────────────────────── */
+    #toast {
+      position: fixed;
+      bottom: calc(env(safe-area-inset-bottom, 0px) + 80px);
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 8px 16px;
+      font-size: 13px;
+      opacity: 0;
+      transition: opacity 0.2s, transform 0.2s;
+      pointer-events: none;
+      white-space: nowrap;
+      z-index: 999;
+    }
+    #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  </style>
+</head>
+<body>
+
+<!-- Header -->
+<header>
+  <div>
+    <h1>DARCI</h1>
+    <div style="font-size:11px;color:var(--text-dim)">Neural Autonomous Agent</div>
+  </div>
+  <div id="status-pill">connecting…</div>
+</header>
+
+<!-- Status bar -->
+<div id="status-bar">
+  <div class="stat">mood: <span id="s-mood">—</span></div>
+  <div class="stat">energy: <span id="s-energy">—</span></div>
+  <div class="stat">cycles: <span id="s-cycles">—</span></div>
+  <div class="stat">activity: <span id="s-activity">—</span></div>
+  <div class="stat">uptime: <span id="s-uptime">—</span></div>
+</div>
+
+<!-- Tabs -->
+<nav>
+  <button class="tab-btn active" onclick="switchTab('chat')">💬 Chat</button>
+  <button class="tab-btn" onclick="switchTab('files')">📁 Files</button>
+</nav>
+
+<!-- Chat panel -->
+<div id="chat-panel" class="panel active">
+  <div id="messages"></div>
+  <div id="input-area">
+    <textarea id="msg-input" rows="1" placeholder="Message DARCI…"
+      oninput="autoResize(this)" onkeydown="onKey(event)"></textarea>
+    <label id="urgent-wrap" title="Mark as urgent">
+      <input type="checkbox" id="urgent-cb" />🔴
+    </label>
+    <button id="send-btn" onclick="sendMessage()" title="Send">➤</button>
+  </div>
+</div>
+
+<!-- Files panel -->
+<div id="files-panel" class="panel">
+  <div id="files-toolbar">
+    <select id="session-filter" onchange="loadFiles()">
+      <option value="">All sessions</option>
+    </select>
+    <button class="icon-btn" onclick="loadFiles()">⟳ Refresh</button>
+  </div>
+  <div id="files-list"><div class="empty-msg">Loading files…</div></div>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<script>
+// ── Config ─────────────────────────────────────────────────────────────────
+// The API is served from the same origin as this page.
+const API = window.location.origin;
+
+// ── Tab switching ──────────────────────────────────────────────────────────
+function switchTab(name) {
+  document.querySelectorAll('.tab-btn').forEach((b, i) =>
+    b.classList.toggle('active', ['chat','files'][i] === name));
+  document.querySelectorAll('.panel').forEach(p =>
+    p.classList.toggle('active', p.id === name + '-panel'));
+  if (name === 'files') loadFiles();
+}
+
+// ── Toast ──────────────────────────────────────────────────────────────────
+let toastTimer;
+function toast(msg, ms = 2500) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), ms);
+}
+
+// ── Status bar ─────────────────────────────────────────────────────────────
+function updateStatusBar(s) {
+  if (!s) return;
+  setText('s-mood',     s.currentMood ?? s.mood ?? '—');
+  setText('s-energy',   s.energy != null ? Math.round(s.energy * 100) + '%' : '—');
+  setText('s-cycles',   s.cycleCount ?? s.cycles ?? '—');
+  setText('s-activity', s.currentActivity ?? s.activity ?? '—');
+  // uptime comes as a TimeSpan string like "00:12:34.0000000"
+  const up = s.uptime ?? '';
+  setText('s-uptime',   up ? up.split('.')[0] : '—');
+}
+
+function setText(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = val;
+}
+
+async function fetchStatus() {
+  try {
+    const r = await fetch(API + '/status');
+    if (r.ok) updateStatusBar(await r.json());
+  } catch (_) {}
+}
+
+// Poll status every 10 s as a fallback even when hub is connected
+fetchStatus();
+setInterval(fetchStatus, 10_000);
+
+// ── SignalR hub ────────────────────────────────────────────────────────────
+const pill = document.getElementById('status-pill');
+let hubConnected = false;
+
+const hub = new signalR.HubConnectionBuilder()
+  .withUrl(API + '/hub')
+  .withAutomaticReconnect([0, 2000, 5000, 10000, 30000])
+  .configureLogging(signalR.LogLevel.Warning)
+  .build();
+
+hub.on('ReceiveResponse', (msg) => {
+  addBubble(msg.content, false, msg.createdAt);
+});
+
+hub.on('StatusUpdate', (s) => {
+  updateStatusBar(s);
+});
+
+hub.on('FileReady', (f) => {
+  toast('📄 New file ready: ' + f.filename);
+  if (document.getElementById('files-panel').classList.contains('active')) {
+    loadFiles();
+  }
+});
+
+hub.on('Notification', (text) => {
+  toast(text, 4000);
+});
+
+hub.onreconnecting(() => {
+  pill.textContent = 'reconnecting…';
+  pill.className   = '';
+  hubConnected = false;
+});
+
+hub.onreconnected(() => {
+  pill.textContent = '● live';
+  pill.className   = 'live';
+  hubConnected = true;
+});
+
+hub.onclose(() => {
+  pill.textContent = 'offline';
+  pill.className   = 'error';
+  hubConnected = false;
+  // Fall back to REST polling
+  startRestPolling();
+});
+
+async function startHub() {
+  try {
+    await hub.start();
+    pill.textContent = '● live';
+    pill.className   = 'live';
+    hubConnected = true;
+  } catch (e) {
+    pill.textContent = 'offline';
+    pill.className   = 'error';
+    startRestPolling();
+  }
+}
+
+// REST polling fallback (when hub unavailable)
+let restPolling = false;
+async function startRestPolling() {
+  if (restPolling) return;
+  restPolling = true;
+  pill.textContent = 'REST poll';
+  while (!hubConnected) {
+    try {
+      const r = await fetch(API + '/responses');
+      if (r.ok) {
+        const msgs = await r.json();
+        msgs.forEach(m => addBubble(m.content, false, m.createdAt));
+      }
+    } catch (_) {}
+    await sleep(3000);
+  }
+  restPolling = false;
+}
+
+startHub();
+
+// ── Chat ───────────────────────────────────────────────────────────────────
+function addBubble(text, fromUser, ts) {
+  const msgs = document.getElementById('messages');
+  const row  = document.createElement('div');
+  row.className = 'bubble-row ' + (fromUser ? 'from-user' : 'from-darci');
+
+  const wrap = document.createElement('div');
+
+  const bub  = document.createElement('div');
+  bub.className = 'bubble';
+  bub.textContent = text;
+
+  const time = document.createElement('div');
+  time.className = 'bubble-ts';
+  time.textContent = ts ? new Date(ts).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : now();
+
+  wrap.appendChild(bub);
+  wrap.appendChild(time);
+  row.appendChild(wrap);
+  msgs.appendChild(row);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+async function sendMessage() {
+  const input  = document.getElementById('msg-input');
+  const urgent = document.getElementById('urgent-cb').checked;
+  const text   = input.value.trim();
+  if (!text) return;
+
+  addBubble(text, true);
+  input.value = '';
+  input.style.height = '';
+  document.getElementById('urgent-cb').checked = false;
+
+  if (hubConnected) {
+    await hub.invoke('SendMessage', text, null, urgent);
+  } else {
+    await fetch(API + '/message', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ message: text, urgent })
+    });
+  }
+}
+
+function onKey(e) {
+  // Send on Enter (but not Shift+Enter)
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+}
+
+function autoResize(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+}
+
+// ── Files ──────────────────────────────────────────────────────────────────
+async function loadFiles() {
+  const sessionId = document.getElementById('session-filter').value || null;
+  const list = document.getElementById('files-list');
+
+  // First load sessions for the filter dropdown
+  loadSessions();
+
+  const url = API + '/research/files' + (sessionId ? '?sessionId=' + sessionId : '');
+  try {
+    const r = await fetch(url);
+    if (!r.ok) { list.innerHTML = '<div class="empty-msg">Error loading files.</div>'; return; }
+    const files = await r.json();
+
+    if (files.length === 0) {
+      list.innerHTML = '<div class="empty-msg">No research files yet.</div>';
+      return;
+    }
+
+    list.innerHTML = '';
+    files.forEach(f => {
+      const card = document.createElement('div');
+      card.className = 'file-card';
+      card.innerHTML = `
+        <div class="file-icon">${fileIcon(f.contentType)}</div>
+        <div class="file-info">
+          <div class="file-name" title="${esc(f.filename)}">${esc(f.filename)}</div>
+          <div class="file-meta">${esc(f.contentType)} · ${fmtBytes(f.sizeBytes)}</div>
+          <div class="file-meta">${fmtDate(f.createdAt)}</div>
+        </div>
+        <a class="dl-btn" href="${API}/research/files/${esc(f.id)}/download"
+           download="${esc(f.filename)}" target="_blank">↓</a>
+      `;
+      list.appendChild(card);
+    });
+  } catch (e) {
+    list.innerHTML = '<div class="empty-msg">Could not reach DARCI.</div>';
+  }
+}
+
+async function loadSessions() {
+  try {
+    const r = await fetch(API + '/research/sessions?limit=50');
+    if (!r.ok) return;
+    const sessions = await r.json();
+    const sel = document.getElementById('session-filter');
+    const cur = sel.value;
+    // Rebuild options, keep current selection
+    while (sel.options.length > 1) sel.remove(1);
+    sessions.forEach(s => {
+      const opt = document.createElement('option');
+      opt.value = s.id;
+      opt.textContent = s.title + (s.status !== 'active' ? ' (' + s.status + ')' : '');
+      sel.appendChild(opt);
+    });
+    sel.value = cur;
+  } catch (_) {}
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+function fileIcon(ct) {
+  if (ct?.includes('json'))     return '📋';
+  if (ct?.includes('pdf'))      return '📄';
+  if (ct?.includes('markdown') || ct?.includes('text')) return '📝';
+  if (ct?.includes('image'))    return '🖼️';
+  if (ct?.includes('csv'))      return '📊';
+  return '📦';
+}
+
+function fmtBytes(b) {
+  if (b < 1024)       return b + ' B';
+  if (b < 1048576)    return (b/1024).toFixed(1) + ' KB';
+  return (b/1048576).toFixed(1) + ' MB';
+}
+
+function fmtDate(s) {
+  if (!s) return '';
+  return new Date(s).toLocaleString([], {dateStyle:'medium', timeStyle:'short'});
+}
+
+function esc(s) {
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function now() {
+  return new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+</script>
+</body>
+</html>

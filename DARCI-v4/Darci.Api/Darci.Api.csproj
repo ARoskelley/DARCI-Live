@@ -14,6 +14,8 @@
   <ItemGroup>
     <ProjectReference Include="..\Darci.Core\Darci.Core.csproj" />
     <ProjectReference Include="..\Darci.Brain\Darci.Brain.csproj" />
+    <ProjectReference Include="..\Darci.Research\Darci.Research.csproj" />
+    <ProjectReference Include="..\Darci.Cloud\Darci.Cloud.csproj" />
   </ItemGroup>
 
   <!-- Copy ONNX model files from training output on build -->

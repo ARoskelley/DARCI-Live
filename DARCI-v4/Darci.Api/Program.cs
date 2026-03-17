@@ -1,6 +1,8 @@
 using Darci.Brain;
+using Darci.Cloud;
 using Darci.Core;
 using Darci.Api;
+using Darci.Research;
 using Darci.Shared;
 using Darci.Goals;
 using Darci.Memory;
@@ -146,13 +148,51 @@ builder.Services.AddHostedService(sp => sp.GetRequiredService<Darci.Core.Darci>(
 // Controllers
 builder.Services.AddControllers();
 
+// === Research Store ===
+builder.Services.AddSingleton<IResearchStore>(sp =>
+    new ResearchStore(
+        connectionString,
+        sp.GetRequiredService<ILogger<ResearchStore>>()));
+
+// === AWS Cloud Relay (optional — off when credentials not set) ===
+var cloudConfig = CloudConfig.FromEnvironment();
+builder.Services.AddSingleton(cloudConfig);
+builder.Services.AddSingleton<IS3FileStore>(sp =>
+    new S3FileStore(cloudConfig, sp.GetRequiredService<ILogger<S3FileStore>>()));
+builder.Services.AddSingleton<IMessageInbox, AwarenessMessageInbox>();
+builder.Services.AddSingleton<IMessageOutbox, ResponseStoreOutbox>();
+builder.Services.AddHostedService<SqsRelayService>();
+
+// === SignalR (real-time hub for mobile app) ===
+builder.Services.AddSignalR();
+builder.Services.AddSingleton<DarciHubNotifier>();
+
+// === CORS (allow mobile app connections) ===
+builder.Services.AddCors(opt =>
+{
+    opt.AddPolicy("DarciApp", policy =>
+        policy
+            .SetIsOriginAllowed(_ => true)   // Android emulator / LAN IP
+            .AllowAnyHeader()
+            .AllowAnyMethod()
+            .AllowCredentials());            // required for SignalR negotiate
+});
+
 var app = builder.Build();
 
 // === Initialize Brain (creates DB tables if needed) ===
 var experienceBuffer = app.Services.GetRequiredService<ExperienceBuffer>();
 await experienceBuffer.InitializeAsync();
 
+// === Initialize Research store ===
+var researchStore = app.Services.GetRequiredService<IResearchStore>();
+await researchStore.InitializeAsync();
+
 // === Middleware ===
+app.UseCors("DarciApp");
+app.UseDefaultFiles();    // serves wwwroot/index.html at /
+app.UseStaticFiles();     // serves wwwroot/** (includes /app/index.html)
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -160,6 +200,9 @@ if (app.Environment.IsDevelopment())
 }
 
 app.MapControllers();
+
+// SignalR hub
+app.MapHub<DarciHub>("/hub");
 
 // === Minimal API Endpoints ===
 
@@ -650,12 +693,150 @@ app.MapDelete("/brain/experiences", async (ExperienceBuffer buffer) =>
     return Results.Ok(new { message = "Experience buffer cleared." });
 });
 
+// === Research Endpoints ===
+
+// List sessions
+app.MapGet("/research/sessions", async (IResearchStore store, string? status, int? limit) =>
+{
+    var sessions = await store.GetSessionsAsync(status, limit ?? 50);
+    return Results.Ok(sessions);
+});
+
+// Get a single session summary
+app.MapGet("/research/sessions/{id}", async (IResearchStore store, string id) =>
+{
+    var summary = await store.GetSessionSummaryAsync(id);
+    return summary is null ? Results.NotFound() : Results.Ok(summary);
+});
+
+// Create a research session
+app.MapPost("/research/sessions", async (IResearchStore store, CreateSessionRequest request) =>
+{
+    var session = await store.CreateSessionAsync(
+        request.Title, request.Description, request.CreatedBy ?? "DARCI", request.Tags);
+    return Results.Created($"/research/sessions/{session.Id}", session);
+});
+
+// Complete / fail a session
+app.MapPatch("/research/sessions/{id}/complete", async (IResearchStore store, string id, string? status) =>
+{
+    var ok = await store.CompleteSessionAsync(id, status ?? "completed");
+    return ok ? Results.Ok(new { sessionId = id, status = status ?? "completed" }) : Results.NotFound();
+});
+
+// Add a result to a session
+app.MapPost("/research/sessions/{id}/results", async (IResearchStore store, string id, AddResultRequest request) =>
+{
+    var result = await store.AddResultAsync(
+        id, request.Source, request.Content,
+        request.ResultType ?? "text", request.Tags, request.RelevanceScore ?? 0f);
+    return Results.Created($"/research/sessions/{id}/results/{result.Id}", result);
+});
+
+// Get results for a session
+app.MapGet("/research/sessions/{id}/results", async (IResearchStore store, string id, string? type) =>
+{
+    var results = await store.GetResultsAsync(id, type);
+    return Results.Ok(results);
+});
+
+// Search across all results
+app.MapGet("/research/search", async (IResearchStore store, string q, int? limit) =>
+{
+    if (string.IsNullOrWhiteSpace(q)) return Results.BadRequest(new { error = "q is required" });
+    var results = await store.SearchResultsAsync(q, limit ?? 20);
+    return Results.Ok(results);
+});
+
+// List all files (optionally scoped to session)
+app.MapGet("/research/files", async (IResearchStore store, string? sessionId) =>
+{
+    var files = await store.GetFilesAsync(sessionId);
+    return Results.Ok(files);
+});
+
+// Download a research file
+app.MapGet("/research/files/{id}/download", async (IResearchStore store, string id) =>
+{
+    var file = await store.GetFileAsync(id);
+    if (file is null || !File.Exists(file.FilePath))
+        return Results.NotFound(new { error = "File not found" });
+
+    var bytes = await File.ReadAllBytesAsync(file.FilePath);
+    return Results.File(bytes, file.ContentType, file.Filename);
+});
+
+// Register a file artifact (external agents call this after writing the file to disk)
+app.MapPost("/research/sessions/{id}/files", async (
+    IResearchStore store, DarciHubNotifier notifier, string id, RegisterFileRequest request) =>
+{
+    var file = await store.RegisterFileAsync(
+        id, request.Filename, request.ContentType, request.FilePath, request.SizeBytes);
+
+    // Push notification to all connected mobile clients
+    await notifier.NotifyFileReady(file.Id, file.Filename, id,
+        $"/research/files/{file.Id}/download");
+
+    return Results.Created($"/research/files/{file.Id}/download", file);
+});
+
+// Delete a file record (does NOT delete the file on disk)
+app.MapDelete("/research/files/{id}", async (IResearchStore store, string id) =>
+{
+    var ok = await store.DeleteFileAsync(id);
+    return ok ? Results.Ok(new { deleted = id }) : Results.NotFound();
+});
+
+// === Cloud / AWS Endpoints ===
+
+// Cloud relay status
+app.MapGet("/cloud/status", (CloudConfig cfg) => Results.Ok(new
+{
+    configured      = cfg.IsConfigured,
+    region          = cfg.Region,
+    inboxQueue      = cfg.IsConfigured ? cfg.InboxQueueUrl : "(not set)",
+    outboxQueue     = cfg.IsConfigured ? cfg.OutboxQueueUrl : "(not set)",
+    filesBucket     = cfg.IsConfigured ? cfg.FilesBucket : "(not set)"
+}));
+
+// Upload a local research file to S3 and register it in the research store
+// (DARCI or a research agent calls this after writing the file to disk on the host)
+app.MapPost("/cloud/upload", async (
+    IS3FileStore s3, IResearchStore store, DarciHubNotifier notifier,
+    UploadFileRequest req, CancellationToken ct) =>
+{
+    if (!File.Exists(req.LocalPath))
+        return Results.BadRequest(new { error = $"File not found on host: {req.LocalPath}" });
+
+    var s3Key = await s3.UploadFileAsync(
+        req.LocalPath, req.Filename, req.ContentType, req.SessionId, ct);
+
+    var presignedUrl = s3.GetPresignedUrl(s3Key);
+
+    var fileInfo = new System.IO.FileInfo(req.LocalPath);
+    var record   = await store.RegisterFileAsync(
+        req.SessionId, req.Filename, req.ContentType, req.LocalPath, fileInfo.Length);
+
+    await notifier.NotifyFileReady(record.Id, req.Filename, req.SessionId, presignedUrl);
+
+    return Results.Created(presignedUrl, new { s3Key, presignedUrl, fileId = record.Id });
+});
+
+// List files in S3 (optionally scoped to session)
+app.MapGet("/cloud/files", async (IS3FileStore s3, string? sessionId, CancellationToken ct) =>
+{
+    var files = await s3.ListFilesAsync(sessionId, ct);
+    return Results.Ok(files);
+});
+
 app.Run();
 
 // === Request/Response Models ===
 
 public record MessageRequest(string Message, string? UserId = null, bool Urgent = false);
 public record GoalRequest(string Title, string? Description, string? UserId, GoalType? Type, GoalPriority? Priority);
+public record RegisterFileRequest(string Filename, string ContentType, string FilePath, long SizeBytes);
+public record UploadFileRequest(string SessionId, string Filename, string ContentType, string LocalPath);
 public record CadRequest(string Description, string? UserId = null, bool Urgent = false);
 public record CadExecuteRequest(
     string Description,
