@@ -697,6 +697,8 @@
         "framework": ".NETCoreApp,Version=v8.0",
         "dependencies": {
           "Dapper": "2.1.66",
+          "Darci.Memory.Confidence": "1.0.0",
+          "Darci.Memory.Graph": "1.0.0",
           "Darci.Shared": "1.0.0",
           "Microsoft.Data.Sqlite": "8.0.0",
           "Microsoft.Extensions.Logging.Abstractions": "8.0.0"
@@ -706,6 +708,37 @@
         },
         "runtime": {
           "bin/placeholder/Darci.Memory.dll": {}
+        }
+      },
+      "Darci.Memory.Confidence/1.0.0": {
+        "type": "project",
+        "framework": ".NETCoreApp,Version=v8.0",
+        "dependencies": {
+          "Dapper": "2.1.35",
+          "Darci.Memory.Graph": "1.0.0",
+          "Microsoft.Data.Sqlite": "8.0.0",
+          "Microsoft.Extensions.Logging.Abstractions": "8.0.0"
+        },
+        "compile": {
+          "bin/placeholder/Darci.Memory.Confidence.dll": {}
+        },
+        "runtime": {
+          "bin/placeholder/Darci.Memory.Confidence.dll": {}
+        }
+      },
+      "Darci.Memory.Graph/1.0.0": {
+        "type": "project",
+        "framework": ".NETCoreApp,Version=v8.0",
+        "dependencies": {
+          "Dapper": "2.1.35",
+          "Microsoft.Data.Sqlite": "8.0.0",
+          "Microsoft.Extensions.Logging.Abstractions": "8.0.0"
+        },
+        "compile": {
+          "bin/placeholder/Darci.Memory.Graph.dll": {}
+        },
+        "runtime": {
+          "bin/placeholder/Darci.Memory.Graph.dll": {}
         }
       },
       "Darci.Personality/1.0.0": {
@@ -724,6 +757,39 @@
           "bin/placeholder/Darci.Personality.dll": {}
         }
       },
+      "Darci.Research/1.0.0": {
+        "type": "project",
+        "framework": ".NETCoreApp,Version=v8.0",
+        "dependencies": {
+          "Dapper": "2.1.35",
+          "Darci.Shared": "1.0.0",
+          "Microsoft.Data.Sqlite": "8.0.0",
+          "Microsoft.Extensions.Logging.Abstractions": "8.0.0"
+        },
+        "compile": {
+          "bin/placeholder/Darci.Research.dll": {}
+        },
+        "runtime": {
+          "bin/placeholder/Darci.Research.dll": {}
+        }
+      },
+      "Darci.Research.Agents/1.0.0": {
+        "type": "project",
+        "framework": ".NETCoreApp,Version=v8.0",
+        "dependencies": {
+          "Darci.Memory.Confidence": "1.0.0",
+          "Darci.Memory.Graph": "1.0.0",
+          "Darci.Research": "1.0.0",
+          "Microsoft.Extensions.Http": "8.0.0",
+          "Microsoft.Extensions.Logging.Abstractions": "8.0.0"
+        },
+        "compile": {
+          "bin/placeholder/Darci.Research.Agents.dll": {}
+        },
+        "runtime": {
+          "bin/placeholder/Darci.Research.Agents.dll": {}
+        }
+      },
       "Darci.Shared/1.0.0": {
         "type": "project",
         "framework": ".NETCoreApp,Version=v8.0",
@@ -740,6 +806,7 @@
         "dependencies": {
           "Darci.Goals": "1.0.0",
           "Darci.Memory": "1.0.0",
+          "Darci.Research.Agents": "1.0.0",
           "Darci.Shared": "1.0.0",
           "Microsoft.Extensions.Http": "8.0.0",
           "Microsoft.Extensions.Logging.Abstractions": "8.0.0"
@@ -1679,10 +1746,30 @@
       "path": "../Darci.Memory/Darci.Memory.csproj",
       "msbuildProject": "../Darci.Memory/Darci.Memory.csproj"
     },
+    "Darci.Memory.Confidence/1.0.0": {
+      "type": "project",
+      "path": "../Darci.Memory.Confidence/Darci.Memory.Confidence.csproj",
+      "msbuildProject": "../Darci.Memory.Confidence/Darci.Memory.Confidence.csproj"
+    },
+    "Darci.Memory.Graph/1.0.0": {
+      "type": "project",
+      "path": "../Darci.Memory.Graph/Darci.Memory.Graph.csproj",
+      "msbuildProject": "../Darci.Memory.Graph/Darci.Memory.Graph.csproj"
+    },
     "Darci.Personality/1.0.0": {
       "type": "project",
       "path": "../Darci.Personality/Darci.Personality.csproj",
       "msbuildProject": "../Darci.Personality/Darci.Personality.csproj"
+    },
+    "Darci.Research/1.0.0": {
+      "type": "project",
+      "path": "../Darci.Research/Darci.Research.csproj",
+      "msbuildProject": "../Darci.Research/Darci.Research.csproj"
+    },
+    "Darci.Research.Agents/1.0.0": {
+      "type": "project",
+      "path": "../Darci.Research.Agents/Darci.Research.Agents.csproj",
+      "msbuildProject": "../Darci.Research.Agents/Darci.Research.Agents.csproj"
     },
     "Darci.Shared/1.0.0": {
       "type": "project",
@@ -1701,6 +1788,7 @@
       "Darci.Engineering >= 1.0.0",
       "Darci.Goals >= 1.0.0",
       "Darci.Memory >= 1.0.0",
+      "Darci.Memory.Confidence >= 1.0.0",
       "Darci.Personality >= 1.0.0",
       "Darci.Shared >= 1.0.0",
       "Darci.Tools >= 1.0.0",
@@ -1715,11 +1803,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\DARCI-v4\\Darci.Core\\Darci.Core.csproj",
+      "projectUniqueName": "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\darci-v4\\Darci.Core\\Darci.Core.csproj",
       "projectName": "Darci.Core",
-      "projectPath": "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\DARCI-v4\\Darci.Core\\Darci.Core.csproj",
+      "projectPath": "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\darci-v4\\Darci.Core\\Darci.Core.csproj",
       "packagesPath": "C:\\Users\\aiden\\.nuget\\packages\\",
-      "outputPath": "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\DARCI-v4\\Darci.Core\\obj\\",
+      "outputPath": "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\darci-v4\\Darci.Core\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
         "C:\\Users\\aiden\\AppData\\Roaming\\NuGet\\NuGet.Config"
@@ -1734,26 +1822,29 @@
         "net8.0": {
           "targetAlias": "net8.0",
           "projectReferences": {
-            "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\DARCI-v4\\Darci.Brain\\Darci.Brain.csproj": {
-              "projectPath": "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\DARCI-v4\\Darci.Brain\\Darci.Brain.csproj"
+            "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\darci-v4\\Darci.Brain\\Darci.Brain.csproj": {
+              "projectPath": "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\darci-v4\\Darci.Brain\\Darci.Brain.csproj"
             },
-            "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\DARCI-v4\\Darci.Engineering\\Darci.Engineering.csproj": {
-              "projectPath": "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\DARCI-v4\\Darci.Engineering\\Darci.Engineering.csproj"
+            "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\darci-v4\\Darci.Engineering\\Darci.Engineering.csproj": {
+              "projectPath": "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\darci-v4\\Darci.Engineering\\Darci.Engineering.csproj"
             },
-            "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\DARCI-v4\\Darci.Goals\\Darci.Goals.csproj": {
-              "projectPath": "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\DARCI-v4\\Darci.Goals\\Darci.Goals.csproj"
+            "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\darci-v4\\Darci.Goals\\Darci.Goals.csproj": {
+              "projectPath": "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\darci-v4\\Darci.Goals\\Darci.Goals.csproj"
             },
-            "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\DARCI-v4\\Darci.Memory\\Darci.Memory.csproj": {
-              "projectPath": "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\DARCI-v4\\Darci.Memory\\Darci.Memory.csproj"
+            "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\darci-v4\\Darci.Memory.Confidence\\Darci.Memory.Confidence.csproj": {
+              "projectPath": "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\darci-v4\\Darci.Memory.Confidence\\Darci.Memory.Confidence.csproj"
             },
-            "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\DARCI-v4\\Darci.Personality\\Darci.Personality.csproj": {
-              "projectPath": "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\DARCI-v4\\Darci.Personality\\Darci.Personality.csproj"
+            "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\darci-v4\\Darci.Memory\\Darci.Memory.csproj": {
+              "projectPath": "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\darci-v4\\Darci.Memory\\Darci.Memory.csproj"
             },
-            "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\DARCI-v4\\Darci.Shared\\Darci.Shared.csproj": {
-              "projectPath": "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\DARCI-v4\\Darci.Shared\\Darci.Shared.csproj"
+            "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\darci-v4\\Darci.Personality\\Darci.Personality.csproj": {
+              "projectPath": "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\darci-v4\\Darci.Personality\\Darci.Personality.csproj"
             },
-            "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\DARCI-v4\\Darci.Tools\\Darci.Tools.csproj": {
-              "projectPath": "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\DARCI-v4\\Darci.Tools\\Darci.Tools.csproj"
+            "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\darci-v4\\Darci.Shared\\Darci.Shared.csproj": {
+              "projectPath": "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\darci-v4\\Darci.Shared\\Darci.Shared.csproj"
+            },
+            "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\darci-v4\\Darci.Tools\\Darci.Tools.csproj": {
+              "projectPath": "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\darci-v4\\Darci.Tools\\Darci.Tools.csproj"
             }
           }
         }
@@ -1767,8 +1858,7 @@
         "enableAudit": "true",
         "auditLevel": "low",
         "auditMode": "direct"
-      },
-      "SdkAnalysisLevel": "10.0.100"
+      }
     },
     "frameworks": {
       "net8.0": {
@@ -1798,26 +1888,12 @@
         ],
         "assetTargetFallback": true,
         "warn": true,
-        "downloadDependencies": [
-          {
-            "name": "Microsoft.AspNetCore.App.Ref",
-            "version": "[8.0.22, 8.0.22]"
-          },
-          {
-            "name": "Microsoft.NETCore.App.Ref",
-            "version": "[8.0.22, 8.0.22]"
-          },
-          {
-            "name": "Microsoft.WindowsDesktop.App.Ref",
-            "version": "[8.0.22, 8.0.22]"
-          }
-        ],
         "frameworkReferences": {
           "Microsoft.NETCore.App": {
             "privateAssets": "all"
           }
         },
-        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.101/PortableRuntimeIdentifierGraph.json"
+        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\8.0.414/PortableRuntimeIdentifierGraph.json"
       }
     }
   }

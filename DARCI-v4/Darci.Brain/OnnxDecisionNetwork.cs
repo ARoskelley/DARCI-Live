@@ -26,6 +26,8 @@ public sealed class OnnxDecisionNetwork : IDecisionNetwork, IDisposable
 
     private InferenceSession? _session;
     private bool _isAvailable;
+    private int _expectedStateDimensions = 29;
+    private bool _hasLoggedDimensionAdaptation;
 
     private float _epsilon;
     private long _trainingSteps;
@@ -61,8 +63,12 @@ public sealed class OnnxDecisionNetwork : IDecisionNetwork, IDisposable
         try
         {
             _session     = new InferenceSession(modelPath);
+            _expectedStateDimensions = ResolveExpectedStateDimensions(_session);
             _isAvailable = true;
-            _logger.LogInformation("OnnxDecisionNetwork loaded from {Path}", modelPath);
+            _logger.LogInformation(
+                "OnnxDecisionNetwork loaded from {Path} (expected state dims: {Dims})",
+                modelPath,
+                _expectedStateDimensions);
         }
         catch (Exception ex)
         {
@@ -80,11 +86,25 @@ public sealed class OnnxDecisionNetwork : IDecisionNetwork, IDisposable
         if (_session == null)
             return new float[10];
 
-        var inputTensor = new DenseTensor<float>(stateVector, new[] { 1, stateVector.Length });
-        var inputs      = new[] { NamedOnnxValue.CreateFromTensor(InputName, inputTensor) };
+        var prepared = PrepareStateVector(stateVector);
+        var inputTensor = new DenseTensor<float>(prepared, new[] { 1, prepared.Length });
+        var inputs = new[] { NamedOnnxValue.CreateFromTensor(InputName, inputTensor) };
 
-        using var outputs = _session.Run(inputs);
-        return outputs.First().AsTensor<float>().ToArray();
+        try
+        {
+            using var outputs = _session.Run(inputs);
+            return outputs.First().AsTensor<float>().ToArray();
+        }
+        catch (OnnxRuntimeException ex)
+        {
+            _logger.LogWarning(
+                ex,
+                "ONNX inference failed for state length {Actual} against model input {Expected}. Disabling neural model and falling back to priority ladder.",
+                stateVector.Length,
+                _expectedStateDimensions);
+            DisableModel();
+            return new float[10];
+        }
     }
 
     /// <summary>
@@ -164,11 +184,17 @@ public sealed class OnnxDecisionNetwork : IDecisionNetwork, IDisposable
         try
         {
             var newSession = new InferenceSession(path);
-            var old        = _session;
-            _session       = newSession;
-            _isAvailable   = true;
+            var expectedDimensions = ResolveExpectedStateDimensions(newSession);
+            var old = _session;
+            _session = newSession;
+            _expectedStateDimensions = expectedDimensions;
+            _hasLoggedDimensionAdaptation = false;
+            _isAvailable = true;
             old?.Dispose();
-            _logger.LogInformation("OnnxDecisionNetwork hot-swapped model from {Path}", path);
+            _logger.LogInformation(
+                "OnnxDecisionNetwork hot-swapped model from {Path} (expected state dims: {Dims})",
+                path,
+                _expectedStateDimensions);
         }
         catch (Exception ex)
         {
@@ -189,5 +215,57 @@ public sealed class OnnxDecisionNetwork : IDecisionNetwork, IDisposable
     public void Dispose()
     {
         _session?.Dispose();
+    }
+
+    private float[] PrepareStateVector(float[] stateVector)
+    {
+        if (_expectedStateDimensions <= 0 || stateVector.Length == _expectedStateDimensions)
+        {
+            return stateVector;
+        }
+
+        var adapted = new float[_expectedStateDimensions];
+        Array.Copy(stateVector, adapted, Math.Min(stateVector.Length, adapted.Length));
+
+        if (!_hasLoggedDimensionAdaptation)
+        {
+            var mode = stateVector.Length > _expectedStateDimensions ? "truncating" : "zero-padding";
+            _logger.LogWarning(
+                "State vector length {Actual} does not match model input {Expected}; {Mode} to preserve compatibility with the loaded ONNX model.",
+                stateVector.Length,
+                _expectedStateDimensions,
+                mode);
+            _hasLoggedDimensionAdaptation = true;
+        }
+
+        return adapted;
+    }
+
+    private static int ResolveExpectedStateDimensions(InferenceSession session)
+    {
+        if (!session.InputMetadata.TryGetValue(InputName, out var metadata))
+        {
+            return 29;
+        }
+
+        var dimensions = metadata.Dimensions;
+        for (var i = dimensions.Length - 1; i >= 0; i--)
+        {
+            if (dimensions[i] > 0)
+            {
+                return dimensions[i];
+            }
+        }
+
+        return 29;
+    }
+
+    private void DisableModel()
+    {
+        _session?.Dispose();
+        _session = null;
+        _isAvailable = false;
+        _expectedStateDimensions = 29;
+        _hasLoggedDimensionAdaptation = false;
     }
 }

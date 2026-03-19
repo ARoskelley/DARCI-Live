@@ -8,16 +8,16 @@
     "net8.0": []
   },
   "packageFolders": {
-    "C:\\Users\\aiden\\.nuget\\packages": {}
+    "C:\\Users\\aiden\\.nuget\\packages\\": {}
   },
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\DARCI-v4\\Darci.Shared\\Darci.Shared.csproj",
+      "projectUniqueName": "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\darci-v4\\Darci.Shared\\Darci.Shared.csproj",
       "projectName": "Darci.Shared",
-      "projectPath": "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\DARCI-v4\\Darci.Shared\\Darci.Shared.csproj",
-      "packagesPath": "C:\\Users\\aiden\\.nuget\\packages",
-      "outputPath": "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\DARCI-v4\\Darci.Shared\\obj\\",
+      "projectPath": "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\darci-v4\\Darci.Shared\\Darci.Shared.csproj",
+      "packagesPath": "C:\\Users\\aiden\\.nuget\\packages\\",
+      "outputPath": "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\darci-v4\\Darci.Shared\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
         "C:\\Users\\aiden\\AppData\\Roaming\\NuGet\\NuGet.Config"
@@ -40,7 +40,7 @@
         ]
       },
       "restoreAuditProperties": {
-        "enableAudit": "false",
+        "enableAudit": "true",
         "auditLevel": "low",
         "auditMode": "direct"
       }

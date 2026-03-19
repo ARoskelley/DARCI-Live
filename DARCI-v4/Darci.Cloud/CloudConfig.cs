@@ -35,11 +35,11 @@ public sealed class CloudConfig
 
     /// <summary>Returns true if AWS credentials + queues are configured.</summary>
     public bool IsConfigured =>
-        !string.IsNullOrWhiteSpace(AccessKeyId)  &&
-        !string.IsNullOrWhiteSpace(SecretAccessKey) &&
-        !string.IsNullOrWhiteSpace(InboxQueueUrl) &&
-        !string.IsNullOrWhiteSpace(OutboxQueueUrl) &&
-        !string.IsNullOrWhiteSpace(FilesBucket);
+        HasUsableValue(AccessKeyId) &&
+        HasUsableValue(SecretAccessKey) &&
+        IsValidQueueUrl(InboxQueueUrl) &&
+        IsValidQueueUrl(OutboxQueueUrl) &&
+        HasUsableValue(FilesBucket);
 
     /// <summary>Load configuration from environment variables.</summary>
     public static CloudConfig FromEnvironment() => new()
@@ -57,4 +57,46 @@ public sealed class CloudConfig
 
     private static string Env(string key, string fallback) =>
         Environment.GetEnvironmentVariable(key) ?? fallback;
+
+    private static bool HasUsableValue(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        return !LooksLikePlaceholder(value);
+    }
+
+    private static bool IsValidQueueUrl(string? value)
+    {
+        if (!HasUsableValue(value))
+        {
+            return false;
+        }
+
+        return Uri.TryCreate(value, UriKind.Absolute, out var uri)
+            && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps);
+    }
+
+    private static bool LooksLikePlaceholder(string value)
+    {
+        var trimmed = value.Trim();
+        if (trimmed.Length == 0)
+        {
+            return true;
+        }
+
+        var lower = trimmed.ToLowerInvariant();
+        return lower.Contains("...")
+            || lower.Contains("your_")
+            || lower.Contains("your-")
+            || lower.Contains("replace")
+            || lower.Contains("changeme")
+            || lower.Contains("change_me")
+            || lower.Contains("change-me")
+            || lower == "todo"
+            || lower == "tbd"
+            || (trimmed.StartsWith('<') && trimmed.EndsWith('>'));
+    }
 }

@@ -1,6 +1,6 @@
 {
   "Version": 1,
-  "Hash": "lTYQc43n7yFSknxwBK9ehuGe8eNw5hyq+B8ab/LrbNA=",
+  "Hash": "TLfDHXp22tZIFoRtwtBxRtyTgd6F46q2FTQ2/Fy3sps=",
   "Source": "Darci.Api",
   "BasePath": "_content/Darci.Api",
   "Mode": "Default",
@@ -10,17 +10,17 @@
     {
       "Name": "Darci.Api\\wwwroot",
       "Source": "Darci.Api",
-      "ContentRoot": "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\DARCI-v4\\Darci.Api\\wwwroot\\",
+      "ContentRoot": "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\darci-v4\\darci.api\\wwwroot\\",
       "BasePath": "_content/Darci.Api",
       "Pattern": "**"
     }
   ],
   "Assets": [
     {
-      "Identity": "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\DARCI-v4\\Darci.Api\\wwwroot\\app\\index.html",
+      "Identity": "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\darci-v4\\darci.api\\wwwroot\\app\\index.html",
       "SourceId": "Darci.Api",
       "SourceType": "Discovered",
-      "ContentRoot": "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\DARCI-v4\\Darci.Api\\wwwroot\\",
+      "ContentRoot": "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\darci-v4\\darci.api\\wwwroot\\",
       "BasePath": "_content/Darci.Api",
       "RelativePath": "app/index.html",
       "AssetKind": "All",

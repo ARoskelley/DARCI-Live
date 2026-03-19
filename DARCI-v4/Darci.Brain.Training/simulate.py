@@ -41,6 +41,8 @@ from train_dqn import DarciDQNAgent, DQNConfig, MixedReplayBuffer
 # Simulated DARCI Environment
 # ============================================================
 
+STATE_DIM = 29
+
 @dataclass
 class SimState:
     """Mutable state tracking for the simulator."""
@@ -85,7 +87,7 @@ class SimState:
     
     def to_vector(self) -> np.ndarray:
         """Convert to the 29-dim normalized state vector."""
-        v = np.zeros(29, dtype=np.float32)
+        v = np.zeros(STATE_DIM, dtype=np.float32)
         
         # Internal (0-7)
         v[0] = np.clip(self.energy, 0, 1)

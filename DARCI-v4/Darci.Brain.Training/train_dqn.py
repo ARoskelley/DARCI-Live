@@ -49,12 +49,14 @@ from train_behavioral_cloning import DarciDecisionNetwork
 from train_reward_model import DarciRewardModel
 
 # ============================================================
-# Hyperparameters — grounded in research recommendations
+# Hyperparameters - grounded in research recommendations
 # ============================================================
+
+STATE_DIM = 29
 
 class DQNConfig:
     # Network
-    state_dim: int = 29
+    state_dim: int = STATE_DIM
     action_dim: int = 10
     
     # DQN core

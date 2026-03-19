@@ -8,6 +8,6 @@ build_property.PlatformNeutralAssembly =
 build_property.EnforceExtendedAnalyzerRules = 
 build_property._SupportedPlatformList = Linux,macOS,Windows
 build_property.RootNamespace = Darci.Research
-build_property.ProjectDir = C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Research\
+build_property.ProjectDir = C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\darci-v4\Darci.Research\
 build_property.EnableComHosting = 
 build_property.EnableGeneratedComInterfaceComImportInterop = 

@@ -1,0 +1,12 @@
+info: Darci.Brain.ExperienceBuffer[0]
+      ExperienceBuffer initialised (capacity=10000)
+info: Darci.Research.ResearchStore[0]
+      ResearchStore tables ready.
+info: Darci.Memory.Graph.KnowledgeGraph[0]
+      KnowledgeGraph tables ready.
+info: Darci.Memory.Confidence.ConfidenceTracker[0]
+      ConfidenceTracker tables ready.
+info: Darci.Memory.MemoryStore[0]
+      Memory database initialized
+info: Darci.Goals.GoalManager[0]
+      Goals database initialized
