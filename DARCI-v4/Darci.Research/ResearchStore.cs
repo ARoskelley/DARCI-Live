@@ -8,16 +8,14 @@ namespace Darci.Research;
 
 /// <summary>
 /// SQLite-backed implementation of <see cref="IResearchStore"/>.
-///
-/// All three tables live in the same darci.db file used by the rest of DARCI.
-/// Schema is created on first call to <see cref="InitializeAsync"/>.
+/// All tables live in the same darci.db file used by the rest of DARCI.
 /// </summary>
 public sealed class ResearchStore : IResearchStore
 {
     private readonly string _connectionString;
     private readonly ILogger<ResearchStore> _logger;
 
-    private static readonly JsonSerializerOptions _json = new() { WriteIndented = false };
+    private static readonly JsonSerializerOptions Json = new() { WriteIndented = false };
 
     public ResearchStore(string connectionString, ILogger<ResearchStore>? logger = null)
     {
@@ -28,7 +26,8 @@ public sealed class ResearchStore : IResearchStore
     public async Task InitializeAsync()
     {
         using var conn = Open();
-        await conn.ExecuteAsync("""
+        await conn.ExecuteAsync(
+            """
             CREATE TABLE IF NOT EXISTS research_sessions (
                 id           TEXT PRIMARY KEY,
                 title        TEXT NOT NULL,
@@ -61,39 +60,61 @@ public sealed class ResearchStore : IResearchStore
                 created_at   TEXT NOT NULL
             );
 
+            CREATE TABLE IF NOT EXISTS research_agent_jobs (
+                id              TEXT PRIMARY KEY,
+                session_id      TEXT NOT NULL REFERENCES research_sessions(id),
+                sub_question    TEXT NOT NULL,
+                agent_type      TEXT NOT NULL DEFAULT 'web',
+                status          TEXT NOT NULL DEFAULT 'queued',
+                assigned_at     TEXT,
+                completed_at    TEXT,
+                result_summary  TEXT,
+                confidence      REAL,
+                error           TEXT,
+                created_at      TEXT NOT NULL
+            );
+
             CREATE INDEX IF NOT EXISTS ix_results_session ON research_results(session_id);
             CREATE INDEX IF NOT EXISTS ix_files_session   ON research_files(session_id);
             CREATE INDEX IF NOT EXISTS ix_sessions_status ON research_sessions(status);
+            CREATE INDEX IF NOT EXISTS ix_agent_jobs_session ON research_agent_jobs(session_id);
+            CREATE INDEX IF NOT EXISTS ix_agent_jobs_status  ON research_agent_jobs(status);
             """);
 
         _logger.LogInformation("ResearchStore tables ready.");
     }
 
-    // ─── Sessions ────────────────────────────────────────────────────────────
-
     public async Task<ResearchSession> CreateSessionAsync(
-        string title, string description, string createdBy = "DARCI", string[]? tags = null)
+        string title,
+        string description,
+        string createdBy = "DARCI",
+        string[]? tags = null)
     {
         var session = new ResearchSession
         {
-            Title       = title,
+            Title = title,
             Description = description,
-            CreatedBy   = createdBy,
-            Tags        = JsonSerializer.Serialize(tags ?? Array.Empty<string>(), _json)
+            CreatedBy = createdBy,
+            Tags = JsonSerializer.Serialize(tags ?? Array.Empty<string>(), Json)
         };
 
         using var conn = Open();
-        await conn.ExecuteAsync("""
+        await conn.ExecuteAsync(
+            """
             INSERT INTO research_sessions (id, title, description, status, created_by, tags, created_at)
             VALUES (@Id, @Title, @Description, @Status, @CreatedBy, @Tags, @CreatedAt)
-            """, new
-        {
-            session.Id, session.Title, session.Description,
-            session.Status, session.CreatedBy, session.Tags,
-            CreatedAt = session.CreatedAt.ToString("O")
-        });
+            """,
+            new
+            {
+                session.Id,
+                session.Title,
+                session.Description,
+                session.Status,
+                session.CreatedBy,
+                session.Tags,
+                CreatedAt = session.CreatedAt.ToString("O")
+            });
 
-        _logger.LogInformation("Research session {Id} created: {Title}", session.Id, title);
         return session;
     }
 
@@ -101,7 +122,9 @@ public sealed class ResearchStore : IResearchStore
     {
         using var conn = Open();
         var row = await conn.QuerySingleOrDefaultAsync<dynamic>(
-            "SELECT * FROM research_sessions WHERE id = @Id", new { Id = sessionId });
+            "SELECT * FROM research_sessions WHERE id = @Id",
+            new { Id = sessionId });
+
         return row is null ? null : MapSession(row);
     }
 
@@ -119,40 +142,54 @@ public sealed class ResearchStore : IResearchStore
     public async Task<bool> CompleteSessionAsync(string sessionId, string status = "completed")
     {
         using var conn = Open();
-        var affected = await conn.ExecuteAsync("""
-            UPDATE research_sessions SET status = @Status, completed_at = @Now WHERE id = @Id
-            """, new { Status = status, Now = DateTime.UtcNow.ToString("O"), Id = sessionId });
+        var affected = await conn.ExecuteAsync(
+            """
+            UPDATE research_sessions
+            SET status = @Status, completed_at = @Now
+            WHERE id = @Id
+            """,
+            new { Status = status, Now = DateTime.UtcNow.ToString("O"), Id = sessionId });
+
         return affected > 0;
     }
 
-    // ─── Results ─────────────────────────────────────────────────────────────
-
     public async Task<ResearchResult> AddResultAsync(
-        string sessionId, string source, string content,
-        string resultType = "text", string[]? tags = null, float relevanceScore = 0f)
+        string sessionId,
+        string source,
+        string content,
+        string resultType = "text",
+        string[]? tags = null,
+        float relevanceScore = 0f)
     {
         var result = new ResearchResult
         {
-            SessionId      = sessionId,
-            Source         = source,
-            Content        = content,
-            ResultType     = resultType,
-            Tags           = JsonSerializer.Serialize(tags ?? Array.Empty<string>(), _json),
+            SessionId = sessionId,
+            Source = source,
+            Content = content,
+            ResultType = resultType,
+            Tags = JsonSerializer.Serialize(tags ?? Array.Empty<string>(), Json),
             RelevanceScore = relevanceScore
         };
 
         using var conn = Open();
-        await conn.ExecuteAsync("""
+        await conn.ExecuteAsync(
+            """
             INSERT INTO research_results
                 (id, session_id, source, content, result_type, tags, relevance_score, created_at)
             VALUES
                 (@Id, @SessionId, @Source, @Content, @ResultType, @Tags, @RelevanceScore, @CreatedAt)
-            """, new
-        {
-            result.Id, result.SessionId, result.Source, result.Content,
-            result.ResultType, result.Tags, result.RelevanceScore,
-            CreatedAt = result.CreatedAt.ToString("O")
-        });
+            """,
+            new
+            {
+                result.Id,
+                result.SessionId,
+                result.Source,
+                result.Content,
+                result.ResultType,
+                result.Tags,
+                result.RelevanceScore,
+                CreatedAt = result.CreatedAt.ToString("O")
+            });
 
         return result;
     }
@@ -171,40 +208,150 @@ public sealed class ResearchStore : IResearchStore
     public async Task<IReadOnlyList<ResearchResult>> SearchResultsAsync(string query, int limit = 20)
     {
         using var conn = Open();
-        var rows = await conn.QueryAsync<dynamic>("""
+        var rows = await conn.QueryAsync<dynamic>(
+            """
             SELECT * FROM research_results
             WHERE content LIKE @Pattern OR source LIKE @Pattern
             ORDER BY relevance_score DESC, created_at DESC
             LIMIT @Limit
-            """, new { Pattern = $"%{query}%", Limit = limit });
+            """,
+            new { Pattern = $"%{query}%", Limit = limit });
+
         return rows.Select(MapResult).ToList();
     }
 
-    // ─── Files ───────────────────────────────────────────────────────────────
-
-    public async Task<ResearchFile> RegisterFileAsync(
-        string sessionId, string filename, string contentType, string filePath, long sizeBytes)
+    public async Task<ResearchAgentJob> CreateAgentJobAsync(
+        string sessionId,
+        string subQuestion,
+        string agentType,
+        string status = "queued")
     {
-        var file = new ResearchFile
+        var job = new ResearchAgentJob
         {
-            SessionId   = sessionId,
-            Filename    = filename,
-            ContentType = contentType,
-            FilePath    = filePath,
-            SizeBytes   = sizeBytes
+            SessionId = sessionId,
+            SubQuestion = subQuestion,
+            AgentType = agentType,
+            Status = status
         };
 
         using var conn = Open();
-        await conn.ExecuteAsync("""
+        await conn.ExecuteAsync(
+            """
+            INSERT INTO research_agent_jobs
+                (id, session_id, sub_question, agent_type, status, assigned_at, completed_at, result_summary, confidence, error, created_at)
+            VALUES
+                (@Id, @SessionId, @SubQuestion, @AgentType, @Status, @AssignedAt, @CompletedAt, @ResultSummary, @Confidence, @Error, @CreatedAt)
+            """,
+            new
+            {
+                job.Id,
+                job.SessionId,
+                job.SubQuestion,
+                job.AgentType,
+                job.Status,
+                AssignedAt = job.AssignedAt?.ToString("O"),
+                CompletedAt = job.CompletedAt?.ToString("O"),
+                job.ResultSummary,
+                job.Confidence,
+                job.Error,
+                CreatedAt = job.CreatedAt.ToString("O")
+            });
+
+        return job;
+    }
+
+    public async Task<ResearchAgentJob?> GetAgentJobAsync(string jobId)
+    {
+        using var conn = Open();
+        var row = await conn.QuerySingleOrDefaultAsync<dynamic>(
+            "SELECT * FROM research_agent_jobs WHERE id = @Id",
+            new { Id = jobId });
+
+        return row is null ? null : MapAgentJob(row);
+    }
+
+    public async Task<IReadOnlyList<ResearchAgentJob>> GetAgentJobsAsync(string sessionId)
+    {
+        using var conn = Open();
+        var rows = await conn.QueryAsync<dynamic>(
+            """
+            SELECT * FROM research_agent_jobs
+            WHERE session_id = @SessionId
+            ORDER BY created_at
+            """,
+            new { SessionId = sessionId });
+
+        return rows.Select(MapAgentJob).ToList();
+    }
+
+    public async Task<bool> UpdateAgentJobAsync(
+        string jobId,
+        string status,
+        string? resultSummary = null,
+        float? confidence = null,
+        string? error = null,
+        DateTime? assignedAt = null,
+        DateTime? completedAt = null)
+    {
+        using var conn = Open();
+        var affected = await conn.ExecuteAsync(
+            """
+            UPDATE research_agent_jobs
+            SET status = @Status,
+                assigned_at = @AssignedAt,
+                completed_at = @CompletedAt,
+                result_summary = @ResultSummary,
+                confidence = @Confidence,
+                error = @Error
+            WHERE id = @Id
+            """,
+            new
+            {
+                Id = jobId,
+                Status = status,
+                AssignedAt = assignedAt?.ToString("O"),
+                CompletedAt = completedAt?.ToString("O"),
+                ResultSummary = resultSummary,
+                Confidence = confidence,
+                Error = error
+            });
+
+        return affected > 0;
+    }
+
+    public async Task<ResearchFile> RegisterFileAsync(
+        string sessionId,
+        string filename,
+        string contentType,
+        string filePath,
+        long sizeBytes)
+    {
+        var file = new ResearchFile
+        {
+            SessionId = sessionId,
+            Filename = filename,
+            ContentType = contentType,
+            FilePath = filePath,
+            SizeBytes = sizeBytes
+        };
+
+        using var conn = Open();
+        await conn.ExecuteAsync(
+            """
             INSERT INTO research_files (id, session_id, filename, content_type, file_path, size_bytes, created_at)
             VALUES (@Id, @SessionId, @Filename, @ContentType, @FilePath, @SizeBytes, @CreatedAt)
-            """, new
-        {
-            file.Id, file.SessionId, file.Filename, file.ContentType,
-            file.FilePath, file.SizeBytes, CreatedAt = file.CreatedAt.ToString("O")
-        });
+            """,
+            new
+            {
+                file.Id,
+                file.SessionId,
+                file.Filename,
+                file.ContentType,
+                file.FilePath,
+                file.SizeBytes,
+                CreatedAt = file.CreatedAt.ToString("O")
+            });
 
-        _logger.LogInformation("Registered research file {Filename} for session {SessionId}", filename, sessionId);
         return file;
     }
 
@@ -223,7 +370,9 @@ public sealed class ResearchStore : IResearchStore
     {
         using var conn = Open();
         var row = await conn.QuerySingleOrDefaultAsync<dynamic>(
-            "SELECT * FROM research_files WHERE id = @Id", new { Id = fileId });
+            "SELECT * FROM research_files WHERE id = @Id",
+            new { Id = fileId });
+
         return row is null ? null : MapFile(row);
     }
 
@@ -231,27 +380,30 @@ public sealed class ResearchStore : IResearchStore
     {
         using var conn = Open();
         var affected = await conn.ExecuteAsync(
-            "DELETE FROM research_files WHERE id = @Id", new { Id = fileId });
+            "DELETE FROM research_files WHERE id = @Id",
+            new { Id = fileId });
+
         return affected > 0;
     }
-
-    // ─── Summary ─────────────────────────────────────────────────────────────
 
     public async Task<SessionSummary?> GetSessionSummaryAsync(string sessionId)
     {
         var session = await GetSessionAsync(sessionId);
-        if (session is null) return null;
+        if (session is null)
+        {
+            return null;
+        }
 
         using var conn = Open();
         var resultCount = await conn.ExecuteScalarAsync<int>(
-            "SELECT COUNT(*) FROM research_results WHERE session_id = @Id", new { Id = sessionId });
+            "SELECT COUNT(*) FROM research_results WHERE session_id = @Id",
+            new { Id = sessionId });
         var fileCount = await conn.ExecuteScalarAsync<int>(
-            "SELECT COUNT(*) FROM research_files WHERE session_id = @Id", new { Id = sessionId });
+            "SELECT COUNT(*) FROM research_files WHERE session_id = @Id",
+            new { Id = sessionId });
 
         return new SessionSummary(session, resultCount, fileCount);
     }
-
-    // ─── Helpers ─────────────────────────────────────────────────────────────
 
     private SqliteConnection Open()
     {
@@ -260,38 +412,53 @@ public sealed class ResearchStore : IResearchStore
         return conn;
     }
 
-    private static ResearchSession MapSession(dynamic r) => new()
+    private static ResearchSession MapSession(dynamic row) => new()
     {
-        Id           = (string)r.id,
-        Title        = (string)r.title,
-        Description  = (string)r.description,
-        Status       = (string)r.status,
-        CreatedBy    = (string)r.created_by,
-        Tags         = (string)r.tags,
-        CreatedAt    = DateTime.Parse((string)r.created_at),
-        CompletedAt  = r.completed_at is null ? null : DateTime.Parse((string)r.completed_at)
+        Id = (string)row.id,
+        Title = (string)row.title,
+        Description = (string)row.description,
+        Status = (string)row.status,
+        CreatedBy = (string)row.created_by,
+        Tags = (string)row.tags,
+        CreatedAt = DateTime.Parse((string)row.created_at),
+        CompletedAt = row.completed_at is null ? null : DateTime.Parse((string)row.completed_at)
     };
 
-    private static ResearchResult MapResult(dynamic r) => new()
+    private static ResearchResult MapResult(dynamic row) => new()
     {
-        Id             = (string)r.id,
-        SessionId      = (string)r.session_id,
-        Source         = (string)r.source,
-        Content        = (string)r.content,
-        ResultType     = (string)r.result_type,
-        Tags           = (string)r.tags,
-        RelevanceScore = (float)(double)r.relevance_score,
-        CreatedAt      = DateTime.Parse((string)r.created_at)
+        Id = (string)row.id,
+        SessionId = (string)row.session_id,
+        Source = (string)row.source,
+        Content = (string)row.content,
+        ResultType = (string)row.result_type,
+        Tags = (string)row.tags,
+        RelevanceScore = (float)(double)row.relevance_score,
+        CreatedAt = DateTime.Parse((string)row.created_at)
     };
 
-    private static ResearchFile MapFile(dynamic r) => new()
+    private static ResearchAgentJob MapAgentJob(dynamic row) => new()
     {
-        Id          = (string)r.id,
-        SessionId   = (string)r.session_id,
-        Filename    = (string)r.filename,
-        ContentType = (string)r.content_type,
-        FilePath    = (string)r.file_path,
-        SizeBytes   = (long)r.size_bytes,
-        CreatedAt   = DateTime.Parse((string)r.created_at)
+        Id = (string)row.id,
+        SessionId = (string)row.session_id,
+        SubQuestion = (string)row.sub_question,
+        AgentType = (string)row.agent_type,
+        Status = (string)row.status,
+        AssignedAt = row.assigned_at is null ? null : DateTime.Parse((string)row.assigned_at),
+        CompletedAt = row.completed_at is null ? null : DateTime.Parse((string)row.completed_at),
+        ResultSummary = row.result_summary is null ? null : (string)row.result_summary,
+        Confidence = row.confidence is null ? null : (float?)(double)row.confidence,
+        Error = row.error is null ? null : (string)row.error,
+        CreatedAt = DateTime.Parse((string)row.created_at)
+    };
+
+    private static ResearchFile MapFile(dynamic row) => new()
+    {
+        Id = (string)row.id,
+        SessionId = (string)row.session_id,
+        Filename = (string)row.filename,
+        ContentType = (string)row.content_type,
+        FilePath = (string)row.file_path,
+        SizeBytes = (long)row.size_bytes,
+        CreatedAt = DateTime.Parse((string)row.created_at)
     };
 }

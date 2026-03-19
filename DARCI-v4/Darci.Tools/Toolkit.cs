@@ -4,6 +4,7 @@ using System.Text.RegularExpressions;
 using Darci.Shared;
 using Darci.Goals;
 using Darci.Memory;
+using Darci.Research.Agents;
 using Darci.Tools.Cad;
 using Darci.Tools.Engineering;
 using Darci.Tools.Ollama;
@@ -14,7 +15,7 @@ namespace Darci.Tools;
 /// <summary>
 /// Implementation of DARCI's toolkit - coordinates all her capabilities.
 /// </summary>
-public class Toolkit : IToolkit
+public class Toolkit : IToolkit, IResearchToolbox
 {
     private readonly ILogger<Toolkit> _logger;
     private readonly IOllamaClient _ollama;
@@ -22,6 +23,7 @@ public class Toolkit : IToolkit
     private readonly IGoalManager _goals;
     private readonly ICadBridge _cad;
     private readonly IEngineeringWorkbench _engineeringWorkbench;
+    private readonly IDeepResearchOrchestrator _deepResearchOrchestrator;
     private readonly Channel<OutgoingMessage> _outgoingMessages;
 
     private const int MaxCadIterations = 8;
@@ -33,7 +35,8 @@ public class Toolkit : IToolkit
         IMemoryStore memory,
         IGoalManager goals,
         ICadBridge cad,
-        IEngineeringWorkbench engineeringWorkbench)
+        IEngineeringWorkbench engineeringWorkbench,
+        IDeepResearchOrchestrator deepResearchOrchestrator)
     {
         _logger = logger;
         _ollama = ollama;
@@ -41,6 +44,7 @@ public class Toolkit : IToolkit
         _goals = goals;
         _cad = cad;
         _engineeringWorkbench = engineeringWorkbench;
+        _deepResearchOrchestrator = deepResearchOrchestrator;
 
         _outgoingMessages = Channel.CreateUnbounded<OutgoingMessage>();
     }
@@ -72,6 +76,12 @@ public class Toolkit : IToolkit
     {
         return await _ollama.Generate(prompt);
     }
+
+    public Task<string> GenerateAsync(string prompt, CancellationToken ct = default)
+        => Generate(prompt);
+
+    public Task<List<float>> GetEmbeddingAsync(string text, CancellationToken ct = default)
+        => _ollama.GetEmbedding(text);
 
     public async Task<MessageIntent> ClassifyIntent(string message)
     {
@@ -154,6 +164,24 @@ Classification:";
 Be concise and factual. If you don't know something, say so.";
 
         return await _ollama.Generate(prompt);
+    }
+
+    public Task<string> SearchWebAsync(string query, CancellationToken ct = default)
+        => SearchWeb(query);
+
+    public async Task<string> DoDeepResearchAsync(string question, string userId, CancellationToken ct = default)
+    {
+        var outcome = await _deepResearchOrchestrator.RunDeepResearchAsync(question, userId, ct);
+        if (!outcome.IsSuccess)
+        {
+            return $"Research failed: {outcome.Error}";
+        }
+
+        var prefix = outcome.IsUncertain
+            ? $"[Confidence: {outcome.Confidence:P0} - UNCERTAIN] "
+            : $"[Confidence: {outcome.Confidence:P0}] ";
+
+        return prefix + outcome.FinalAnswer;
     }
 
     // === Files ===

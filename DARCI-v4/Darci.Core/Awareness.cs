@@ -167,14 +167,14 @@ public class Awareness
         return messages;
     }
 
-    private async Task<List<TaskCompletion>> DrainCompletions()
+    private Task<List<TaskCompletion>> DrainCompletions()
     {
         var completions = new List<TaskCompletion>();
         while (_taskCompletionChannel.Reader.TryRead(out var completion))
         {
             completions.Add(completion);
         }
-        return completions;
+        return Task.FromResult(completions);
     }
 
     private MessageIntent ClassifyIntent(string content)

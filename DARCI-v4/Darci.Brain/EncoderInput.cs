@@ -1,7 +1,7 @@
 namespace Darci.Brain;
 
 /// <summary>
-/// All values required to encode DARCI's current state into a 28-dimensional vector.
+/// All values required to encode DARCI's current state into a 29-dimensional vector.
 /// This is the bridge between Core's rich object model and Brain's numerical world.
 ///
 /// Populated by Darci.Core from its State + Perception objects, then handed to
@@ -86,7 +86,7 @@ public record EncoderInput
     public float UserTrustLevel { get; init; }
 
     // =========================================================
-    // Message Context — indices 20–27
+    // Message Context — indices 20–28
     // Characterises the top waiting message without using English.
     // All values are 0 when there are no messages waiting.
     // =========================================================
@@ -121,4 +121,10 @@ public record EncoderInput
     /// 0 when no memories were checked. Populated by the memory subsystem.
     /// </summary>
     public float MemoryRelevance { get; init; }
+
+    /// <summary>
+    /// [28] Confidence in the currently relevant research topic, 0–1.
+    /// Defaults toward 0.5 when no topic-specific synthesis is available.
+    /// </summary>
+    public float ResearchTopicConfidence { get; init; } = 0.5f;
 }

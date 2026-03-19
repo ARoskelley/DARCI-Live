@@ -1,0 +1,16 @@
+C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Memory.Confidence\bin\Debug\net8.0\Darci.Memory.Confidence.deps.json
+C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Memory.Confidence\bin\Debug\net8.0\Darci.Memory.Confidence.dll
+C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Memory.Confidence\bin\Debug\net8.0\Darci.Memory.Confidence.pdb
+C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Memory.Confidence\bin\Debug\net8.0\Darci.Memory.Graph.dll
+C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Memory.Confidence\bin\Debug\net8.0\Darci.Memory.Graph.pdb
+C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Memory.Confidence\obj\Debug\net8.0\Darci.Memory.Confidence.csproj.AssemblyReference.cache
+C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Memory.Confidence\obj\Debug\net8.0\Darci.Memory.Confidence.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Memory.Confidence\obj\Debug\net8.0\Darci.Memory.Confidence.AssemblyInfoInputs.cache
+C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Memory.Confidence\obj\Debug\net8.0\Darci.Memory.Confidence.AssemblyInfo.cs
+C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Memory.Confidence\obj\Debug\net8.0\Darci.Memory.Confidence.csproj.CoreCompileInputs.cache
+C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Memory.Confidence\obj\Debug\net8.0\Darci.Memory.Confidence.sourcelink.json
+C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Memory.Confidence\obj\Debug\net8.0\Darci.Me.19FFFBD1.Up2Date
+C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Memory.Confidence\obj\Debug\net8.0\Darci.Memory.Confidence.dll
+C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Memory.Confidence\obj\Debug\net8.0\refint\Darci.Memory.Confidence.dll
+C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Memory.Confidence\obj\Debug\net8.0\Darci.Memory.Confidence.pdb
+C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Memory.Confidence\obj\Debug\net8.0\ref\Darci.Memory.Confidence.dll

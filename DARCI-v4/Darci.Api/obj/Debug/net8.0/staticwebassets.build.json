@@ -1,1 +1,39 @@
-{"Version":1,"Hash":"0YQVAG/SRozD9q2TdiSTb6EI+ofQ3m/59+o223HtAbg=","Source":"Darci.Api","BasePath":"/","Mode":"Root","ManifestType":"Build","ReferencedProjectsConfiguration":[],"DiscoveryPatterns":[{"Name":"Darci.Api\\wwwroot","Source":"Darci.Api","ContentRoot":"C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\DARCI-v4\\Darci.Api\\wwwroot\\","BasePath":"/","Pattern":"**"}],"Assets":[{"Identity":"C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\DARCI-v4\\Darci.Api\\wwwroot\\app\\index.html","SourceId":"Darci.Api","SourceType":"Discovered","ContentRoot":"C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\DARCI-v4\\Darci.Api\\wwwroot\\","BasePath":"/","RelativePath":"app/index#[.{fingerprint}]?.html","AssetKind":"All","AssetMode":"All","AssetRole":"Primary","AssetMergeBehavior":"","AssetMergeSource":"","RelatedAsset":"","AssetTraitName":"","AssetTraitValue":"","Fingerprint":"grcdbvux44","Integrity":"JJdk2U/cdAemk6z1J2lqFEskgYqaZ3mOdDb6RFZc5rg=","CopyToOutputDirectory":"Never","CopyToPublishDirectory":"PreserveNewest","OriginalItemSpec":"wwwroot\\app\\index.html","FileLength":20828,"LastWriteTime":"2026-03-17T04:34:56+00:00"}],"Endpoints":[{"Route":"app/index.grcdbvux44.html","AssetFile":"C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\DARCI-v4\\Darci.Api\\wwwroot\\app\\index.html","Selectors":[],"ResponseHeaders":[{"Name":"Cache-Control","Value":"max-age=31536000, immutable"},{"Name":"Content-Length","Value":"20828"},{"Name":"Content-Type","Value":"text/html"},{"Name":"ETag","Value":"\"JJdk2U/cdAemk6z1J2lqFEskgYqaZ3mOdDb6RFZc5rg=\""},{"Name":"Last-Modified","Value":"Tue, 17 Mar 2026 04:34:56 GMT"}],"EndpointProperties":[{"Name":"fingerprint","Value":"grcdbvux44"},{"Name":"integrity","Value":"sha256-JJdk2U/cdAemk6z1J2lqFEskgYqaZ3mOdDb6RFZc5rg="},{"Name":"label","Value":"app/index.html"}]},{"Route":"app/index.html","AssetFile":"C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\DARCI-v4\\Darci.Api\\wwwroot\\app\\index.html","Selectors":[],"ResponseHeaders":[{"Name":"Cache-Control","Value":"no-cache"},{"Name":"Content-Length","Value":"20828"},{"Name":"Content-Type","Value":"text/html"},{"Name":"ETag","Value":"\"JJdk2U/cdAemk6z1J2lqFEskgYqaZ3mOdDb6RFZc5rg=\""},{"Name":"Last-Modified","Value":"Tue, 17 Mar 2026 04:34:56 GMT"}],"EndpointProperties":[{"Name":"integrity","Value":"sha256-JJdk2U/cdAemk6z1J2lqFEskgYqaZ3mOdDb6RFZc5rg="}]}]}
+{
+  "Version": 1,
+  "Hash": "lTYQc43n7yFSknxwBK9ehuGe8eNw5hyq+B8ab/LrbNA=",
+  "Source": "Darci.Api",
+  "BasePath": "_content/Darci.Api",
+  "Mode": "Default",
+  "ManifestType": "Build",
+  "ReferencedProjectsConfiguration": [],
+  "DiscoveryPatterns": [
+    {
+      "Name": "Darci.Api\\wwwroot",
+      "Source": "Darci.Api",
+      "ContentRoot": "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\DARCI-v4\\Darci.Api\\wwwroot\\",
+      "BasePath": "_content/Darci.Api",
+      "Pattern": "**"
+    }
+  ],
+  "Assets": [
+    {
+      "Identity": "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\DARCI-v4\\Darci.Api\\wwwroot\\app\\index.html",
+      "SourceId": "Darci.Api",
+      "SourceType": "Discovered",
+      "ContentRoot": "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\DARCI-v4\\Darci.Api\\wwwroot\\",
+      "BasePath": "_content/Darci.Api",
+      "RelativePath": "app/index.html",
+      "AssetKind": "All",
+      "AssetMode": "All",
+      "AssetRole": "Primary",
+      "AssetMergeBehavior": "PreferTarget",
+      "AssetMergeSource": "",
+      "RelatedAsset": "",
+      "AssetTraitName": "",
+      "AssetTraitValue": "",
+      "CopyToOutputDirectory": "Never",
+      "CopyToPublishDirectory": "PreserveNewest",
+      "OriginalItemSpec": "wwwroot\\app\\index.html"
+    }
+  ]
+}

@@ -1,7 +1,7 @@
 namespace Darci.Brain;
 
 /// <summary>
-/// The Decision Network: maps a 28-dimensional state vector to a discrete action.
+/// The Decision Network: maps a 29-dimensional state vector to a discrete action.
 ///
 /// This is DARCI's executive cortex. It replaces the hardcoded C# priority ladder
 /// from v3 with a neural network that learns which actions lead to better outcomes.
@@ -27,14 +27,14 @@ public interface IDecisionNetwork
     /// Returns float[10] — one value per action, unnormalised.
     /// Softmax + masking is applied by <see cref="SelectAction"/>.
     /// </summary>
-    /// <param name="stateVector">float[28] from <see cref="IStateEncoder"/>.</param>
+    /// <param name="stateVector">float[29] from <see cref="IStateEncoder"/>.</param>
     float[] Predict(float[] stateVector);
 
     /// <summary>
     /// Select the best valid action for a state, applying epsilon-greedy
     /// exploration and an action validity mask.
     /// </summary>
-    /// <param name="stateVector">float[28] from <see cref="IStateEncoder"/>.</param>
+    /// <param name="stateVector">float[29] from <see cref="IStateEncoder"/>.</param>
     /// <param name="actionMask">
     /// bool[10] where true = action is valid in this state.
     /// Invalid actions are set to -∞ before softmax so they never win.

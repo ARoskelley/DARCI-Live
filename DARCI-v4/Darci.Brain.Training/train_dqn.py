@@ -54,7 +54,7 @@ from train_reward_model import DarciRewardModel
 
 class DQNConfig:
     # Network
-    state_dim: int = 28
+    state_dim: int = 29
     action_dim: int = 10
     
     # DQN core
@@ -509,7 +509,7 @@ def load_teacher_decisions(db_path: str) -> list[dict]:
     for row in cursor:
         try:
             sv = np.array(json.loads(row[0]), dtype=np.float32)
-            if len(sv) == 28:
+            if len(sv) == 29:
                 rows.append({"state": sv, "action": int(row[1])})
         except (json.JSONDecodeError, TypeError):
             continue

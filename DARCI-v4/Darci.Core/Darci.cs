@@ -21,7 +21,7 @@ namespace Darci.Core;
 ///
 /// v4 changes (Phase 1 — instrumentation):
 ///   Each cycle now also:
-///     1. Encodes state as a 28-dim vector before deciding
+///     1. Encodes state as a 29-dim vector before deciding
 ///     2. Computes a reward signal after the action completes
 ///     3. Stores the (prev_state, action, reward, next_state) experience
 ///        in the SQLite ring buffer for DQN training
@@ -241,7 +241,19 @@ public class Darci : BackgroundService
                 return 0.8f;  // Proactively notified user about something important
 
             case ActionType.Research:
-                return 0.4f;  // Meaningful work toward a goal or question
+            {
+                var reward = 0.4f;  // Meaningful work toward a goal or question
+                if (outcome.Result is string researchResult && researchResult.Contains("[Confidence:", StringComparison.Ordinal))
+                {
+                    reward += 0.15f;
+                    if (researchResult.Contains("UNCERTAIN", StringComparison.OrdinalIgnoreCase))
+                    {
+                        reward += 0.05f;
+                    }
+                }
+
+                return reward;
+            }
 
             case ActionType.CreateGoal:
             case ActionType.ReviewGoals:
@@ -474,21 +486,22 @@ public class Darci : BackgroundService
     {
         if (string.IsNullOrEmpty(action.Query)) return null;
 
-        var results = await _tools.SearchWeb(action.Query);
+        var userId = action.RecipientId ?? "Tinman";
+        var results = await _tools.DoDeepResearchAsync(action.Query, userId);
 
         await _tools.StoreMemory(
             $"Research on '{action.Query}': {results}",
-            new[] { "research", "web" });
+            new[] { "research", "deep_research" });
 
         return results;
     }
 
-    private async Task<object?> DoGoalWork(DarciAction action)
+    private Task<object?> DoGoalWork(DarciAction action)
     {
-        if (!action.GoalId.HasValue) return null;
+        if (!action.GoalId.HasValue) return Task.FromResult<object?>(null);
 
         _logger.LogInformation("Working on goal {GoalId}", action.GoalId);
-        return "Working on goal";
+        return Task.FromResult<object?>("Working on goal");
     }
 
     private async Task<object?> DoCreateGoal(DarciAction action)

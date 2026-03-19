@@ -1,5 +1,7 @@
 using System.Text.Json;
 using Dapper;
+using Darci.Memory.Confidence;
+using Darci.Memory.Graph;
 using Darci.Shared;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
@@ -14,15 +16,32 @@ public class MemoryStore : IMemoryStore
     private readonly ILogger<MemoryStore> _logger;
     private readonly string _connectionString;
     private readonly Func<string, Task<List<float>>> _getEmbedding;
-    
+    private readonly Func<string, Task<string>>? _generateText;
+    private readonly IKnowledgeGraph? _graph;
+    private readonly IConfidenceTracker? _confidence;
+
     public MemoryStore(
         ILogger<MemoryStore> logger,
         string connectionString,
         Func<string, Task<List<float>>> getEmbedding)
+        : this(logger, connectionString, getEmbedding, null, null, null)
+    {
+    }
+
+    public MemoryStore(
+        ILogger<MemoryStore> logger,
+        string connectionString,
+        Func<string, Task<List<float>>> getEmbedding,
+        Func<string, Task<string>>? generateText,
+        IKnowledgeGraph? graph,
+        IConfidenceTracker? confidence)
     {
         _logger = logger;
         _connectionString = connectionString;
         _getEmbedding = getEmbedding;
+        _generateText = generateText;
+        _graph = graph;
+        _confidence = confidence;
         
         InitializeDatabase();
     }
@@ -44,6 +63,21 @@ public class MemoryStore : IMemoryStore
                 Embedding = embeddingJson,
                 CreatedAt = DateTime.UtcNow.ToString("o")
             });
+
+        if (_graph is not null && _generateText is not null)
+        {
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await _graph.IngestMemoryAsync(content, tags, _getEmbedding, _generateText);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogDebug(ex, "Knowledge graph ingestion failed for stored memory");
+                }
+            });
+        }
         
         _logger.LogDebug("Stored memory: {Preview}...", 
             content.Length > 50 ? content[..50] : content);
@@ -135,6 +169,11 @@ public class MemoryStore : IMemoryStore
         if (deleted > 0)
         {
             _logger.LogInformation("Consolidated memories: removed {Count} old entries", deleted);
+        }
+
+        if (_confidence is not null)
+        {
+            await _confidence.DecayAsync();
         }
     }
     

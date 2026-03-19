@@ -49,6 +49,24 @@ public record ResearchResult
 }
 
 /// <summary>
+/// Tracks one sub-agent job within a research session.
+/// </summary>
+public record ResearchAgentJob
+{
+    public string Id { get; init; } = Guid.NewGuid().ToString("N");
+    public string SessionId { get; init; } = "";
+    public string SubQuestion { get; init; } = "";
+    public string AgentType { get; init; } = "web";
+    public string Status { get; init; } = "queued";
+    public DateTime? AssignedAt { get; init; }
+    public DateTime? CompletedAt { get; init; }
+    public string? ResultSummary { get; init; }
+    public float? Confidence { get; init; }
+    public string? Error { get; init; }
+    public DateTime CreatedAt { get; init; } = DateTime.UtcNow;
+}
+
+/// <summary>
 /// A file artifact produced during a research session (reports, exports, generated code, etc.).
 /// The file itself lives on disk at FilePath; this record is the index entry.
 /// </summary>

@@ -25,6 +25,7 @@ public interface IToolkit
 
     // === Research ===
     Task<string> SearchWeb(string query);
+    Task<string> DoDeepResearchAsync(string question, string userId, CancellationToken ct = default);
 
     // === Files ===
     Task<string> ReadFile(string path);

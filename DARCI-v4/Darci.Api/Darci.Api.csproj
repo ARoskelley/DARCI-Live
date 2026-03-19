@@ -15,6 +15,9 @@
     <ProjectReference Include="..\Darci.Core\Darci.Core.csproj" />
     <ProjectReference Include="..\Darci.Brain\Darci.Brain.csproj" />
     <ProjectReference Include="..\Darci.Research\Darci.Research.csproj" />
+    <ProjectReference Include="..\Darci.Research.Agents\Darci.Research.Agents.csproj" />
+    <ProjectReference Include="..\Darci.Memory.Graph\Darci.Memory.Graph.csproj" />
+    <ProjectReference Include="..\Darci.Memory.Confidence\Darci.Memory.Confidence.csproj" />
     <ProjectReference Include="..\Darci.Cloud\Darci.Cloud.csproj" />
     <ProjectReference Include="..\Darci.Engineering\Darci.Engineering.csproj" />
   </ItemGroup>
