@@ -36,6 +36,7 @@ public class State
     // Interaction state
     public DateTime LastUserInteraction { get; private set; } = DateTime.UtcNow;
     public int ConsecutiveRestCycles { get; private set; } = 0;
+    public float ResearchTopicConfidence { get; private set; } = 0.5f;
 
     // Long-term traits (from personality)
     public PersonalityTraits Traits { get; private set; } = new();
@@ -111,7 +112,7 @@ public class State
         }
     }
 
-    public async Task Process(Outcome outcome)
+    public Task Process(Outcome outcome)
     {
         if (outcome.ActionTaken == ActionType.Rest)
         {
@@ -145,6 +146,8 @@ public class State
                 _logger.LogWarning("Action {Action} failed: {Error}", outcome.ActionTaken, outcome.Error);
             }
         }
+
+        return Task.CompletedTask;
     }
 
     public void StartActivity(string activity, int? goalId = null)
@@ -165,6 +168,11 @@ public class State
     }
 
     public bool IsEngagedWith(int goalId) => CurrentGoalId == goalId;
+
+    public void SetResearchTopicConfidence(float confidence)
+    {
+        ResearchTopicConfidence = Math.Clamp(confidence, 0f, 1f);
+    }
 
     public string Describe()
     {
@@ -273,7 +281,8 @@ public class State
             IntentRequest         = intentReq,
             IntentResearch        = intentResearch,
             IntentFeedback        = intentFeedback,
-            MemoryRelevance       = memoryRelevance
+            MemoryRelevance       = memoryRelevance,
+            ResearchTopicConfidence = ResearchTopicConfidence
         };
     }
 

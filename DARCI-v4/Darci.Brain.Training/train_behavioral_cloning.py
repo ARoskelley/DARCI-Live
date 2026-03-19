@@ -32,7 +32,7 @@ from torch.utils.data import DataLoader, TensorDataset, random_split
 
 # ============================================================
 # Network Architecture — matches ARCHITECTURE.md §6.1 exactly
-# 28 → 64 (ReLU) → 32 (ReLU) → 10 (logits)
+# 29 → 64 (ReLU) → 32 (ReLU) → 10 (logits)
 # ~4,160 parameters
 # ============================================================
 
@@ -40,11 +40,11 @@ class DarciDecisionNetwork(nn.Module):
     """
     DARCI's executive cortex.
     
-    Input:  float[28] state vector (normalized, from StateEncoder)
+    Input:  float[29] state vector (normalized, from StateEncoder)
     Output: float[10] action logits (one per BrainAction)
     """
     
-    STATE_DIM = 28
+    STATE_DIM = 29
     ACTION_DIM = 10
     
     def __init__(self):

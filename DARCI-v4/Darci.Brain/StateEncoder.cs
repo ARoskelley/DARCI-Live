@@ -1,7 +1,7 @@
 namespace Darci.Brain;
 
 /// <summary>
-/// Converts an <see cref="EncoderInput"/> into a 28-dimensional float vector
+/// Converts an <see cref="EncoderInput"/> into a 29-dimensional float vector
 /// that feeds into the Decision Network.
 ///
 /// Encoding rules (per ARCHITECTURE.md §3):
@@ -13,7 +13,7 @@ namespace Darci.Brain;
 /// </summary>
 public sealed class StateEncoder : IStateEncoder
 {
-    public int Dimensions => 28;
+    public int Dimensions => 29;
 
     // Named index constants so changes to the vector layout are a single-point edit.
     // Grouped to match the three sections in ARCHITECTURE.md §3.
@@ -52,6 +52,7 @@ public sealed class StateEncoder : IStateEncoder
         public const int IntentResearch    = 25;
         public const int IntentFeedback    = 26;
         public const int MemoryRelevance   = 27;
+        public const int ResearchTopicConfidence = 28;
     }
 
     public float[] Encode(EncoderInput input)
@@ -104,6 +105,8 @@ public sealed class StateEncoder : IStateEncoder
             s[Idx.IntentFeedback]     = Clamp01(input.IntentFeedback);
             s[Idx.MemoryRelevance]    = Clamp01(input.MemoryRelevance);
         }
+
+        s[Idx.ResearchTopicConfidence] = Clamp01(input.ResearchTopicConfidence);
 
         return s;
     }

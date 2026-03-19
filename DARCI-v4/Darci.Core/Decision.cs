@@ -1,5 +1,6 @@
 using Darci.Brain;
 using Darci.Engineering;
+using Darci.Memory.Confidence;
 using Darci.Shared;
 using Darci.Tools;
 using Darci.Goals;
@@ -27,6 +28,7 @@ public class Decision
     private readonly ExperienceBuffer _buffer;
     private readonly IDecisionNetwork _network;
     private readonly EngineeringGoalDetector? _engineeringDetector;
+    private readonly IConfidenceTracker? _confidence;
 
     public Decision(
         ILogger<Decision> logger,
@@ -35,7 +37,8 @@ public class Decision
         IStateEncoder encoder,
         ExperienceBuffer buffer,
         IDecisionNetwork network,
-        EngineeringGoalDetector? engineeringDetector = null)
+        EngineeringGoalDetector? engineeringDetector = null,
+        IConfidenceTracker? confidence = null)
     {
         _logger               = logger;
         _tools                = tools;
@@ -44,6 +47,7 @@ public class Decision
         _buffer               = buffer;
         _network              = network;
         _engineeringDetector  = engineeringDetector;
+        _confidence           = confidence;
     }
 
     /// <summary>
@@ -55,6 +59,7 @@ public class Decision
     /// </summary>
     public async Task<DarciAction> Decide(State state, Perception perception)
     {
+        await UpdateResearchTopicConfidenceAsync(state, perception);
         var stateVector = _encoder.Encode(state.ToEncoderInput(perception));
 
         DarciAction action;
@@ -125,6 +130,9 @@ public class Decision
 
         if (quietHours)
             mask[(int)BrainAction.NotifyUser] = false;
+
+        if (_confidence is not null && state.ResearchTopicConfidence < 0.4f)
+            mask[(int)BrainAction.Research] = state.Energy > 0.1f;
 
         return mask;
     }
@@ -573,26 +581,26 @@ public class Decision
             externalNotify: ShouldExternallyNotifyReply(message));
     }
 
-    private async Task<DarciAction> HandleEngineeringCollectionRequest(IncomingMessage message, State state)
+    private Task<DarciAction> HandleEngineeringCollectionRequest(IncomingMessage message, State state)
     {
         var description = message.Intent?.ExtractedTopic ?? message.Content;
 
         if (ShouldRunEngineeringCollectionImmediately(message))
         {
             _logger.LogInformation("Immediate engineering collection run for: {Desc}", description);
-            return DarciAction.EngineerCollection(
+            return Task.FromResult(DarciAction.EngineerCollection(
                 description,
                 userId:    message.UserId,
                 messageId: message.Id,
-                reason: "Engineering collection request from user");
+                reason: "Engineering collection request from user"));
         }
 
-        return DarciAction.Reply(
+        return Task.FromResult(DarciAction.Reply(
             "I can run that as an engineering collection. Send it with `#collection` (optionally with JSON), or mark it urgent and I'll start immediately.",
             message.UserId,
             message.Id,
             "Prompting for collection execution mode",
-            externalNotify: ShouldExternallyNotifyReply(message));
+            externalNotify: ShouldExternallyNotifyReply(message)));
     }
 
     private async Task<DarciAction> HandleFeedback(IncomingMessage message, State state)
@@ -617,28 +625,28 @@ public class Decision
         return await DecideResponseTo(message, state);
     }
 
-    private async Task<DarciAction> HandleTaskCompletion(TaskCompletion completion, State state)
+    private Task<DarciAction> HandleTaskCompletion(TaskCompletion completion, State state)
     {
         if (completion.Success)
         {
             if (completion.TaskType == "research" && completion.Result is string)
             {
-                return new DarciAction
+                return Task.FromResult(new DarciAction
                 {
                     Type = ActionType.Notify,
                     MessageContent = "I finished looking into that. Here's what I found...",
                     RecipientId = "Tinman",
                     Reasoning = "Research task completed, user might want to know"
-                };
+                });
             }
 
             if (completion.TaskType == "cad")
             {
-                return DarciAction.Rest(TimeSpan.FromMilliseconds(100), "CAD task completed and user notified");
+                return Task.FromResult(DarciAction.Rest(TimeSpan.FromMilliseconds(100), "CAD task completed and user notified"));
             }
         }
 
-        return DarciAction.Rest(TimeSpan.FromMilliseconds(100), "Processed task completion");
+        return Task.FromResult(DarciAction.Rest(TimeSpan.FromMilliseconds(100), "Processed task completion"));
     }
 
     private async Task<DarciAction> HandleGoalEvent(GoalEvent evt, State state)
@@ -724,7 +732,7 @@ public class Decision
         };
     }
 
-    private async Task<string?> ChooseThinkingTopic(State state)
+    private Task<string?> ChooseThinkingTopic(State state)
     {
         var topics = new[]
         {
@@ -735,10 +743,10 @@ public class Decision
 
         if (state.ConsecutiveRestCycles > 100)
         {
-            return topics[Random.Shared.Next(topics.Length)];
+            return Task.FromResult<string?>(topics[Random.Shared.Next(topics.Length)]);
         }
 
-        return null;
+        return Task.FromResult<string?>(null);
     }
 
     private TimeSpan CalculateRestDuration(State state, Perception perception)
@@ -766,4 +774,51 @@ public class Decision
 
     private bool ContainsAny(string text, params string[] patterns)
         => patterns.Any(p => text.Contains(p));
+
+    private async Task UpdateResearchTopicConfidenceAsync(State state, Perception perception)
+    {
+        if (_confidence is null)
+        {
+            state.SetResearchTopicConfidence(0.5f);
+            return;
+        }
+
+        var topic = await ResolveResearchTopicAsync(state, perception);
+        if (string.IsNullOrWhiteSpace(topic))
+        {
+            state.SetResearchTopicConfidence(0.5f);
+            return;
+        }
+
+        try
+        {
+            var synthesis = await _confidence.SynthesizeAsync(topic);
+            state.SetResearchTopicConfidence(synthesis.AggregateConf);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Failed to compute research topic confidence for: {Topic}", topic);
+            state.SetResearchTopicConfidence(0.5f);
+        }
+    }
+
+    private async Task<string?> ResolveResearchTopicAsync(State state, Perception perception)
+    {
+        if (state.CurrentGoalId.HasValue)
+        {
+            var goal = await _goals.GetGoal(state.CurrentGoalId.Value);
+            if (goal != null
+                && (goal.Type == GoalType.Research
+                    || goal.Title.StartsWith("Research:", StringComparison.OrdinalIgnoreCase)
+                    || goal.Description.Contains("research", StringComparison.OrdinalIgnoreCase)))
+            {
+                return string.IsNullOrWhiteSpace(goal.Description) ? goal.Title : goal.Description;
+            }
+        }
+
+        var researchMessage = perception.NewMessages.FirstOrDefault(message =>
+            message.Intent?.Type == IntentType.Research);
+
+        return researchMessage?.Intent?.ExtractedTopic ?? researchMessage?.Content;
+    }
 }

@@ -114,8 +114,9 @@ When there's a message to process, these features characterize it without using 
 | 25 | msg_intent_research | 0–1 | Classifier confidence: research |
 | 26 | msg_intent_feedback | 0–1 | Classifier confidence: feedback |
 | 27 | msg_memory_relevance | 0–1 | Best memory match score for this message |
+| 28 | research_topic_confidence | 0–1 | Confidence in the currently relevant research topic |
 
-**Total state vector size: 28 dimensions.** Intentionally compact. A game AI playing Atari uses thousands of dimensions (raw pixels). DARCI's world is simpler, and a small state space means faster learning with less data.
+**Total state vector size: 29 dimensions.** Intentionally compact. A game AI playing Atari uses thousands of dimensions (raw pixels). DARCI's world is simpler, and a small state space means faster learning with less data.
 
 ---
 
@@ -218,10 +219,10 @@ Raw rewards can be sparse. Reward shaping adds small continuous signals that gui
 
 ### 6.1 The Decision Network
 
-Intentionally simple. 28-dimension state space, 10 actions. Complexity can be added later.
+Intentionally simple. 29-dimension state space, 10 actions. Complexity can be added later.
 
 ```
-Input Layer:    28 neurons (state vector)
+Input Layer:    29 neurons (state vector)
                     │
 Hidden Layer 1: 64 neurons, ReLU activation
                     │
@@ -232,7 +233,7 @@ Output Layer:   10 neurons (action logits)
 Action Mask  → Softmax → Probabilities
 ```
 
-Total parameters: ~4,160 weights. Trains in seconds on CPU. No GPU required.
+Total parameters: ~4,330 parameters. Trains in seconds on CPU. No GPU required.
 
 ### 6.2 Technology Choice
 
@@ -429,7 +430,7 @@ public interface IDecisionNetwork
 ## 10. Implementation Roadmap
 
 ### Phase 1: Instrumentation and Data Collection (1–2 weeks)
-- Add StateEncoder to convert existing Perception + State into float[28]
+- Add StateEncoder to convert existing Perception + State into float[29]
 - Instrument Decision.Decide() to log (state_vector, chosen_action, timestamp) to SQLite
 - Add reward calculation to Darci.cs after each action outcome
 - Run DARCI normally, accumulating training data

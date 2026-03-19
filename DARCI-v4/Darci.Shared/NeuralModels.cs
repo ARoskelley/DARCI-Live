@@ -31,7 +31,7 @@ public record Experience
 {
     public long Id { get; init; }
 
-    /// <summary>The 28-dimensional state vector before the action.</summary>
+    /// <summary>The 29-dimensional state vector before the action.</summary>
     public float[] State { get; init; } = Array.Empty<float>();
 
     /// <summary>The action taken (0–9, cast from BrainAction).</summary>
@@ -40,7 +40,7 @@ public record Experience
     /// <summary>The reward signal received after this action.</summary>
     public float Reward { get; init; }
 
-    /// <summary>The 28-dimensional state vector after the action completed.</summary>
+    /// <summary>The 29-dimensional state vector after the action completed.</summary>
     public float[] NextState { get; init; } = Array.Empty<float>();
 
     /// <summary>True if this was the last action in an episode (e.g., shutdown).</summary>
@@ -58,7 +58,7 @@ public record DecisionLog
 {
     public long Id { get; init; }
 
-    /// <summary>The 28-dimensional state vector at decision time.</summary>
+    /// <summary>The 29-dimensional state vector at decision time.</summary>
     public float[] StateVector { get; init; } = Array.Empty<float>();
 
     /// <summary>Action chosen (BrainAction int ID).</summary>

@@ -1,5 +1,4 @@
 C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Api\obj\Debug\net8.0\Darci.Api.csproj.AssemblyReference.cache
-C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Api\obj\Debug\net8.0\rpswa.dswa.cache.json
 C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Api\obj\Debug\net8.0\Darci.Api.GeneratedMSBuildEditorConfig.editorconfig
 C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Api\obj\Debug\net8.0\Darci.Api.AssemblyInfoInputs.cache
 C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Api\obj\Debug\net8.0\Darci.Api.AssemblyInfo.cs
@@ -8,7 +7,6 @@ C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Api\ob
 C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Api\obj\Debug\net8.0\Darci.Api.MvcApplicationPartsAssemblyInfo.cache
 C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Api\obj\Debug\net8.0\Darci.Api.sourcelink.json
 C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Api\bin\Debug\net8.0\appsettings.json
-C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Api\bin\Debug\net8.0\Darci.Api.staticwebassets.endpoints.json
 C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Api\bin\Debug\net8.0\Darci.Api.exe
 C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Api\bin\Debug\net8.0\Darci.Api.deps.json
 C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Api\bin\Debug\net8.0\Darci.Api.runtimeconfig.json
@@ -57,15 +55,9 @@ C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Api\bi
 C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Api\bin\Debug\net8.0\Darci.Personality.pdb
 C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Api\bin\Debug\net8.0\Darci.Shared.pdb
 C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Api\bin\Debug\net8.0\Darci.Tools.pdb
-C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Api\obj\Debug\net8.0\rjimswa.dswa.cache.json
-C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Api\obj\Debug\net8.0\rjsmrazor.dswa.cache.json
-C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Api\obj\Debug\net8.0\rjsmcshtml.dswa.cache.json
 C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Api\obj\Debug\net8.0\scopedcss\bundle\Darci.Api.styles.css
 C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Api\obj\Debug\net8.0\staticwebassets.build.json
-C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Api\obj\Debug\net8.0\staticwebassets.build.json.cache
 C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Api\obj\Debug\net8.0\staticwebassets.development.json
-C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Api\obj\Debug\net8.0\staticwebassets.build.endpoints.json
-C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Api\obj\Debug\net8.0\swae.build.ex.cache
 C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Api\obj\Debug\net8.0\Darci.Api.csproj.Up2Date
 C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Api\obj\Debug\net8.0\Darci.Api.dll
 C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Api\obj\Debug\net8.0\refint\Darci.Api.dll
@@ -205,3 +197,14 @@ C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Api\bi
 C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Api\bin\Debug\net8.0\Darci.Api.staticwebassets.runtime.json
 C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Api\bin\Debug\net8.0\Darci.Engineering.dll
 C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Api\bin\Debug\net8.0\Darci.Engineering.pdb
+C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Api\bin\Debug\net8.0\Darci.Memory.Confidence.dll
+C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Api\bin\Debug\net8.0\Darci.Memory.Graph.dll
+C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Api\bin\Debug\net8.0\Darci.Research.Agents.dll
+C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Api\bin\Debug\net8.0\Darci.Research.Agents.pdb
+C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Api\bin\Debug\net8.0\Darci.Memory.Graph.pdb
+C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Api\bin\Debug\net8.0\Darci.Memory.Confidence.pdb
+C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Api\obj\Debug\net8.0\staticwebassets\msbuild.Darci.Api.Microsoft.AspNetCore.StaticWebAssets.props
+C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Api\obj\Debug\net8.0\staticwebassets\msbuild.build.Darci.Api.props
+C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Api\obj\Debug\net8.0\staticwebassets\msbuild.buildMultiTargeting.Darci.Api.props
+C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Api\obj\Debug\net8.0\staticwebassets\msbuild.buildTransitive.Darci.Api.props
+C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Api\obj\Debug\net8.0\staticwebassets.pack.json

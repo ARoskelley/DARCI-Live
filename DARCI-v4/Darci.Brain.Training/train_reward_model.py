@@ -39,7 +39,7 @@ from torch.utils.data import DataLoader, TensorDataset, random_split
 
 # ============================================================
 # Reward Network Architecture
-# Input: state(28) + action_one_hot(10) = 38 dimensions
+# Input: state(29) + action_one_hot(10) = 39 dimensions
 # Output: scalar reward prediction
 # ============================================================
 
@@ -52,9 +52,9 @@ class DarciRewardModel(nn.Module):
     model is how reward hacking starts.
     """
     
-    STATE_DIM = 28
+    STATE_DIM = 29
     ACTION_DIM = 10
-    INPUT_DIM = STATE_DIM + ACTION_DIM  # 38
+    INPUT_DIM = STATE_DIM + ACTION_DIM  # 39
     
     def __init__(self):
         super().__init__()
@@ -71,7 +71,7 @@ class DarciRewardModel(nn.Module):
     def forward(self, state: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
         """
         Args:
-            state:  (batch, 28) float state vectors
+            state:  (batch, 29) float state vectors
             action: (batch,) int action IDs  OR  (batch, 10) one-hot
         Returns:
             (batch, 1) predicted reward
@@ -108,7 +108,7 @@ def generate_bootstrap_data(n_samples: int = 5000, seed: int = 42) -> tuple:
     model before real preference data is available.
     
     Returns:
-        states:  (N, 28) float32
+        states:  (N, 29) float32
         actions: (N,)    int64
         rewards: (N,)    float32
     """
@@ -120,7 +120,7 @@ def generate_bootstrap_data(n_samples: int = 5000, seed: int = 42) -> tuple:
     
     for _ in range(n_samples):
         # Generate a random but plausible state vector
-        state = np.zeros(28, dtype=np.float32)
+        state = np.zeros(29, dtype=np.float32)
         
         # Internal state (0-7): random personality values
         state[0] = rng.uniform(0.2, 1.0)   # energy

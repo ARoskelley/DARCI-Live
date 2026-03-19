@@ -77,14 +77,15 @@ class SimState:
     intent_research: float = 0.0
     intent_feedback: float = 0.0
     memory_relevance: float = 0.0
+    research_topic_confidence: float = 0.5
     
     # Tracking
     step: int = 0
     total_reward: float = 0.0
     
     def to_vector(self) -> np.ndarray:
-        """Convert to the 28-dim normalized state vector."""
-        v = np.zeros(28, dtype=np.float32)
+        """Convert to the 29-dim normalized state vector."""
+        v = np.zeros(29, dtype=np.float32)
         
         # Internal (0-7)
         v[0] = np.clip(self.energy, 0, 1)
@@ -120,6 +121,8 @@ class SimState:
             v[25] = self.intent_research
             v[26] = self.intent_feedback
             v[27] = np.clip(self.memory_relevance, 0, 1)
+
+        v[28] = np.clip(self.research_topic_confidence, 0, 1)
         
         return v
     
@@ -140,6 +143,9 @@ class SimState:
         if self.energy < 0.2:
             mask[2] = False  # research too expensive
             mask[9] = False  # thinking too expensive
+
+        if self.research_topic_confidence < 0.4:
+            mask[2] = self.energy > 0.1
         
         if self.is_quiet_hours:
             mask[8] = False  # don't notify during quiet hours
@@ -400,6 +406,7 @@ class DarciSimulator:
         s.intent_feedback = intents[3]
         
         s.memory_relevance = self.rng.uniform(0, 0.7)
+        s.research_topic_confidence = self.rng.uniform(0.15, 0.85) if s.intent_research > 0.2 else 0.5
     
     def _schedule_response(self):
         """Simulate user sending a follow-up message soon."""

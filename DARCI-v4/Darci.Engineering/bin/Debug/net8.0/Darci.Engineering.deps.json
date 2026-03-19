@@ -11,7 +11,8 @@
           "Darci.Shared": "1.0.0",
           "Microsoft.Extensions.Http": "8.0.0",
           "Microsoft.Extensions.Logging.Abstractions": "8.0.0",
-          "Microsoft.ML.OnnxRuntime": "1.19.2"
+          "Microsoft.ML.OnnxRuntime": "1.19.2",
+          "System.Text.Json": "8.0.5"
         },
         "runtime": {
           "Darci.Engineering.dll": {}
@@ -86,7 +87,8 @@
       "Microsoft.Extensions.Diagnostics.Abstractions/8.0.0": {
         "dependencies": {
           "Microsoft.Extensions.DependencyInjection.Abstractions": "8.0.0",
-          "Microsoft.Extensions.Options": "8.0.0"
+          "Microsoft.Extensions.Options": "8.0.0",
+          "System.Diagnostics.DiagnosticSource": "8.0.0"
         },
         "runtime": {
           "lib/net8.0/Microsoft.Extensions.Diagnostics.Abstractions.dll": {
@@ -278,6 +280,9 @@
         }
       },
       "Microsoft.ML.OnnxRuntime.Managed/1.19.2": {
+        "dependencies": {
+          "System.Memory": "4.5.5"
+        },
         "runtime": {
           "lib/net6.0/Microsoft.ML.OnnxRuntime.dll": {
             "assemblyVersion": "1.19.2.0",
@@ -285,10 +290,13 @@
           }
         }
       },
+      "System.Diagnostics.DiagnosticSource/8.0.0": {},
+      "System.Memory/4.5.5": {},
+      "System.Text.Json/8.0.5": {},
       "Darci.Shared/1.0.0": {
         "runtime": {
           "Darci.Shared.dll": {
-            "assemblyVersion": "1.0.0.0",
+            "assemblyVersion": "1.0.0",
             "fileVersion": "1.0.0.0"
           }
         }
@@ -405,6 +413,27 @@
       "sha512": "sha512-4oNu7/L1ar3PmXNvAnary0/MbyqNkKDmisrG54QVbFoSuW1GNw1CcWDBrlYHbafo41p4/cnVQ3lF/IHuSm8quQ==",
       "path": "microsoft.ml.onnxruntime.managed/1.19.2",
       "hashPath": "microsoft.ml.onnxruntime.managed.1.19.2.nupkg.sha512"
+    },
+    "System.Diagnostics.DiagnosticSource/8.0.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-c9xLpVz6PL9lp/djOWtk5KPDZq3cSYpmXoJQY524EOtuFl5z9ZtsotpsyrDW40U1DRnQSYvcPKEUV0X//u6gkQ==",
+      "path": "system.diagnostics.diagnosticsource/8.0.0",
+      "hashPath": "system.diagnostics.diagnosticsource.8.0.0.nupkg.sha512"
+    },
+    "System.Memory/4.5.5": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-XIWiDvKPXaTveaB7HVganDlOCRoj03l+jrwNvcge/t8vhGYKvqV+dMv6G4SAX2NoNmN0wZfVPTAlFwZcZvVOUw==",
+      "path": "system.memory/4.5.5",
+      "hashPath": "system.memory.4.5.5.nupkg.sha512"
+    },
+    "System.Text.Json/8.0.5": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-0f1B50Ss7rqxXiaBJyzUu9bWFOO2/zSlifZ/UNMdiIpDYe4cY4LQQicP4nirK1OS31I43rn062UIJ1Q9bpmHpg==",
+      "path": "system.text.json/8.0.5",
+      "hashPath": "system.text.json.8.0.5.nupkg.sha512"
     },
     "Darci.Shared/1.0.0": {
       "type": "project",

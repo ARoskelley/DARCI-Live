@@ -30,3 +30,7 @@ C:\Users\ROG\Documents\GitHub\DARCI-Live\darci-v4\Darci.Memory\obj\Debug\net8.0\
 C:\Users\ROG\Documents\GitHub\DARCI-Live\darci-v4\Darci.Memory\obj\Debug\net8.0\refint\Darci.Memory.dll
 C:\Users\ROG\Documents\GitHub\DARCI-Live\darci-v4\Darci.Memory\obj\Debug\net8.0\Darci.Memory.pdb
 C:\Users\ROG\Documents\GitHub\DARCI-Live\darci-v4\Darci.Memory\obj\Debug\net8.0\ref\Darci.Memory.dll
+C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Memory\bin\Debug\net8.0\Darci.Memory.Confidence.dll
+C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Memory\bin\Debug\net8.0\Darci.Memory.Graph.dll
+C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Memory\bin\Debug\net8.0\Darci.Memory.Graph.pdb
+C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Memory\bin\Debug\net8.0\Darci.Memory.Confidence.pdb

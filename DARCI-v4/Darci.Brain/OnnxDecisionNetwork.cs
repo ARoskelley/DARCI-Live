@@ -13,7 +13,7 @@ namespace Darci.Brain;
 /// falls back to the v3 priority ladder transparently.
 ///
 /// ONNX model contract:
-///   Input  — "state_vector" : float32[1, 28]
+///   Input  — "state_vector" : float32[1, 29]
 ///   Output — "action_logits": float32[1, 10]
 ///
 /// Thread safety: <see cref="InferenceSession.Run"/> is thread-safe.
@@ -72,7 +72,7 @@ public sealed class OnnxDecisionNetwork : IDecisionNetwork, IDisposable
     }
 
     /// <summary>
-    /// Feed a 28-dim state vector through the network and return 10 raw action logits.
+    /// Feed a 29-dim state vector through the network and return 10 raw action logits.
     /// Returns all-zeros if the model is unavailable.
     /// </summary>
     public float[] Predict(float[] stateVector)
@@ -80,7 +80,7 @@ public sealed class OnnxDecisionNetwork : IDecisionNetwork, IDisposable
         if (_session == null)
             return new float[10];
 
-        var inputTensor = new DenseTensor<float>(stateVector, new[] { 1, 28 });
+        var inputTensor = new DenseTensor<float>(stateVector, new[] { 1, stateVector.Length });
         var inputs      = new[] { NamedOnnxValue.CreateFromTensor(InputName, inputTensor) };
 
         using var outputs = _session.Run(inputs);

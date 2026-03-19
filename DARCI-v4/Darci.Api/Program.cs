@@ -4,9 +4,13 @@ using Darci.Core;
 using Darci.Engineering;
 using Darci.Api;
 using Darci.Research;
+using Darci.Research.Agents;
+using Darci.Research.Agents.Agents;
 using Darci.Shared;
 using Darci.Goals;
 using Darci.Memory;
+using Darci.Memory.Graph;
+using Darci.Memory.Confidence;
 using Darci.Personality;
 using Darci.Tools;
 using Darci.Tools.Cad;
@@ -62,7 +66,10 @@ builder.Services.AddSingleton<IMemoryStore>(sp =>
     return new MemoryStore(
         sp.GetRequiredService<ILogger<MemoryStore>>(),
         connectionString,
-        text => ollama.GetEmbedding(text));
+        text => ollama.GetEmbedding(text),
+        prompt => ollama.Generate(prompt),
+        sp.GetRequiredService<IKnowledgeGraph>(),
+        sp.GetRequiredService<IConfidenceTracker>());
 });
 
 // Goals (singleton)
@@ -74,6 +81,7 @@ builder.Services.AddSingleton<IGoalManager>(sp =>
 // Toolkit (singleton)
 builder.Services.AddSingleton<Toolkit>();
 builder.Services.AddSingleton<IToolkit>(sp => sp.GetRequiredService<Toolkit>());
+builder.Services.AddSingleton<IResearchToolbox>(sp => sp.GetRequiredService<Toolkit>());
 
 // Response delivery + notification fanout
 builder.Services.AddSingleton<IResponseStore, InMemoryResponseStore>();
@@ -132,7 +140,8 @@ builder.Services.AddSingleton<Decision>(sp =>
         sp.GetRequiredService<IStateEncoder>(),
         sp.GetRequiredService<ExperienceBuffer>(),
         sp.GetRequiredService<IDecisionNetwork>(),
-        sp.GetRequiredService<EngineeringGoalDetector>()));
+        sp.GetRequiredService<EngineeringGoalDetector>(),
+        sp.GetRequiredService<IConfidenceTracker>()));
 
 // DARCI herself - the background service
 // Constructor: (ILogger, Awareness, Decision, State, IToolkit, IStateEncoder, ExperienceBuffer, EngineeringOrchestrator?)
@@ -156,6 +165,26 @@ builder.Services.AddSingleton<IResearchStore>(sp =>
     new ResearchStore(
         connectionString,
         sp.GetRequiredService<ILogger<ResearchStore>>()));
+
+builder.Services.AddSingleton<IKnowledgeGraph>(sp =>
+    new KnowledgeGraph(
+        connectionString,
+        sp.GetRequiredService<ILogger<KnowledgeGraph>>()));
+
+builder.Services.AddSingleton<IConfidenceTracker>(sp =>
+    new ConfidenceTracker(
+        connectionString,
+        sp.GetRequiredService<IKnowledgeGraph>(),
+        sp.GetRequiredService<ILogger<ConfidenceTracker>>()));
+
+builder.Services.AddSingleton<WebResearchAgent>();
+builder.Services.AddSingleton<GraphResearchAgent>();
+builder.Services.AddSingleton<ReasoningAgent>();
+builder.Services.AddSingleton<PubMedAgent>();
+builder.Services.AddSingleton<IResearchAgentFactory, ResearchAgentFactory>();
+builder.Services.AddSingleton<DeepResearchOrchestrator>();
+builder.Services.AddSingleton<IDeepResearchOrchestrator>(sp =>
+    sp.GetRequiredService<DeepResearchOrchestrator>());
 
 // === Engineering Services ===
 
@@ -213,6 +242,12 @@ await experienceBuffer.InitializeAsync();
 var researchStore = app.Services.GetRequiredService<IResearchStore>();
 await researchStore.InitializeAsync();
 
+var knowledgeGraph = app.Services.GetRequiredService<IKnowledgeGraph>();
+await knowledgeGraph.InitializeAsync();
+
+var confidenceTracker = app.Services.GetRequiredService<IConfidenceTracker>();
+await confidenceTracker.InitializeAsync();
+
 // === Middleware ===
 app.UseCors("DarciApp");
 app.UseDefaultFiles();    // serves wwwroot/index.html at /
@@ -255,7 +290,7 @@ app.MapPost("/message", async (MessageRequest request, Awareness awareness) =>
 });
 
 // Get pending responses (poll endpoint)
-app.MapGet("/responses", async (IResponseStore responses, CancellationToken ct) =>
+app.MapGet("/responses", (IResponseStore responses, CancellationToken ct) =>
 {
     var pending = new List<OutgoingMessage>();
 
@@ -765,6 +800,13 @@ app.MapGet("/research/sessions/{id}/results", async (IResearchStore store, strin
     return Results.Ok(results);
 });
 
+// Get agent jobs for a session
+app.MapGet("/research/sessions/{id}/agents", async (IResearchStore store, string id) =>
+{
+    var jobs = await store.GetAgentJobsAsync(id);
+    return Results.Ok(jobs);
+});
+
 // Search across all results
 app.MapGet("/research/search", async (IResearchStore store, string q, int? limit) =>
 {
@@ -810,6 +852,96 @@ app.MapDelete("/research/files/{id}", async (IResearchStore store, string id) =>
 {
     var ok = await store.DeleteFileAsync(id);
     return ok ? Results.Ok(new { deleted = id }) : Results.NotFound();
+});
+
+// Run deep research directly and return the full structured outcome
+app.MapPost("/research/deep", async (
+    DeepResearchRequest request,
+    IDeepResearchOrchestrator orchestrator,
+    CancellationToken ct) =>
+{
+    if (string.IsNullOrWhiteSpace(request.Question))
+    {
+        return Results.BadRequest(new { error = "question is required" });
+    }
+
+    var outcome = await orchestrator.RunDeepResearchAsync(request.Question, request.UserId ?? "Tinman", ct);
+    return outcome.IsSuccess ? Results.Ok(outcome) : Results.UnprocessableEntity(outcome);
+});
+
+// Knowledge graph search
+app.MapGet("/knowledge/entities/search", async (
+    IKnowledgeGraph graph,
+    string q,
+    string? domain,
+    int? limit,
+    CancellationToken ct) =>
+{
+    if (string.IsNullOrWhiteSpace(q))
+    {
+        return Results.BadRequest(new { error = "q is required" });
+    }
+
+    var entities = await graph.SearchEntitiesAsync(q, domain, limit ?? 20, ct);
+    return Results.Ok(entities);
+});
+
+app.MapGet("/knowledge/entities/{id}", async (IKnowledgeGraph graph, string id, CancellationToken ct) =>
+{
+    var entity = await graph.GetEntityAsync(id, ct);
+    return entity is null ? Results.NotFound() : Results.Ok(entity);
+});
+
+app.MapGet("/knowledge/entities/{id}/neighbours", async (
+    IKnowledgeGraph graph,
+    string id,
+    int? depth,
+    string? relationType,
+    CancellationToken ct) =>
+{
+    var neighbours = await graph.GetNeighboursAsync(id, depth ?? 1, relationType, ct);
+    return Results.Ok(neighbours);
+});
+
+app.MapGet("/knowledge/path", async (
+    IKnowledgeGraph graph,
+    string fromEntityId,
+    string toEntityId,
+    int? maxHops,
+    CancellationToken ct) =>
+{
+    var path = await graph.FindPathAsync(fromEntityId, toEntityId, maxHops ?? 5, ct);
+    return path.IsEmpty ? Results.NotFound(path) : Results.Ok(path);
+});
+
+app.MapGet("/confidence/claims/uncertain", async (
+    IConfidenceTracker confidence,
+    float? threshold,
+    string? domain,
+    int? limit,
+    CancellationToken ct) =>
+{
+    var claims = await confidence.GetUncertainClaimsAsync(threshold ?? 0.4f, domain, limit ?? 30, ct);
+    return Results.Ok(claims);
+});
+
+app.MapGet("/confidence/entities/{entityId}/claims", async (
+    IConfidenceTracker confidence,
+    string entityId,
+    int? limit,
+    CancellationToken ct) =>
+{
+    var claims = await confidence.GetClaimsForEntityAsync(entityId, limit ?? 50, ct);
+    return Results.Ok(claims);
+});
+
+app.MapGet("/confidence/contradictions", async (
+    IConfidenceTracker confidence,
+    string? domain,
+    CancellationToken ct) =>
+{
+    var contradictions = await confidence.GetUnresolvedContradictionsAsync(domain, ct);
+    return Results.Ok(contradictions);
 });
 
 // === Engineering Neural Endpoints ===
@@ -897,6 +1029,7 @@ public record MessageRequest(string Message, string? UserId = null, bool Urgent 
 public record GoalRequest(string Title, string? Description, string? UserId, GoalType? Type, GoalPriority? Priority);
 public record RegisterFileRequest(string Filename, string ContentType, string FilePath, long SizeBytes);
 public record UploadFileRequest(string SessionId, string Filename, string ContentType, string LocalPath);
+public record DeepResearchRequest(string Question, string? UserId = null);
 public record CadRequest(string Description, string? UserId = null, bool Urgent = false);
 public record CadExecuteRequest(
     string Description,

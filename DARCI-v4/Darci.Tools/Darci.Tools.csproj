@@ -16,6 +16,7 @@
     <ProjectReference Include="..\Darci.Shared\Darci.Shared.csproj" />
     <ProjectReference Include="..\Darci.Memory\Darci.Memory.csproj" />
     <ProjectReference Include="..\Darci.Goals\Darci.Goals.csproj" />
+    <ProjectReference Include="..\Darci.Research.Agents\Darci.Research.Agents.csproj" />
   </ItemGroup>
 
 </Project>

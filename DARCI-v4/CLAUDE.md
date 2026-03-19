@@ -44,8 +44,8 @@ DARCI-Live/
 
 ## Key Design Decisions
 
-### State Vector (28 dimensions)
-All perception is encoded as a float[28] normalized to [0,1] or [-1,1]. No English passes through the decision network. See ARCHITECTURE.md §3 for the full vector definition.
+### State Vector (29 dimensions)
+All perception is encoded as a float[29] normalized to [0,1] or [-1,1]. No English passes through the decision network. See ARCHITECTURE.md §3 for the full vector definition.
 
 ### Action Space (10 discrete actions)
 Actions are integers 0–9, not strings. The network outputs logits over these actions. Invalid actions are masked before softmax. See ARCHITECTURE.md §4.
@@ -53,8 +53,11 @@ Actions are integers 0–9, not strings. The network outputs logits over these a
 ### Reward System
 Immediate rewards (replied to message: +1.0, rested when messages waiting: -1.0) plus delayed rewards (user said thanks: +1.0). See ARCHITECTURE.md §5.
 
+### Cognitive Memory Systems
+DARCI v4 now layers a knowledge graph, a confidence tracker, and deep research agents on top of the existing SQLite-backed memory store. The graph captures explicit entities and relations, the confidence layer tracks corroboration and contradictions for claims, and deep research coordinates parallel specialist agents before feeding synthesized findings back into memory.
+
 ### Two-Brain Design
-- **Decision Network**: Small NN (~4,160 params). 28 → 64 → 32 → 10. Handles all "what should I do" logic.
+- **Decision Network**: Small NN (~4,330 params). 29 → 64 → 32 → 10. Handles all "what should I do" logic.
 - **LLM (Ollama)**: Text generation only. Replies, summaries, intent comprehension. Never decides actions.
 
 ### Training Pipeline
