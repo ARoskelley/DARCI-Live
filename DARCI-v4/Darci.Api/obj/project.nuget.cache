@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "K7BzTUTjvcI=",
+  "dgSpecHash": "tuFQiU4qVFw=",
   "success": true,
-  "projectFilePath": "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\DARCI-v4\\Darci.Api\\Darci.Api.csproj",
+  "projectFilePath": "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\darci-v4\\darci.api\\Darci.Api.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\aiden\\.nuget\\packages\\awssdk.core\\3.7.303.3\\awssdk.core.3.7.303.3.nupkg.sha512",
     "C:\\Users\\aiden\\.nuget\\packages\\awssdk.s3\\3.7.307.4\\awssdk.s3.3.7.307.4.nupkg.sha512",
@@ -40,11 +40,7 @@
     "C:\\Users\\aiden\\.nuget\\packages\\system.diagnostics.diagnosticsource\\8.0.0\\system.diagnostics.diagnosticsource.8.0.0.nupkg.sha512",
     "C:\\Users\\aiden\\.nuget\\packages\\system.memory\\4.5.5\\system.memory.4.5.5.nupkg.sha512",
     "C:\\Users\\aiden\\.nuget\\packages\\system.text.json\\8.0.5\\system.text.json.8.0.5.nupkg.sha512",
-    "C:\\Users\\aiden\\.nuget\\packages\\system.threading.channels\\8.0.0\\system.threading.channels.8.0.0.nupkg.sha512",
-    "C:\\Users\\aiden\\.nuget\\packages\\microsoft.netcore.app.ref\\8.0.22\\microsoft.netcore.app.ref.8.0.22.nupkg.sha512",
-    "C:\\Users\\aiden\\.nuget\\packages\\microsoft.windowsdesktop.app.ref\\8.0.22\\microsoft.windowsdesktop.app.ref.8.0.22.nupkg.sha512",
-    "C:\\Users\\aiden\\.nuget\\packages\\microsoft.aspnetcore.app.ref\\8.0.22\\microsoft.aspnetcore.app.ref.8.0.22.nupkg.sha512",
-    "C:\\Users\\aiden\\.nuget\\packages\\microsoft.netcore.app.host.win-x64\\8.0.22\\microsoft.netcore.app.host.win-x64.8.0.22.nupkg.sha512"
+    "C:\\Users\\aiden\\.nuget\\packages\\system.threading.channels\\8.0.0\\system.threading.channels.8.0.0.nupkg.sha512"
   ],
   "logs": []
 }

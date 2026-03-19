@@ -81,7 +81,7 @@ builder.Services.AddSingleton<IGoalManager>(sp =>
 // Toolkit (singleton)
 builder.Services.AddSingleton<Toolkit>();
 builder.Services.AddSingleton<IToolkit>(sp => sp.GetRequiredService<Toolkit>());
-builder.Services.AddSingleton<IResearchToolbox>(sp => sp.GetRequiredService<Toolkit>());
+builder.Services.AddSingleton<IResearchToolbox, ResearchToolbox>();
 
 // Response delivery + notification fanout
 builder.Services.AddSingleton<IResponseStore, InMemoryResponseStore>();
@@ -215,7 +215,10 @@ builder.Services.AddSingleton<IS3FileStore>(sp =>
     new S3FileStore(cloudConfig, sp.GetRequiredService<ILogger<S3FileStore>>()));
 builder.Services.AddSingleton<IMessageInbox, AwarenessMessageInbox>();
 builder.Services.AddSingleton<IMessageOutbox, ResponseStoreOutbox>();
-builder.Services.AddHostedService<SqsRelayService>();
+if (cloudConfig.IsConfigured)
+{
+    builder.Services.AddHostedService<SqsRelayService>();
+}
 
 // === SignalR (real-time hub for mobile app) ===
 builder.Services.AddSignalR();
@@ -994,9 +997,13 @@ app.MapGet("/cloud/status", (CloudConfig cfg) => Results.Ok(new
 // Upload a local research file to S3 and register it in the research store
 // (DARCI or a research agent calls this after writing the file to disk on the host)
 app.MapPost("/cloud/upload", async (
+    CloudConfig cfg,
     IS3FileStore s3, IResearchStore store, DarciHubNotifier notifier,
     UploadFileRequest req, CancellationToken ct) =>
 {
+    if (!cfg.IsConfigured)
+        return Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
+
     if (!File.Exists(req.LocalPath))
         return Results.BadRequest(new { error = $"File not found on host: {req.LocalPath}" });
 
@@ -1015,8 +1022,11 @@ app.MapPost("/cloud/upload", async (
 });
 
 // List files in S3 (optionally scoped to session)
-app.MapGet("/cloud/files", async (IS3FileStore s3, string? sessionId, CancellationToken ct) =>
+app.MapGet("/cloud/files", async (CloudConfig cfg, IS3FileStore s3, string? sessionId, CancellationToken ct) =>
 {
+    if (!cfg.IsConfigured)
+        return Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
+
     var files = await s3.ListFilesAsync(sessionId, ct);
     return Results.Ok(files);
 });

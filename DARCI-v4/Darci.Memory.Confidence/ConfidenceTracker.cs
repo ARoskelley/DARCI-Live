@@ -24,12 +24,16 @@ public sealed class ConfidenceTracker : IConfidenceTracker
 
     private static readonly Dictionary<string, float> SourceQualityDefaults = new(StringComparer.OrdinalIgnoreCase)
     {
-        ["pubmed"] = 0.95f,
-        ["web"] = 0.55f,
-        ["llm"] = 0.40f,
-        ["user"] = 0.65f,
-        ["reasoning"] = 0.50f,
-        ["graph"] = 0.70f
+        ["pubmed"] = 0.85f,
+        ["clinical_trial"] = 0.90f,
+        ["systematic_review"] = 0.92f,
+        ["textbook"] = 0.80f,
+        ["web_news"] = 0.45f,
+        ["web_general"] = 0.35f,
+        ["llm"] = 0.30f,
+        ["user"] = 0.60f,
+        ["reasoning"] = 0.40f,
+        ["peer_reviewed"] = 0.88f
     };
 
     public ConfidenceTracker(
