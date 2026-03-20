@@ -131,7 +131,7 @@ builder.Services.AddSingleton<IDecisionNetwork>(sp =>
 // Core DARCI components (singletons - one consciousness)
 builder.Services.AddSingleton<Awareness>();
 builder.Services.AddSingleton<State>();
-// Constructor: (ILogger, IToolkit, IGoalManager, IStateEncoder, ExperienceBuffer, IDecisionNetwork, EngineeringGoalDetector?)
+// Constructor: (ILogger, IToolkit, IGoalManager, IStateEncoder, ExperienceBuffer, IDecisionNetwork, EngineeringGoalDetector?, IConfidenceTracker?, GoalDecomposer?)
 builder.Services.AddSingleton<Decision>(sp =>
     new Decision(
         sp.GetRequiredService<ILogger<Decision>>(),
@@ -141,9 +141,20 @@ builder.Services.AddSingleton<Decision>(sp =>
         sp.GetRequiredService<ExperienceBuffer>(),
         sp.GetRequiredService<IDecisionNetwork>(),
         sp.GetRequiredService<EngineeringGoalDetector>(),
-        sp.GetRequiredService<IConfidenceTracker>()));
+        sp.GetRequiredService<IConfidenceTracker>(),
+        sp.GetRequiredService<GoalDecomposer>()));
 
 // DARCI herself - the background service
+// BomGenerator + AutonomousBundler (autonomous engineering path)
+builder.Services.AddSingleton<BomGenerator>();
+builder.Services.AddSingleton<IAutonomousBundler>(sp =>
+    new AutonomousBundler(
+        builder.Environment.ContentRootPath,
+        sp.GetRequiredService<ILogger<AutonomousBundler>>()));
+
+// GoalDecomposer (LLM-driven step population after goal creation)
+builder.Services.AddSingleton<GoalDecomposer>();
+
 // Constructor: (ILogger, Awareness, Decision, State, IToolkit, IStateEncoder, ExperienceBuffer, EngineeringOrchestrator?)
 builder.Services.AddSingleton<Darci.Core.Darci>(sp =>
     new Darci.Core.Darci(
@@ -154,7 +165,12 @@ builder.Services.AddSingleton<Darci.Core.Darci>(sp =>
         sp.GetRequiredService<IToolkit>(),
         sp.GetRequiredService<IStateEncoder>(),
         sp.GetRequiredService<ExperienceBuffer>(),
-        sp.GetRequiredService<EngineeringOrchestrator>()));
+        sp.GetRequiredService<EngineeringOrchestrator>(),
+        sp.GetRequiredService<IDeepResearchOrchestrator>(),
+        sp.GetRequiredService<ConstraintExtractor>(),
+        sp.GetRequiredService<IAutonomousBundler>(),
+        sp.GetRequiredService<BomGenerator>(),
+        sp.GetRequiredService<IGoalManager>()));
 builder.Services.AddHostedService(sp => sp.GetRequiredService<Darci.Core.Darci>());
 
 // Controllers
@@ -182,7 +198,16 @@ builder.Services.AddSingleton<GraphResearchAgent>();
 builder.Services.AddSingleton<ReasoningAgent>();
 builder.Services.AddSingleton<PubMedAgent>();
 builder.Services.AddSingleton<IResearchAgentFactory, ResearchAgentFactory>();
-builder.Services.AddSingleton<DeepResearchOrchestrator>();
+builder.Services.AddSingleton<KnowledgeAssessor>();
+builder.Services.AddSingleton<ConstraintExtractor>();
+builder.Services.AddSingleton<DeepResearchOrchestrator>(sp => new DeepResearchOrchestrator(
+    sp.GetRequiredService<IResearchStore>(),
+    sp.GetRequiredService<IResearchAgentFactory>(),
+    sp.GetRequiredService<IKnowledgeGraph>(),
+    sp.GetRequiredService<IConfidenceTracker>(),
+    sp.GetRequiredService<IResearchToolbox>(),
+    sp.GetRequiredService<KnowledgeAssessor>(),
+    sp.GetRequiredService<ILogger<DeepResearchOrchestrator>>()));
 builder.Services.AddSingleton<IDeepResearchOrchestrator>(sp =>
     sp.GetRequiredService<DeepResearchOrchestrator>());
 

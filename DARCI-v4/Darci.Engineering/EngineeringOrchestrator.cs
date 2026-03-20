@@ -46,14 +46,35 @@ public class EngineeringOrchestrator
     {
         _logger.LogInformation("Engineering orchestrator starting: {Description}", goal.Description);
 
-        if (!await _workbench.IsHealthyAsync(ct))
+        // Retry workbench health check with exponential back-off
+        const int MaxRetries = 2;
+        bool workbenchReady = false;
+        for (int attempt = 0; attempt <= MaxRetries; attempt++)
         {
-            _logger.LogWarning("Geometry workbench service is not reachable");
+            if (await _workbench.IsHealthyAsync(ct))
+            {
+                workbenchReady = true;
+                break;
+            }
+            if (attempt < MaxRetries)
+            {
+                var delay = TimeSpan.FromSeconds(Math.Pow(2, attempt)); // 1s, 2s
+                _logger.LogWarning(
+                    "Workbench not ready, retrying in {Delay}s (attempt {A}/{Max})",
+                    delay.TotalSeconds, attempt + 1, MaxRetries);
+                await Task.Delay(delay, ct);
+            }
+        }
+
+        if (!workbenchReady)
+        {
+            _logger.LogWarning("Geometry workbench service is not reachable after retries");
             return new EngineeringResult
             {
                 Success      = false,
-                ErrorMessage = "Geometry workbench service unavailable. " +
-                               "Start it with: cd Darci.Engineering.Workbench && uvicorn main:app --port 8001"
+                ErrorMessage = "Geometry workbench unavailable after retries. " +
+                               "Start it with: cd Darci.Engineering.Workbench && uvicorn main:app --port 8001. " +
+                               "Research was completed and constraints were extracted — retry when workbench is running."
             };
         }
 

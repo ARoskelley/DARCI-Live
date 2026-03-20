@@ -55,6 +55,20 @@ Sources:
 """;
     }
 
+    public static string BuildGapFillDecompositionPrompt(
+        string question, string knownFacts)
+    {
+        return $"""
+You are a research coordinator. The following question needs investigation,
+but some relevant knowledge already exists.
+Generate 2-4 sub-questions that ONLY address what is NOT yet known.
+Do not ask about facts already covered by the existing knowledge.
+Respond ONLY with a JSON array of strings, no markdown.
+Question: {question}
+Already known: {knownFacts}
+""";
+    }
+
     public static string BuildGapFillPrompt(
         string question,
         IEnumerable<string> coveredTopics,

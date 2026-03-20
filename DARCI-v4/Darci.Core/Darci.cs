@@ -1,5 +1,7 @@
 using Darci.Brain;
 using Darci.Engineering;
+using Darci.Goals;
+using Darci.Research.Agents;
 using Darci.Shared;
 using Darci.Tools;
 using Darci.Tools.Cad;
@@ -37,6 +39,11 @@ public class Darci : BackgroundService
     private readonly IStateEncoder _encoder;
     private readonly ExperienceBuffer _buffer;
     private readonly EngineeringOrchestrator? _engineeringOrchestrator;
+    private readonly IDeepResearchOrchestrator? _research;
+    private readonly ConstraintExtractor? _constraintExtractor;
+    private readonly IAutonomousBundler? _bundler;
+    private readonly BomGenerator? _bomGenerator;
+    private readonly IGoalManager? _goalManager;
 
     private long _cycleCount = 0;
     private readonly Stopwatch _uptime = new();
@@ -58,7 +65,12 @@ public class Darci : BackgroundService
         IToolkit tools,
         IStateEncoder encoder,
         ExperienceBuffer buffer,
-        EngineeringOrchestrator? engineeringOrchestrator = null)
+        EngineeringOrchestrator? engineeringOrchestrator = null,
+        IDeepResearchOrchestrator? research = null,
+        ConstraintExtractor? constraintExtractor = null,
+        IAutonomousBundler? bundler = null,
+        BomGenerator? bomGenerator = null,
+        IGoalManager? goalManager = null)
     {
         _logger                   = logger;
         _awareness                = awareness;
@@ -68,6 +80,11 @@ public class Darci : BackgroundService
         _encoder                  = encoder;
         _buffer                   = buffer;
         _engineeringOrchestrator  = engineeringOrchestrator;
+        _research                 = research;
+        _constraintExtractor      = constraintExtractor;
+        _bundler                  = bundler;
+        _bomGenerator             = bomGenerator;
+        _goalManager              = goalManager;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -355,8 +372,8 @@ public class Darci : BackgroundService
                 ActionType.Remember   => await DoRemember(action),
                 ActionType.Recall     => await DoRecall(action),
                 ActionType.Consolidate => await DoConsolidate(action),
-                ActionType.Research   => await DoResearch(action),
-                ActionType.WorkOnGoal => await DoGoalWork(action),
+                ActionType.Research   => await DoResearch(action, ct),
+                ActionType.WorkOnGoal => await DoGoalWork(action, ct),
                 ActionType.CreateGoal => await DoCreateGoal(action),
                 ActionType.ReadFile   => await DoReadFile(action),
                 ActionType.WriteFile  => await DoWriteFile(action),
@@ -482,26 +499,109 @@ public class Darci : BackgroundService
         return null;
     }
 
-    private async Task<object?> DoResearch(DarciAction action)
+    private async Task<object?> DoResearch(DarciAction action, CancellationToken ct)
     {
-        if (string.IsNullOrEmpty(action.Query)) return null;
+        var query = action.Query ?? action.Topic;
+        if (string.IsNullOrEmpty(query)) return null;
 
         var userId = action.RecipientId ?? "Tinman";
-        var results = await _tools.DoDeepResearchAsync(action.Query, userId);
 
+        if (_research is not null)
+        {
+            var outcome = await _research.RunResearchAsync(
+                query,
+                userId: userId,
+                mode: ResearchOrchestrationMode.LearnAndSynthesize,
+                ct: ct);
+
+            var prefix = outcome.IsUncertain
+                ? $"[Confidence: {outcome.Confidence:P0} - UNCERTAIN] "
+                : $"[Confidence: {outcome.Confidence:P0}] ";
+
+            var result = prefix + outcome.FinalAnswer;
+            await _tools.StoreMemory(
+                $"Research on '{query}': {result}",
+                new[] { "research", "deep_research" });
+            return result;
+        }
+
+        // Fallback to toolkit when no orchestrator is wired
+        var results = await _tools.DoDeepResearchAsync(query, userId, ct);
         await _tools.StoreMemory(
-            $"Research on '{action.Query}': {results}",
+            $"Research on '{query}': {results}",
             new[] { "research", "deep_research" });
-
         return results;
     }
 
-    private Task<object?> DoGoalWork(DarciAction action)
+    private async Task<object?> DoGoalWork(DarciAction action, CancellationToken ct)
     {
-        if (!action.GoalId.HasValue) return Task.FromResult<object?>(null);
+        if (!action.GoalId.HasValue) return null;
+
+        if (_research is not null)
+        {
+            // §E: use goal title for richer gap detection topic — avoids "current goal step" noise
+            var topic = await GetGoalTitleAsync(action.GoalId)
+                ?? _state.CurrentActivity
+                ?? action.Reasoning
+                ?? "current goal step";
+            await DetectAndFillKnowledgeGapAsync(topic, ct);
+            // Regardless of outcome, continue — gap fill is best-effort
+        }
 
         _logger.LogInformation("Working on goal {GoalId}", action.GoalId);
-        return Task.FromResult<object?>("Working on goal");
+        return "Working on goal";
+    }
+
+    /// <summary>
+    /// Returns the title of a goal by id, or null on any failure.
+    /// Single async DB read — non-blocking, non-fatal.
+    /// </summary>
+    private async Task<string?> GetGoalTitleAsync(int? goalId)
+    {
+        if (goalId is null || _goalManager is null) return null;
+        try
+        {
+            var goal = await _goalManager.GetGoal(goalId.Value);
+            return goal?.Title;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Called during goal work. Checks if DARCI has sufficient knowledge
+    /// for the given topic. If not, runs agents in LearnOnly mode to fill
+    /// the gap. Silent — no notification, no Ollama call.
+    /// Returns true if knowledge was sufficient or successfully filled.
+    /// </summary>
+    private async Task<bool> DetectAndFillKnowledgeGapAsync(string topic, CancellationToken ct)
+    {
+        if (_research is null) return true;
+
+        try
+        {
+            var outcome = await _research.RunResearchAsync(
+                topic,
+                userId: "DARCI",
+                mode: ResearchOrchestrationMode.LearnOnly,
+                ct: ct);
+
+            if (outcome.IsSuccess)
+                _logger.LogDebug(
+                    "Knowledge gap filled: '{Topic}' (confidence {Conf:P0})",
+                    topic, outcome.Confidence);
+            else
+                _logger.LogDebug("Knowledge gap fill failed for: '{Topic}'", topic);
+
+            return outcome.IsSuccess;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Gap detection failed for topic: {Topic}", topic);
+            return false;
+        }
     }
 
     private async Task<object?> DoCreateGoal(DarciAction action)
@@ -629,7 +729,10 @@ public class Darci : BackgroundService
 
     /// <summary>
     /// Handles ActionType.Engineering — runs the neural geometry workbench loop.
-    /// Degrades gracefully if the orchestrator is not registered.
+    /// §C: runs research + constraint extraction before workbench.
+    /// §G: bundles output into a timestamped folder after completion.
+    /// §H: writes a BOM markdown file into the bundle.
+    /// Degrades gracefully if any optional service is not registered.
     /// </summary>
     private async Task<object?> DoNeuralEngineeringWork(DarciAction action, CancellationToken ct)
     {
@@ -650,7 +753,74 @@ public class Darci : BackgroundService
 
         _logger.LogInformation("Neural engineering starting: {Description}", spec.Description);
 
+        // §C — Research pass: fill knowledge gaps and extract engineering constraints
+        Dictionary<string, object>? extractedConstraints = null;
+        if (_research is not null)
+        {
+            var researchOutcome = await _research.RunResearchAsync(
+                spec.Description,
+                userId: "DARCI",
+                mode: ResearchOrchestrationMode.LearnOnly,
+                ct: ct);
+
+            if (researchOutcome.IsSuccess && _constraintExtractor is not null)
+            {
+                extractedConstraints = await _constraintExtractor.ExtractAsync(
+                    researchOutcome, spec.Description, ct);
+
+                if (extractedConstraints.Count > 0)
+                {
+                    var merged = new Dictionary<string, object>(
+                        spec.Constraints ?? new Dictionary<string, object>());
+                    foreach (var (k, v) in extractedConstraints)
+                        merged.TryAdd(k, v); // never overwrite explicit user constraints
+                    spec = spec with { Constraints = merged };
+                    _logger.LogInformation(
+                        "Merged {Count} research-derived constraints into engineering spec",
+                        extractedConstraints.Count);
+                }
+            }
+        }
+
         var result = await _engineeringOrchestrator.RunAsync(spec, ct);
+
+        // §G — Bundle output into a folder
+        string? bundlePath = null;
+        if (_bundler is not null && (result.Success || result.ExportedStlPath is not null))
+        {
+            try
+            {
+                bundlePath = await _bundler.CreateAsync(spec.Description, result, ct);
+                if (bundlePath is not null)
+                {
+                    _logger.LogInformation("Engineering bundle created: {Path}", bundlePath);
+                    await _tools.StoreMemory(
+                        $"Engineering project bundle: {spec.Description} → {bundlePath}",
+                        new[] { "engineering", "bundle", "output" });
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Bundler failed — engineering result still stored");
+            }
+        }
+
+        // §H — Generate and write BOM
+        if (_bomGenerator is not null && bundlePath is not null)
+        {
+            try
+            {
+                var bomMarkdown = await _bomGenerator.GenerateBomAsync(
+                    spec.Description, result, extractedConstraints, ct);
+                var bomPath = Path.Combine(bundlePath, "bill_of_materials.md");
+                await File.WriteAllTextAsync(bomPath, bomMarkdown, ct);
+                _logger.LogInformation("BOM written to {Path}", bomPath);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "BOM generation failed");
+            }
+        }
 
         if (result.Success)
         {
@@ -658,10 +828,9 @@ public class Darci : BackgroundService
                 $"Neural engineering succeeded for '{spec.Description}': score {result.FinalScore:F2}, {result.StepsTaken} steps",
                 new[] { "engineering", "neural", "success", userId });
 
-            await _tools.SendMessage(
-                userId,
-                $"Engineering complete.\n  Score: {result.FinalScore:P0}  Steps: {result.StepsTaken}  Passed: {result.ValidationPassed}",
-                externalNotify: true);
+            var msg = $"Engineering complete.\n  Score: {result.FinalScore:P0}  Steps: {result.StepsTaken}  Passed: {result.ValidationPassed}";
+            if (bundlePath is not null) msg += $"\n  Output: {bundlePath}";
+            await _tools.SendMessage(userId, msg, externalNotify: true);
         }
         else
         {
