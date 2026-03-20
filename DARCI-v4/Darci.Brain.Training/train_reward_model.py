@@ -90,6 +90,13 @@ class DarciRewardModel(nn.Module):
     
     def predict_reward(self, state: np.ndarray, action: int) -> float:
         """Convenience method for single (state, action) pair."""
+        state = np.asarray(state, dtype=np.float32).reshape(-1)
+        if state.shape[0] != self.STATE_DIM:
+            raise ValueError(
+                f"Reward model expected a {self.STATE_DIM}-dim state vector, got {state.shape[0]}. "
+                "Filter or migrate legacy rows before DQN training."
+            )
+
         self.eval()
         with torch.no_grad():
             s = torch.from_numpy(state).float().unsqueeze(0)

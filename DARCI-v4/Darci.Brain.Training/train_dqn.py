@@ -472,31 +472,52 @@ class DarciDQNAgent:
 # Data Loading — seed buffer from SQLite
 # ============================================================
 
-def load_experiences_from_db(db_path: str) -> list[dict]:
-    """Load all experiences from the SQLite experience buffer."""
+def load_experiences_from_db(db_path: str) -> tuple[list[dict], dict]:
+    """Load current-format experiences from SQLite, skipping legacy rows."""
     conn = sqlite3.connect(db_path)
     cursor = conn.execute(
         "SELECT state, action, reward, next_state, is_terminal FROM experiences ORDER BY id"
     )
     
     experiences = []
+    stats = {
+        "accepted": 0,
+        "legacy_28": 0,
+        "wrong_dim": 0,
+        "malformed": 0,
+    }
+
     for row in cursor:
         try:
+            state = np.array(json.loads(row[0]), dtype=np.float32)
+            next_state = np.array(json.loads(row[3]), dtype=np.float32)
+
+            state_len = len(state)
+            next_state_len = len(next_state)
+            if state_len != STATE_DIM or next_state_len != STATE_DIM:
+                dims = {state_len, next_state_len}
+                if dims.issubset({28, STATE_DIM}) and 28 in dims:
+                    stats["legacy_28"] += 1
+                else:
+                    stats["wrong_dim"] += 1
+                continue
+
             experiences.append({
-                "state": np.array(json.loads(row[0]), dtype=np.float32),
+                "state": state,
                 "action": int(row[1]),
                 "reward": float(row[2]),
-                "next_state": np.array(json.loads(row[3]), dtype=np.float32),
+                "next_state": next_state,
                 "terminal": bool(row[4]),
             })
+            stats["accepted"] += 1
         except (json.JSONDecodeError, TypeError):
-            continue
+            stats["malformed"] += 1
     
     conn.close()
-    return experiences
+    return experiences, stats
 
 
-def load_teacher_decisions(db_path: str) -> list[dict]:
+def load_teacher_decisions(db_path: str) -> tuple[list[dict], dict]:
     """
     Load teacher decisions and convert to pseudo-experiences.
     Since decision_log doesn't have next_state or reward,
@@ -508,13 +529,25 @@ def load_teacher_decisions(db_path: str) -> list[dict]:
     )
     
     rows = []
+    stats = {
+        "accepted": 0,
+        "legacy_28": 0,
+        "wrong_dim": 0,
+        "malformed": 0,
+    }
+
     for row in cursor:
         try:
             sv = np.array(json.loads(row[0]), dtype=np.float32)
-            if len(sv) == 29:
+            if len(sv) == STATE_DIM:
                 rows.append({"state": sv, "action": int(row[1])})
+                stats["accepted"] += 1
+            elif len(sv) == 28:
+                stats["legacy_28"] += 1
+            else:
+                stats["wrong_dim"] += 1
         except (json.JSONDecodeError, TypeError):
-            continue
+            stats["malformed"] += 1
     
     conn.close()
     
@@ -529,7 +562,7 @@ def load_teacher_decisions(db_path: str) -> list[dict]:
             "terminal": False,
         })
     
-    return experiences
+    return experiences, stats
 
 
 # ============================================================
@@ -568,16 +601,23 @@ def train_offline(
     buffer = MixedReplayBuffer(online_capacity=50000)
     
     # Teacher data (from decision_log — permanent)
-    teacher_data = load_teacher_decisions(db_path)
+    teacher_data, teacher_stats = load_teacher_decisions(db_path)
     for exp in teacher_data:
         buffer.add_teacher(
             exp["state"], exp["action"], exp["reward"],
             exp["next_state"], exp["terminal"]
         )
     print(f"  ✓ Teacher pool: {buffer.teacher_size} experiences")
+    if teacher_stats["legacy_28"] or teacher_stats["wrong_dim"] or teacher_stats["malformed"]:
+        print(
+            "    skipped teacher rows:"
+            f" legacy28={teacher_stats['legacy_28']},"
+            f" wrong_dim={teacher_stats['wrong_dim']},"
+            f" malformed={teacher_stats['malformed']}"
+        )
     
     # Online data (from experience buffer — treated as self-generated)
-    online_data = load_experiences_from_db(db_path)
+    online_data, online_stats = load_experiences_from_db(db_path)
     for exp in online_data:
         # Optionally re-score with learned reward model
         reward = exp["reward"]
@@ -598,6 +638,13 @@ def train_offline(
             exp["next_state"], exp["terminal"]
         )
     print(f"  ✓ Online pool: {buffer.online_size} experiences")
+    if online_stats["legacy_28"] or online_stats["wrong_dim"] or online_stats["malformed"]:
+        print(
+            "    skipped online rows:"
+            f" legacy28={online_stats['legacy_28']},"
+            f" wrong_dim={online_stats['wrong_dim']},"
+            f" malformed={online_stats['malformed']}"
+        )
     print(f"  ✓ Total: {buffer.total_size} experiences")
     
     if buffer.total_size < config.min_buffer_size:
