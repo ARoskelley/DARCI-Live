@@ -63,22 +63,41 @@ public sealed class PubMedAgent : IResearchAgent
                 return await RunReasoningFallbackAsync(jobId, sessionId, subQuestion, startedAt, stopwatch, ct);
             }
 
-            var notes = string.Join(Environment.NewLine, articles.Select(article => $"- {article}"));
-            var prompt = $"""
+            var abstracts = await FetchAbstractsAsync(pmids.Take(3), client, ct);
+            var hasAbstracts = !string.IsNullOrWhiteSpace(abstracts);
+            var confidence = hasAbstracts ? 0.75f : 0.55f;
+
+            string prompt;
+            if (hasAbstracts)
+            {
+                prompt = $"""
+Summarize the following PubMed abstracts into 2-5 factual sentences.
+Clearly state what was studied, what was found, and any caveats.
+Question: {subQuestion}
+Abstracts:
+{abstracts}
+""";
+            }
+            else
+            {
+                var notes = string.Join(Environment.NewLine, articles.Select(article => $"- {article}"));
+                prompt = $"""
 Summarize the following PubMed article results into 2-5 sentences.
 Question: {subQuestion}
 Results:
 {notes}
 """;
-            var summary = await _toolbox.GenerateAsync(prompt, ct);
-            var sourceRef = string.Join(",", pmids);
+            }
 
-            await _store.AddResultAsync(sessionId, "pubmed", summary, "summary", relevanceScore: 0.75f);
+            var summary = await _toolbox.GenerateAsync(prompt, ct);
+            var sourceRef = string.Join(",", pmids.Select(id => $"PMID:{id}"));
+
+            await _store.AddResultAsync(sessionId, "pubmed", summary, "summary", relevanceScore: confidence);
             await _store.UpdateAgentJobAsync(
                 jobId,
                 "done",
                 resultSummary: summary,
-                confidence: 0.75f,
+                confidence: confidence,
                 assignedAt: startedAt,
                 completedAt: DateTime.UtcNow);
 
@@ -89,7 +108,7 @@ Results:
                 SubQuestion = subQuestion,
                 IsSuccess = true,
                 Summary = summary,
-                Confidence = 0.75f,
+                Confidence = confidence,
                 SourceRef = sourceRef,
                 Duration = stopwatch.Elapsed
             };
@@ -173,6 +192,22 @@ Claims:
                 Error = ex.Message,
                 Duration = stopwatch.Elapsed
             };
+        }
+    }
+
+    private async Task<string> FetchAbstractsAsync(IEnumerable<string> pmids, HttpClient client, CancellationToken ct)
+    {
+        try
+        {
+            var ids = string.Join(",", pmids);
+            var url = $"efetch.fcgi?db=pubmed&rettype=abstract&retmode=text&id={ids}";
+            var text = await client.GetStringAsync(url, ct);
+            return string.IsNullOrWhiteSpace(text) ? string.Empty : text.Trim();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "PubMed efetch failed; falling back to title-only synthesis");
+            return string.Empty;
         }
     }
 

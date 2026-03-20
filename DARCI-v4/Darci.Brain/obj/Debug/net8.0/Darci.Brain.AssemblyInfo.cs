@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Darci.Brain")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+80ceb706d95f06b2aaa2b27ecec0c345aebf2226")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+82123384825a5777d77f67fc50119e54c626db4f")]
 [assembly: System.Reflection.AssemblyProductAttribute("Darci.Brain")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Darci.Brain")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

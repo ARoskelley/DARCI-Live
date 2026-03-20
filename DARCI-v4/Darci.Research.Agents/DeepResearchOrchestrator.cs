@@ -63,7 +63,12 @@ public sealed class DeepResearchOrchestrator : IDeepResearchOrchestrator
         using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(90));
         using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(ct, timeoutCts.Token);
 
-        var reports = await Task.WhenAll(jobs.Select(job => RunAgentSafeAsync(job, linkedCts.Token)));
+        var firstPassReports = await Task.WhenAll(jobs.Select(job => RunAgentSafeAsync(job, linkedCts.Token)));
+
+        // Change 6: gap-fill pass before quality gate
+        var gapReports = await RunGapFillPassAsync(trimmedQuestion, firstPassReports, session.Id, ct);
+        var reports = firstPassReports.Concat(gapReports).ToArray();
+
         var successfulReports = reports.Where(report => report.IsSuccess).ToList();
         if (successfulReports.Count == 0)
         {
@@ -71,9 +76,29 @@ public sealed class DeepResearchOrchestrator : IDeepResearchOrchestrator
             return ResearchOutcome.Failed(trimmedQuestion);
         }
 
-        var synthesisPrompt = DeepResearchPrompts.BuildSynthesisPrompt(trimmedQuestion, successfulReports);
+        // Change 4: quality gate before synthesis
+        const float QualityThreshold = 0.35f;
+        var qualityReports = successfulReports
+            .Where(r => r.Confidence >= QualityThreshold)
+            .OrderByDescending(r => r.Confidence)
+            .ToList();
+        var reportsForSynthesis = qualityReports.Count > 0 ? qualityReports : successfulReports;
+
+        var synthesisPrompt = DeepResearchPrompts.BuildSynthesisPrompt(trimmedQuestion, reportsForSynthesis);
         var finalAnswer = await _toolbox.GenerateAsync(synthesisPrompt, ct);
-        var aggregateConfidence = successfulReports.Average(report => report.Confidence);
+        var aggregateConfidence = reportsForSynthesis.Average(report => report.Confidence);
+
+        // Change 5: build numbered citations list
+        var citations = reportsForSynthesis
+            .Select((r, i) => new ResearchCitation
+            {
+                Number = i + 1,
+                AgentType = r.AgentType,
+                SubQuestion = r.SubQuestion,
+                SourceRef = r.SourceRef,
+                Confidence = r.Confidence,
+            })
+            .ToList();
 
         await _store.AddResultAsync(
             session.Id,
@@ -108,8 +133,50 @@ public sealed class DeepResearchOrchestrator : IDeepResearchOrchestrator
             FinalAnswer = finalAnswer,
             Confidence = aggregateConfidence,
             AgentReports = reports,
+            Citations = citations,
             IsUncertain = aggregateConfidence < 0.45f
         };
+    }
+
+    private async Task<List<AgentReport>> RunGapFillPassAsync(
+        string originalQuestion,
+        IReadOnlyList<AgentReport> firstPassReports,
+        string sessionId,
+        CancellationToken ct)
+    {
+        var qualityCount = firstPassReports.Count(r => r.IsSuccess && r.Confidence >= 0.35f);
+        if (qualityCount >= firstPassReports.Count / 2) return new List<AgentReport>();
+
+        _logger.LogInformation("Gap fill: {Quality}/{Total} quality results, running follow-up",
+            qualityCount, firstPassReports.Count);
+
+        var coveredTopics = firstPassReports
+            .Where(r => r.IsSuccess && r.Confidence >= 0.35f)
+            .Select(r => r.SubQuestion);
+        var missedTopics = firstPassReports
+            .Where(r => !r.IsSuccess || r.Confidence < 0.35f)
+            .Select(r => r.SubQuestion);
+
+        var gapPrompt = DeepResearchPrompts.BuildGapFillPrompt(originalQuestion, coveredTopics, missedTopics);
+        var gapResponse = await _toolbox.GenerateAsync(gapPrompt, ct);
+        var followUpQuestions = ParseSubQuestions(gapResponse);
+
+        if (followUpQuestions.Length == 0) return new List<AgentReport>();
+
+        using var gapCts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(ct, gapCts.Token);
+
+        var gapJobs = new List<ResearchAgentJob>();
+        foreach (var q in followUpQuestions.Take(3))
+        {
+            var agentType = q.ToLowerInvariant().ContainsAny(
+                "study", "gene", "protein", "clinical") ? "pubmed" : "web";
+            gapJobs.Add(await _store.CreateAgentJobAsync(sessionId, q, agentType));
+        }
+
+        return (await Task.WhenAll(
+            gapJobs.Select(j => RunAgentSafeAsync(j, linkedCts.Token))
+        )).ToList();
     }
 
     private async Task<AgentReport> RunAgentSafeAsync(ResearchAgentJob job, CancellationToken ct)
@@ -144,36 +211,43 @@ public sealed class DeepResearchOrchestrator : IDeepResearchOrchestrator
     private async Task<string> SelectAgentTypeAsync(string subQuestion, CancellationToken ct)
     {
         var normalized = subQuestion.Trim().ToLowerInvariant();
-        if (normalized.Contains("study")
-            || normalized.Contains("trial")
-            || normalized.Contains("pubmed")
-            || normalized.Contains("research")
-            || normalized.Contains("evidence"))
-        {
-            return "pubmed";
-        }
 
+        // Tier 1: PubMed triggers (medical/scientific empirical questions)
+        var pubmedTriggers = new[]
+        {
+            "study", "trial", "clinical", "randomized", "cohort", "meta-analysis",
+            "systematic review", "evidence", "efficacy", "safety", "outcome",
+            "gene", "genetic", "genomic", "snp", "variant", "mutation", "allele",
+            "protein", "enzyme", "receptor", "pathway", "expression", "folding",
+            "dna", "rna", "mrna", "chromosome", "epigenetic",
+            "diabetes", "cancer", "tumor", "insulin", "glucose", "hba1c",
+            "predisposition", "risk factor", "prevalence", "incidence",
+            "diagnosis", "prognosis", "treatment", "therapy", "drug",
+            "biomarker", "assay", "screening",
+            "molecule", "compound", "binding", "inhibitor", "agonist",
+            "pharmacokinetic", "dose", "concentration",
+        };
+        if (pubmedTriggers.Any(t => normalized.Contains(t))) return "pubmed";
+
+        // Tier 2: Graph (semantic match against existing knowledge)
         try
         {
             var embedding = await _toolbox.GetEmbeddingAsync(subQuestion, ct);
             var matches = await _graph.SemanticSearchAsync(embedding.ToArray(), limit: 1, ct);
-            if (matches.Count > 0 && matches[0].Score > 0.7f)
-            {
-                return "graph";
-            }
+            if (matches.Count > 0 && matches[0].Score > 0.7f) return "graph";
         }
         catch (Exception ex)
         {
-            _logger.LogDebug(ex, "Semantic graph routing failed for sub-question: {SubQuestion}", subQuestion);
+            _logger.LogDebug(ex, "Semantic graph routing failed: {Q}", subQuestion);
         }
 
-        if (normalized.StartsWith("what is", StringComparison.Ordinal)
-            || normalized.StartsWith("define", StringComparison.Ordinal)
-            || normalized.StartsWith("explain", StringComparison.Ordinal))
-        {
+        // Tier 3: Reasoning (definitional / explanatory)
+        var reasoningTriggers = new[]
+        { "what is", "define", "explain", "describe", "how does", "what are" };
+        if (reasoningTriggers.Any(t => normalized.StartsWith(t, StringComparison.Ordinal)))
             return "reasoning";
-        }
 
+        // Default: Web
         return "web";
     }
 
@@ -214,26 +288,31 @@ public sealed class DeepResearchOrchestrator : IDeepResearchOrchestrator
     private static string DetectDomain(string question)
     {
         var lower = question.ToLowerInvariant();
-        if (lower.Contains("gene") || lower.Contains("protein") || lower.Contains("disease") || lower.Contains("biology"))
-        {
+
+        if (lower.ContainsAny("gene", "protein", "disease", "biology", "cell",
+            "diabetes", "cancer", "clinical", "genome", "dna", "rna",
+            "enzyme", "receptor", "drug", "treatment", "diagnosis"))
             return "biology";
-        }
 
-        if (lower.Contains("chemical") || lower.Contains("compound") || lower.Contains("chemistry"))
-        {
+        if (lower.ContainsAny("chemical", "compound", "chemistry", "molecule",
+            "reaction", "catalyst", "polymer", "organic", "inorganic"))
             return "chemistry";
-        }
 
-        if (lower.Contains("engineer") || lower.Contains("cad") || lower.Contains("assembly") || lower.Contains("geometry"))
-        {
+        if (lower.ContainsAny("engineer", "cad", "assembly", "geometry",
+            "circuit", "pcb", "mechanical", "structural", "simulation"))
             return "engineering";
-        }
 
-        if (lower.Contains("math") || lower.Contains("proof") || lower.Contains("equation"))
-        {
+        if (lower.ContainsAny("math", "proof", "equation", "theorem",
+            "calculus", "algebra", "statistics", "probability"))
             return "math";
-        }
 
         return "general";
     }
+
+}
+
+internal static class StringExtensions
+{
+    internal static bool ContainsAny(this string source, params string[] values)
+        => values.Any(v => source.Contains(v, StringComparison.OrdinalIgnoreCase));
 }

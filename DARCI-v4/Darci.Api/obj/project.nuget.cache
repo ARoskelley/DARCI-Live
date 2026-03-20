@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "tuFQiU4qVFw=",
+  "dgSpecHash": "1iwFzW+DL+s=",
   "success": true,
-  "projectFilePath": "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\darci-v4\\darci.api\\Darci.Api.csproj",
+  "projectFilePath": "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\DARCI-v4\\Darci.Api\\Darci.Api.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\aiden\\.nuget\\packages\\awssdk.core\\3.7.303.3\\awssdk.core.3.7.303.3.nupkg.sha512",
     "C:\\Users\\aiden\\.nuget\\packages\\awssdk.s3\\3.7.307.4\\awssdk.s3.3.7.307.4.nupkg.sha512",
