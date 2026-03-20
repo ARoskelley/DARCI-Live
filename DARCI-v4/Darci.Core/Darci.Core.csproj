@@ -22,6 +22,7 @@
     <ProjectReference Include="..\Darci.Brain\Darci.Brain.csproj" />
     <ProjectReference Include="..\Darci.Engineering\Darci.Engineering.csproj" />
     <ProjectReference Include="..\Darci.Memory.Confidence\Darci.Memory.Confidence.csproj" />
+    <ProjectReference Include="..\Darci.Research.Agents\Darci.Research.Agents.csproj" />
   </ItemGroup>
 
 </Project>

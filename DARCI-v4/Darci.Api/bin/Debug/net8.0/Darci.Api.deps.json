@@ -511,6 +511,7 @@
           "Darci.Memory": "1.0.0",
           "Darci.Memory.Confidence": "1.0.0",
           "Darci.Personality": "1.0.0",
+          "Darci.Research.Agents": "1.0.0",
           "Darci.Shared": "1.0.0",
           "Darci.Tools": "1.0.0",
           "Microsoft.Extensions.Hosting.Abstractions": "8.0.0",

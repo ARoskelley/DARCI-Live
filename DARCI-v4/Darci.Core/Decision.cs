@@ -29,6 +29,7 @@ public class Decision
     private readonly IDecisionNetwork _network;
     private readonly EngineeringGoalDetector? _engineeringDetector;
     private readonly IConfidenceTracker? _confidence;
+    private readonly GoalDecomposer? _goalDecomposer;
 
     public Decision(
         ILogger<Decision> logger,
@@ -38,7 +39,8 @@ public class Decision
         ExperienceBuffer buffer,
         IDecisionNetwork network,
         EngineeringGoalDetector? engineeringDetector = null,
-        IConfidenceTracker? confidence = null)
+        IConfidenceTracker? confidence = null,
+        GoalDecomposer? goalDecomposer = null)
     {
         _logger               = logger;
         _tools                = tools;
@@ -48,6 +50,7 @@ public class Decision
         _network              = network;
         _engineeringDetector  = engineeringDetector;
         _confidence           = confidence;
+        _goalDecomposer       = goalDecomposer;
     }
 
     /// <summary>
@@ -531,7 +534,7 @@ public class Decision
 
     private async Task<DarciAction> HandleTaskRequest(IncomingMessage message, State state)
     {
-        await _goals.CreateGoal(new GoalCreation
+        var goal = await _goals.CreateGoal(new GoalCreation
         {
             Title       = TruncateForTitle(message.Content),
             Description = message.Content,
@@ -539,6 +542,10 @@ public class Decision
             Source      = GoalSource.UserRequested,
             Priority    = message.Urgency >= Urgency.Now ? GoalPriority.High : GoalPriority.Medium
         });
+
+        // Fire-and-forget LLM decomposition — steps arrive before DARCI picks up the goal
+        if (_goalDecomposer is not null)
+            _ = _goalDecomposer.DecomposeAsync(goal.Id, goal.Title, message.Content, CancellationToken.None);
 
         return DarciAction.Reply(
             "I understand. I'll work on this.",
@@ -581,26 +588,46 @@ public class Decision
             externalNotify: ShouldExternallyNotifyReply(message));
     }
 
-    private Task<DarciAction> HandleEngineeringCollectionRequest(IncomingMessage message, State state)
+    private async Task<DarciAction> HandleEngineeringCollectionRequest(IncomingMessage message, State state)
     {
         var description = message.Intent?.ExtractedTopic ?? message.Content;
+
+        // If the message has no JSON structure, create a Task goal with the raw description.
+        // GoalDecomposer will fire and populate steps from LLM output.
+        bool isStructured = description.TrimStart().StartsWith("{", StringComparison.Ordinal);
+
+        if (!isStructured)
+        {
+            var goal = await _goals.CreateGoal(new GoalCreation
+            {
+                Title       = TruncateForTitle(description),
+                Description = description,
+                UserId      = message.UserId,
+                Source      = GoalSource.UserRequested,
+                Type        = GoalType.Task,
+                Priority    = message.Urgency >= Urgency.Now ? GoalPriority.High : GoalPriority.Medium
+            });
+
+            if (_goalDecomposer is not null)
+                _ = _goalDecomposer.DecomposeAsync(goal.Id, goal.Title, description, CancellationToken.None);
+        }
 
         if (ShouldRunEngineeringCollectionImmediately(message))
         {
             _logger.LogInformation("Immediate engineering collection run for: {Desc}", description);
-            return Task.FromResult(DarciAction.EngineerCollection(
+            return DarciAction.EngineerCollection(
                 description,
                 userId:    message.UserId,
                 messageId: message.Id,
-                reason: "Engineering collection request from user"));
+                reason: "Engineering collection request from user");
         }
 
-        return Task.FromResult(DarciAction.Reply(
+        return DarciAction.Reply(
             "I can run that as an engineering collection. Send it with `#collection` (optionally with JSON), or mark it urgent and I'll start immediately.",
             message.UserId,
             message.Id,
             "Prompting for collection execution mode",
-            externalNotify: ShouldExternallyNotifyReply(message)));
+            externalNotify: ShouldExternallyNotifyReply(message));
     }
 
     private async Task<DarciAction> HandleFeedback(IncomingMessage message, State state)

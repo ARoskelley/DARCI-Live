@@ -22,4 +22,10 @@ public interface IGoalManager
     /// Feeds state vector dimension [13] (goals_with_pending_steps).
     /// </summary>
     Task<int> GetGoalsWithPendingStepsCount();
+
+    /// <summary>
+    /// Appends a new pending step to an existing goal.
+    /// Used by GoalDecomposer to populate steps after LLM decomposition.
+    /// </summary>
+    Task AddStepAsync(int goalId, string description);
 }

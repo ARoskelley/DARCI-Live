@@ -313,6 +313,30 @@ public class GoalManager : IGoalManager
         tx.Commit();
     }
     
+    public async Task AddStepAsync(int goalId, string description)
+    {
+        using var conn = new SqliteConnection(_connectionString);
+
+        // Determine next step order
+        var maxOrder = await conn.ExecuteScalarAsync<int?>(
+            "SELECT MAX(StepOrder) FROM GoalSteps WHERE GoalId = @GoalId",
+            new { GoalId = goalId });
+
+        var nextOrder = (maxOrder ?? -1) + 1;
+
+        await conn.ExecuteAsync(@"
+            INSERT INTO GoalSteps (GoalId, StepOrder, Type, Description, Status, Query, Prompt, Message)
+            VALUES (@GoalId, @Order, @Type, @Description, 'Pending', @Query, null, null)",
+            new
+            {
+                GoalId = goalId,
+                Order = nextOrder,
+                Type = GoalStepType.Generate.ToString(),
+                Description = description,
+                Query = description,
+            });
+    }
+
     private async Task CreateInitialSteps(int goalId, GoalCreation creation)
     {
         using var conn = new SqliteConnection(_connectionString);

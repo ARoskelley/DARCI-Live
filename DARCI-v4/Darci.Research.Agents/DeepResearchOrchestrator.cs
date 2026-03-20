@@ -1,5 +1,6 @@
 #nullable enable
 
+using System.Text;
 using System.Text.Json;
 using Darci.Memory.Confidence;
 using Darci.Memory.Graph;
@@ -16,6 +17,7 @@ public sealed class DeepResearchOrchestrator : IDeepResearchOrchestrator
     private readonly IKnowledgeGraph _graph;
     private readonly IConfidenceTracker _confidence;
     private readonly IResearchToolbox _toolbox;
+    private readonly KnowledgeAssessor _assessor;
     private readonly ILogger<DeepResearchOrchestrator> _logger;
 
     public DeepResearchOrchestrator(
@@ -24,6 +26,7 @@ public sealed class DeepResearchOrchestrator : IDeepResearchOrchestrator
         IKnowledgeGraph graph,
         IConfidenceTracker confidence,
         IResearchToolbox toolbox,
+        KnowledgeAssessor assessor,
         ILogger<DeepResearchOrchestrator> logger)
     {
         _store = store;
@@ -31,26 +34,110 @@ public sealed class DeepResearchOrchestrator : IDeepResearchOrchestrator
         _graph = graph;
         _confidence = confidence;
         _toolbox = toolbox;
+        _assessor = assessor;
         _logger = logger;
     }
 
-    public async Task<ResearchOutcome> RunDeepResearchAsync(string question, string userId, CancellationToken ct = default)
-    {
-        var trimmedQuestion = question.Trim();
-        var domain = DetectDomain(trimmedQuestion);
+    // Legacy entry point — kept for API endpoint compatibility.
+    public Task<ResearchOutcome> RunDeepResearchAsync(
+        string question, string userId, CancellationToken ct = default)
+        => RunResearchAsync(question, userId, ResearchOrchestrationMode.LearnAndSynthesize, ct);
 
-        var decompositionPrompt = DeepResearchPrompts.BuildDecompositionPrompt(trimmedQuestion);
-        var decompositionResponse = await _toolbox.GenerateAsync(decompositionPrompt, ct);
-        var subQuestions = ParseSubQuestions(decompositionResponse);
-        if (subQuestions.Length == 0)
+    public async Task<ResearchOutcome> RunResearchAsync(
+        string question,
+        string userId,
+        ResearchOrchestrationMode mode,
+        CancellationToken ct = default)
+    {
+        var trimmed = question.Trim();
+        var domain = DetectDomain(trimmed);
+
+        // PHASE 1 — Knowledge Assessment
+        var assessment = await _assessor.AssessAsync(trimmed, ct);
+        _logger.LogInformation(
+            "Research assessment: {Decision} ({Reason}) for '{Question}'",
+            assessment.Decision, assessment.DecisionReason, trimmed);
+
+        ResearchOutcome? agentOutcome = null;
+
+        // PHASE 2 — Agent Dispatch (conditional)
+        if (assessment.Decision != DispatchDecision.SkipAgents)
         {
-            subQuestions = new[] { trimmedQuestion };
+            agentOutcome = await RunAgentPassAsync(trimmed, userId, domain, assessment, ct);
+
+            if (agentOutcome.IsSuccess && !string.IsNullOrWhiteSpace(agentOutcome.FinalAnswer))
+            {
+                _ = _graph.IngestMemoryAsync(
+                    agentOutcome.FinalAnswer,
+                    new[] { "deep_research", domain },
+                    getEmbedding: text => _toolbox.GetEmbeddingAsync(text, ct),
+                    llmExtract: prompt => _toolbox.GenerateAsync(prompt, ct),
+                    ct: ct);
+
+                _ = _confidence.AddClaimAsync(
+                    agentOutcome.FinalAnswer, domain, "research",
+                    sourceRef: agentOutcome.SessionId,
+                    sourceQuality: agentOutcome.Confidence,
+                    ct: ct);
+            }
         }
 
+        // PHASE 3 — Language Output (conditional on mode)
+        if (mode == ResearchOrchestrationMode.LearnOnly)
+        {
+            return agentOutcome ?? ResearchOutcome.FromAssessment(assessment, trimmed);
+        }
+
+        // LearnAndSynthesize — build context package and call Ollama
+        var contextPackage = BuildOllamaContextPackage(trimmed, assessment, agentOutcome);
+        var ollamaPrompt = BuildOllamaPrompt(contextPackage);
+        var finalReply = await _toolbox.GenerateAsync(ollamaPrompt, ct);
+
+        var sessionId = agentOutcome?.SessionId ?? "";
+        var confidence = agentOutcome?.Confidence ?? assessment.GraphConfidence;
+        var citations = agentOutcome?.Citations ?? Array.Empty<ResearchCitation>();
+
+        return new ResearchOutcome
+        {
+            IsSuccess = true,
+            SessionId = sessionId,
+            Question = trimmed,
+            FinalAnswer = finalReply,
+            Confidence = confidence,
+            AgentReports = agentOutcome?.AgentReports ?? Array.Empty<AgentReport>(),
+            Citations = citations,
+            IsUncertain = confidence < 0.45f
+        };
+    }
+
+    private async Task<ResearchOutcome> RunAgentPassAsync(
+        string question,
+        string userId,
+        string domain,
+        KnowledgeAssessment assessment,
+        CancellationToken ct)
+    {
+        string decompositionPrompt;
+        if (assessment.Decision == DispatchDecision.RunGapFill
+            && assessment.SupportingClaims.Count > 0)
+        {
+            var known = string.Join("; ",
+                assessment.SupportingClaims.Take(3).Select(c => c.Statement));
+            decompositionPrompt = DeepResearchPrompts.BuildGapFillDecompositionPrompt(question, known);
+        }
+        else
+        {
+            decompositionPrompt = DeepResearchPrompts.BuildDecompositionPrompt(question);
+        }
+
+        var decompositionResponse = await _toolbox.GenerateAsync(decompositionPrompt, ct);
+        var subQuestions = ParseSubQuestions(decompositionResponse);
+        if (subQuestions.Length == 0) subQuestions = new[] { question };
+
         var session = await _store.CreateSessionAsync(
-            title: trimmedQuestion,
-            description: $"Deep research requested by {userId}",
-            createdBy: "DeepResearch",
+            title: question,
+            description: "Research session",
+            createdBy: userId,
             tags: new[] { "deep_research", domain });
 
         var jobs = new List<ResearchAgentJob>(subQuestions.Length);
@@ -65,18 +152,18 @@ public sealed class DeepResearchOrchestrator : IDeepResearchOrchestrator
 
         var firstPassReports = await Task.WhenAll(jobs.Select(job => RunAgentSafeAsync(job, linkedCts.Token)));
 
-        // Change 6: gap-fill pass before quality gate
-        var gapReports = await RunGapFillPassAsync(trimmedQuestion, firstPassReports, session.Id, ct);
+        // Gap-fill pass
+        var gapReports = await RunGapFillPassAsync(question, firstPassReports, session.Id, ct);
         var reports = firstPassReports.Concat(gapReports).ToArray();
 
-        var successfulReports = reports.Where(report => report.IsSuccess).ToList();
+        var successfulReports = reports.Where(r => r.IsSuccess).ToList();
         if (successfulReports.Count == 0)
         {
             await _store.CompleteSessionAsync(session.Id, "failed");
-            return ResearchOutcome.Failed(trimmedQuestion);
+            return ResearchOutcome.Failed(question);
         }
 
-        // Change 4: quality gate before synthesis
+        // Quality gate
         const float QualityThreshold = 0.35f;
         var qualityReports = successfulReports
             .Where(r => r.Confidence >= QualityThreshold)
@@ -84,11 +171,11 @@ public sealed class DeepResearchOrchestrator : IDeepResearchOrchestrator
             .ToList();
         var reportsForSynthesis = qualityReports.Count > 0 ? qualityReports : successfulReports;
 
-        var synthesisPrompt = DeepResearchPrompts.BuildSynthesisPrompt(trimmedQuestion, reportsForSynthesis);
-        var finalAnswer = await _toolbox.GenerateAsync(synthesisPrompt, ct);
-        var aggregateConfidence = reportsForSynthesis.Average(report => report.Confidence);
+        // Intermediate synthesis (for ingestion — not the user-facing Ollama reply)
+        var synthesisPrompt = DeepResearchPrompts.BuildSynthesisPrompt(question, reportsForSynthesis);
+        var intermediateSynthesis = await _toolbox.GenerateAsync(synthesisPrompt, ct);
+        var aggregateConfidence = reportsForSynthesis.Average(r => r.Confidence);
 
-        // Change 5: build numbered citations list
         var citations = reportsForSynthesis
             .Select((r, i) => new ResearchCitation
             {
@@ -100,42 +187,97 @@ public sealed class DeepResearchOrchestrator : IDeepResearchOrchestrator
             })
             .ToList();
 
-        await _store.AddResultAsync(
-            session.Id,
-            source: "synthesis",
-            content: finalAnswer,
-            resultType: "synthesis",
+        await _store.AddResultAsync(session.Id, "synthesis",
+            intermediateSynthesis, "synthesis",
             tags: new[] { "deep_research", domain },
             relevanceScore: aggregateConfidence);
-
         await _store.CompleteSessionAsync(session.Id);
-
-        await _graph.IngestMemoryAsync(
-            finalAnswer,
-            new[] { "deep_research", domain },
-            getEmbedding: text => _toolbox.GetEmbeddingAsync(text, ct),
-            llmExtract: prompt => _toolbox.GenerateAsync(prompt, ct),
-            ct: ct);
-
-        await _confidence.AddClaimAsync(
-            finalAnswer,
-            domain,
-            "reasoning",
-            sourceRef: session.Id,
-            sourceQuality: aggregateConfidence,
-            ct: ct);
 
         return new ResearchOutcome
         {
             IsSuccess = true,
             SessionId = session.Id,
-            Question = trimmedQuestion,
-            FinalAnswer = finalAnswer,
+            Question = question,
+            FinalAnswer = intermediateSynthesis,
             Confidence = aggregateConfidence,
             AgentReports = reports,
             Citations = citations,
             IsUncertain = aggregateConfidence < 0.45f
         };
+    }
+
+    private record OllamaContextPackage(
+        string Question,
+        float Confidence,
+        bool IsUncertain,
+        IReadOnlyList<string> GraphClaims,
+        IReadOnlyList<string> ResearchFindings,
+        IReadOnlyList<string> Contradictions,
+        IReadOnlyList<ResearchCitation> Citations
+    );
+
+    private static OllamaContextPackage BuildOllamaContextPackage(
+        string question,
+        KnowledgeAssessment assessment,
+        ResearchOutcome? agentOutcome)
+    {
+        var graphClaims = assessment.SupportingClaims
+            .Take(6)
+            .Select(c => $"[{c.Confidence:P0}] {c.Statement}")
+            .ToList();
+
+        var researchFindings = agentOutcome is { IsSuccess: true }
+            ? agentOutcome.Citations
+                .Select(c => $"[{c.AgentType}] {c.SubQuestion}")
+                .ToList()
+            : new List<string>();
+
+        var confidence = agentOutcome?.Confidence ?? assessment.GraphConfidence;
+
+        return new OllamaContextPackage(
+            Question: question,
+            Confidence: confidence,
+            IsUncertain: confidence < 0.45f,
+            GraphClaims: graphClaims,
+            ResearchFindings: researchFindings,
+            Contradictions: Array.Empty<string>(),
+            Citations: agentOutcome?.Citations ?? Array.Empty<ResearchCitation>()
+        );
+    }
+
+    private static string BuildOllamaPrompt(OllamaContextPackage pkg)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine("You are DARCI's language layer. Your job is to translate");
+        sb.AppendLine("structured knowledge into a clear, accurate reply.");
+        sb.AppendLine("Use ONLY the knowledge provided below. Do not add facts");
+        sb.AppendLine("from your own training if they are not present here.");
+        if (pkg.IsUncertain)
+            sb.AppendLine($"CONFIDENCE IS LOW ({pkg.Confidence:P0}) — state uncertainty clearly.");
+        sb.AppendLine();
+        sb.AppendLine($"Question: {pkg.Question}");
+        sb.AppendLine();
+        if (pkg.GraphClaims.Count > 0)
+        {
+            sb.AppendLine("Established knowledge (from DARCI's graph):");
+            foreach (var c in pkg.GraphClaims) sb.AppendLine($"  {c}");
+            sb.AppendLine();
+        }
+        if (pkg.ResearchFindings.Count > 0)
+        {
+            sb.AppendLine("New research findings:");
+            foreach (var f in pkg.ResearchFindings) sb.AppendLine($"  {f}");
+            sb.AppendLine();
+        }
+        if (pkg.Citations.Count > 0)
+        {
+            sb.AppendLine("Sources:");
+            foreach (var c in pkg.Citations)
+                sb.AppendLine($"  [{c.Number}] {c.AgentType} — {c.SourceRef ?? "internal"}");
+            sb.AppendLine();
+        }
+        sb.AppendLine("Reply:");
+        return sb.ToString();
     }
 
     private async Task<List<AgentReport>> RunGapFillPassAsync(
@@ -226,6 +368,24 @@ public sealed class DeepResearchOrchestrator : IDeepResearchOrchestrator
             "biomarker", "assay", "screening",
             "molecule", "compound", "binding", "inhibitor", "agonist",
             "pharmacokinetic", "dose", "concentration",
+
+            // Biomechanics / musculoskeletal
+            "biomechanical", "biomechanics", "ergonomic", "ergonomics",
+            "musculoskeletal", "spine", "spinal", "vertebra", "lumbar", "thoracic",
+            "load distribution", "stress distribution", "compressive force", "shear force",
+            "orthopedic", "orthotic", "prosthetic", "exoskeleton", "wearable device",
+            "range of motion", "joint angle", "posture", "gait",
+
+            // Electromyography / neuromuscular
+            "emg", "electromyography", "electromyographic",
+            "muscle activation", "motor unit", "neuromuscular", "myoelectric",
+            "eeg", "electroencephalography", "brain-computer interface", "bci",
+            "neural interface", "neuroprosthetic",
+
+            // Mechanical / materials
+            "tensile strength", "yield strength", "fatigue life", "stress fracture",
+            "biocompatible", "biocompatibility", "implant", "in vivo", "in vitro",
+            "torque", "moment arm", "actuator force", "mechanical advantage",
         };
         if (pubmedTriggers.Any(t => normalized.Contains(t))) return "pubmed";
 
@@ -308,7 +468,6 @@ public sealed class DeepResearchOrchestrator : IDeepResearchOrchestrator
 
         return "general";
     }
-
 }
 
 internal static class StringExtensions

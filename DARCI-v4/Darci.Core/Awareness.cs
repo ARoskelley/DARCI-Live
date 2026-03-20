@@ -220,6 +220,19 @@ public class Awareness
             };
         }
 
+        // Intercept complex multi-domain requests before LLM fallback.
+        // Deterministic pattern match — runs in <1ms.
+        if (ComplexRequestDetector.IsComplex(content))
+        {
+            _logger.LogDebug("ComplexRequestDetector: routing to EngineeringCollection");
+            return new MessageIntent
+            {
+                Type = IntentType.EngineeringCollection,
+                ExtractedTopic = ExtractCollectionTopic(content),
+                Confidence = 0.9f
+            };
+        }
+
         if (MightBeActionable(lower))
         {
             return new MessageIntent

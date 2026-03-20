@@ -22,6 +22,22 @@ public sealed record ResearchOutcome
             Error = error,
             IsUncertain = true
         };
+
+    /// <summary>
+    /// Creates a successful outcome directly from a knowledge assessment
+    /// when agents were skipped (confidence was sufficient).
+    /// </summary>
+    public static ResearchOutcome FromAssessment(
+        KnowledgeAssessment assessment, string question)
+        => new()
+        {
+            IsSuccess = true,
+            Question = question,
+            FinalAnswer = string.Join("\n",
+                assessment.SupportingClaims.Take(5).Select(c => c.Statement)),
+            Confidence = assessment.GraphConfidence,
+            IsUncertain = assessment.GraphConfidence < 0.45f,
+        };
 }
 
 public sealed record ResearchCitation
