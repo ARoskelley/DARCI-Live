@@ -10,6 +10,7 @@ public sealed record ResearchOutcome
     public string FinalAnswer { get; init; } = "";
     public float Confidence { get; init; }
     public IReadOnlyList<AgentReport> AgentReports { get; init; } = Array.Empty<AgentReport>();
+    public IReadOnlyList<ResearchCitation> Citations { get; init; } = Array.Empty<ResearchCitation>();
     public bool IsUncertain { get; init; }
     public string? Error { get; init; }
 
@@ -21,4 +22,13 @@ public sealed record ResearchOutcome
             Error = error,
             IsUncertain = true
         };
+}
+
+public sealed record ResearchCitation
+{
+    public int Number { get; init; }
+    public string AgentType { get; init; } = "";
+    public string SubQuestion { get; init; } = "";
+    public string? SourceRef { get; init; }
+    public float Confidence { get; init; }
 }

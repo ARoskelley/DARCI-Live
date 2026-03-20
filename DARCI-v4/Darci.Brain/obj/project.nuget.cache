@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "LeK6+PmHr2o=",
+  "dgSpecHash": "zRLCHs+WZ9E=",
   "success": true,
-  "projectFilePath": "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\darci-v4\\Darci.Brain\\Darci.Brain.csproj",
+  "projectFilePath": "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\DARCI-v4\\Darci.Brain\\Darci.Brain.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\aiden\\.nuget\\packages\\dapper\\2.1.35\\dapper.2.1.35.nupkg.sha512",
     "C:\\Users\\aiden\\.nuget\\packages\\microsoft.data.sqlite\\8.0.0\\microsoft.data.sqlite.8.0.0.nupkg.sha512",

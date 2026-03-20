@@ -208,3 +208,4 @@ C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\darci-v4\darci.api\ob
 C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\darci-v4\darci.api\obj\Debug\net8.0\Darci.Api.pdb
 C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\darci-v4\darci.api\obj\Debug\net8.0\Darci.Api.genruntimeconfig.cache
 C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\darci-v4\darci.api\obj\Debug\net8.0\ref\Darci.Api.dll
+C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Api\bin\Debug\net8.0\Models\darci_policy.onnx

@@ -2425,11 +2425,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\darci-v4\\darci.api\\Darci.Api.csproj",
+      "projectUniqueName": "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\DARCI-v4\\Darci.Api\\Darci.Api.csproj",
       "projectName": "Darci.Api",
-      "projectPath": "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\darci-v4\\darci.api\\Darci.Api.csproj",
+      "projectPath": "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\DARCI-v4\\Darci.Api\\Darci.Api.csproj",
       "packagesPath": "C:\\Users\\aiden\\.nuget\\packages\\",
-      "outputPath": "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\darci-v4\\darci.api\\obj\\",
+      "outputPath": "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\DARCI-v4\\Darci.Api\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
         "C:\\Users\\aiden\\AppData\\Roaming\\NuGet\\NuGet.Config"
@@ -2444,29 +2444,29 @@
         "net8.0": {
           "targetAlias": "net8.0",
           "projectReferences": {
-            "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\darci-v4\\Darci.Brain\\Darci.Brain.csproj": {
-              "projectPath": "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\darci-v4\\Darci.Brain\\Darci.Brain.csproj"
+            "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\DARCI-v4\\Darci.Brain\\Darci.Brain.csproj": {
+              "projectPath": "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\DARCI-v4\\Darci.Brain\\Darci.Brain.csproj"
             },
-            "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\darci-v4\\Darci.Cloud\\Darci.Cloud.csproj": {
-              "projectPath": "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\darci-v4\\Darci.Cloud\\Darci.Cloud.csproj"
+            "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\DARCI-v4\\Darci.Cloud\\Darci.Cloud.csproj": {
+              "projectPath": "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\DARCI-v4\\Darci.Cloud\\Darci.Cloud.csproj"
             },
-            "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\darci-v4\\Darci.Core\\Darci.Core.csproj": {
-              "projectPath": "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\darci-v4\\Darci.Core\\Darci.Core.csproj"
+            "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\DARCI-v4\\Darci.Core\\Darci.Core.csproj": {
+              "projectPath": "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\DARCI-v4\\Darci.Core\\Darci.Core.csproj"
             },
-            "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\darci-v4\\Darci.Engineering\\Darci.Engineering.csproj": {
-              "projectPath": "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\darci-v4\\Darci.Engineering\\Darci.Engineering.csproj"
+            "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\DARCI-v4\\Darci.Engineering\\Darci.Engineering.csproj": {
+              "projectPath": "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\DARCI-v4\\Darci.Engineering\\Darci.Engineering.csproj"
             },
-            "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\darci-v4\\Darci.Memory.Confidence\\Darci.Memory.Confidence.csproj": {
-              "projectPath": "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\darci-v4\\Darci.Memory.Confidence\\Darci.Memory.Confidence.csproj"
+            "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\DARCI-v4\\Darci.Memory.Confidence\\Darci.Memory.Confidence.csproj": {
+              "projectPath": "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\DARCI-v4\\Darci.Memory.Confidence\\Darci.Memory.Confidence.csproj"
             },
-            "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\darci-v4\\Darci.Memory.Graph\\Darci.Memory.Graph.csproj": {
-              "projectPath": "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\darci-v4\\Darci.Memory.Graph\\Darci.Memory.Graph.csproj"
+            "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\DARCI-v4\\Darci.Memory.Graph\\Darci.Memory.Graph.csproj": {
+              "projectPath": "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\DARCI-v4\\Darci.Memory.Graph\\Darci.Memory.Graph.csproj"
             },
-            "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\darci-v4\\Darci.Research.Agents\\Darci.Research.Agents.csproj": {
-              "projectPath": "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\darci-v4\\Darci.Research.Agents\\Darci.Research.Agents.csproj"
+            "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\DARCI-v4\\Darci.Research.Agents\\Darci.Research.Agents.csproj": {
+              "projectPath": "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\DARCI-v4\\Darci.Research.Agents\\Darci.Research.Agents.csproj"
             },
-            "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\darci-v4\\Darci.Research\\Darci.Research.csproj": {
-              "projectPath": "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\darci-v4\\Darci.Research\\Darci.Research.csproj"
+            "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\DARCI-v4\\Darci.Research\\Darci.Research.csproj": {
+              "projectPath": "C:\\Users\\aiden\\OneDrive\\Documents\\GitHub\\ProgDS\\DARCI-Live\\DARCI-v4\\Darci.Research\\Darci.Research.csproj"
             }
           }
         }
