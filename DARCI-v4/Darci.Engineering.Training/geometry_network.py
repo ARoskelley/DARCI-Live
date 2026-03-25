@@ -328,6 +328,13 @@ class GeometrySACAgent:
         critic1_loss = F.mse_loss(current_q1, target_q)
         critic2_loss = F.mse_loss(current_q2, target_q)
 
+        if (
+            not torch.isfinite(critic1_loss).item()
+            or not torch.isfinite(critic2_loss).item()
+        ):
+            print("  ✗ critic_loss is NaN/Inf — skipping update", flush=True)
+            return {}
+
         self.critic1_optimizer.zero_grad()
         critic1_loss.backward()
         torch.nn.utils.clip_grad_norm_(self.critic1.parameters(), 1.0)
@@ -364,6 +371,10 @@ class GeometrySACAgent:
                 kl = F.kl_div(student_log_probs, teacher_probs, reduction="batchmean")
                 actor_loss = actor_loss + self.teacher_kl_coeff * kl
                 kl_loss_val = kl.item()
+
+            if not torch.isfinite(actor_loss).item():
+                print("  ✗ actor_loss is NaN/Inf — skipping update", flush=True)
+                return {}
 
             self.actor_optimizer.zero_grad()
             actor_loss.backward()

@@ -1,6 +1,7 @@
 """Geometry Engine — manages the live CadQuery workplane and mesh."""
 
 import concurrent
+import threading
 
 import cadquery as cq
 import trimesh
@@ -204,7 +205,7 @@ class GeometryEngine:
     # Private                                                              #
     # ------------------------------------------------------------------ #
 
-    def _update_mesh(self):
+    def _update_mesh_legacy(self):
         """Re-tessellate CadQuery B-rep → trimesh."""
         if self._workplane is None:
             self._mesh = None
@@ -220,6 +221,55 @@ class GeometryEngine:
         except Exception:
             self._mesh = None
             self.mesh_analyzer = None
+
+    def _update_mesh_impl(self):
+        """Re-tessellate CadQuery B-rep â†’ trimesh."""
+        if self._workplane is None:
+            return None, None
+        try:
+            solid = self._workplane.val()
+            vertices, triangles = solid.tessellate(0.1)
+            verts = np.array([(v.x, v.y, v.z) for v in vertices])
+            faces = np.array([(t[0], t[1], t[2]) for t in triangles])
+            mesh = trimesh.Trimesh(vertices=verts, faces=faces, process=False)
+            return mesh, MeshAnalyzer(mesh)
+        except Exception:
+            return None, None
+
+    def _update_mesh(self):
+        """Re-tessellate CadQuery B-rep â†’ trimesh with a timeout fallback."""
+        result = {
+            "done": False,
+            "error": None,
+            "mesh": None,
+            "mesh_analyzer": None,
+        }
+
+        def target():
+            try:
+                mesh, mesh_analyzer = self._update_mesh_impl()
+                result["mesh"] = mesh
+                result["mesh_analyzer"] = mesh_analyzer
+                result["done"] = True
+            except Exception as e:
+                result["error"] = e
+
+        worker = threading.Thread(target=target, daemon=True)
+        worker.start()
+        worker.join(timeout=10)
+
+        if worker.is_alive():
+            self._mesh = trimesh.creation.box(extents=[10, 10, 10])
+            self.mesh_analyzer = MeshAnalyzer(self._mesh)
+            print("  ⚠ _update_mesh timed out — using fallback box mesh", flush=True)
+            return False
+
+        if result["error"]:
+            raise result["error"]
+
+        self._mesh = result["mesh"]
+        self.mesh_analyzer = result["mesh_analyzer"]
+        return True
 
     def _push_history(self):
         # Always push current state (including None) so the first action is undoable

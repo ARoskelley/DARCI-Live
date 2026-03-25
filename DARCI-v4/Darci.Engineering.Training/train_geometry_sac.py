@@ -223,7 +223,7 @@ def run_episode(
         next_mask = engine.get_action_mask()
 
         # Store in buffer
-        if training:
+        if training and buffer is not None:
             buffer.add(
                 state, action_id, params, reward,
                 next_state, terminal, action_mask, next_mask
@@ -339,12 +339,14 @@ def train(
 
         # Train if buffer is large enough
         if buffer.size >= config.min_buffer_size:
-            train_metrics_accum = []
             n_updates = ep_metrics["steps"] * config.updates_per_step
-            for _ in range(max(n_updates, 1)):
+            print(f"  [upd] ep={episode} buf={buffer.size} n_upd={max(n_updates, 1)}", flush=True)
+            train_metrics_accum = []
+            for update_i in range(max(n_updates, 1)):
                 batch = buffer.sample(config.batch_size)
                 metrics = agent.update(batch)
                 train_metrics_accum.append(metrics)
+            print("  [upd] done", flush=True)
 
         # Logging
         if episode % config.log_every == 0:
