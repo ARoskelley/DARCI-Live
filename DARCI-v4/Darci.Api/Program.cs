@@ -13,6 +13,7 @@ using Darci.Memory.Graph;
 using Darci.Memory.Confidence;
 using Darci.Personality;
 using Darci.Tools;
+using Lizzy.Client;
 using Darci.Tools.Cad;
 using Darci.Tools.Engineering;
 using Darci.Tools.Engineering.Providers;
@@ -24,6 +25,9 @@ EnvironmentFileLoader.Load(
     builder.Environment.ContentRootPath,
     ".env.local",
     ".env.engineering.local");
+
+// Load local secrets (gitignored — never committed)
+builder.Configuration.AddJsonFile("appsettings.Secrets.json", optional: true, reloadOnChange: false);
 
 // === Configuration ===
 var dbPath = Path.Combine(AppContext.BaseDirectory, "Data", "darci.db");
@@ -43,6 +47,10 @@ builder.Services.AddSwaggerGen(c =>
 
 // HTTP client for Ollama
 builder.Services.AddHttpClient<IOllamaClient, OllamaClient>();
+
+// HTTP clients for external research APIs
+builder.Services.AddHttpClient("tavily");
+builder.Services.AddHttpClient("firecrawl");
 
 // HTTP client for Python CAD service
 builder.Services.AddHttpClient<ICadBridge, CadBridge>();
@@ -108,6 +116,40 @@ builder.Services.AddSingleton<INotificationService, NotificationService>();
 builder.Services.AddHostedService<ResponseDispatcher>();
 builder.Services.AddHostedService<TelegramInboundService>();
 
+// === Lizzy NLP Service ===
+builder.Services.AddSingleton(sp =>
+{
+    var baseUrl = builder.Configuration["Lizzy:BaseUrl"] ?? "http://localhost:5200";
+    var client  = new LizzyClient(new LizzyClientOptions { BaseUrl = baseUrl });
+    var logger  = sp.GetRequiredService<ILogger<LizzyClient>>();
+
+    // Warm-up ping — log a clear warning if Lizzy is unreachable at startup
+    // so intent classification degradation is immediately visible in logs.
+    Task.Run(async () =>
+    {
+        try
+        {
+            var reachable = await client.PingAsync();
+            if (!reachable)
+                logger.LogWarning(
+                    "Lizzy NLP service is not reachable at {BaseUrl}. " +
+                    "Intent classification will fall back to LLM until Lizzy starts.",
+                    baseUrl);
+            else
+                logger.LogInformation("Lizzy NLP service is up at {BaseUrl}.", baseUrl);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex,
+                "Lizzy ping failed at startup ({BaseUrl}). " +
+                "Intent classification will fall back to LLM.",
+                baseUrl);
+        }
+    });
+
+    return client;
+});
+
 // === v4 Brain Services ===
 
 // State encoder: stateless, safe as singleton
@@ -132,6 +174,8 @@ builder.Services.AddSingleton<IDecisionNetwork>(sp =>
 builder.Services.AddSingleton<Awareness>();
 builder.Services.AddSingleton<State>();
 // Constructor: (ILogger, IToolkit, IGoalManager, IStateEncoder, ExperienceBuffer, IDecisionNetwork, EngineeringGoalDetector?, IConfidenceTracker?, GoalDecomposer?)
+// The last three parameters are nullable — use GetService<> so they resolve to null
+// rather than throwing if a dependency isn't registered.
 builder.Services.AddSingleton<Decision>(sp =>
     new Decision(
         sp.GetRequiredService<ILogger<Decision>>(),
@@ -140,9 +184,9 @@ builder.Services.AddSingleton<Decision>(sp =>
         sp.GetRequiredService<IStateEncoder>(),
         sp.GetRequiredService<ExperienceBuffer>(),
         sp.GetRequiredService<IDecisionNetwork>(),
-        sp.GetRequiredService<EngineeringGoalDetector>(),
-        sp.GetRequiredService<IConfidenceTracker>(),
-        sp.GetRequiredService<GoalDecomposer>()));
+        sp.GetService<EngineeringGoalDetector>(),
+        sp.GetService<IConfidenceTracker>(),
+        sp.GetService<GoalDecomposer>()));
 
 // DARCI herself - the background service
 // BomGenerator + AutonomousBundler (autonomous engineering path)
@@ -218,6 +262,15 @@ builder.Services.AddHttpClient<IEngineeringTool, GeometryWorkbenchClient>();
 
 // Geometry ONNX network (falls back to random exploration if model not present)
 var geometryModelPath = Path.Combine(AppContext.BaseDirectory, "Models", "geometry_policy.onnx");
+if (!File.Exists(geometryModelPath))
+{
+    var startupLogger = LoggerFactory.Create(b => b.AddConsole()).CreateLogger("Startup");
+    startupLogger.LogWarning(
+        "Geometry policy model not found at '{Path}'. " +
+        "Engineering goals will use random exploration until a trained model is placed there. " +
+        "Run Darci.Engineering.Training to produce geometry_policy.onnx, then copy it to Models/.",
+        geometryModelPath);
+}
 builder.Services.AddSingleton<IEngineeringNetwork>(sp =>
     new OnnxGeometryNetwork(
         sp.GetRequiredService<ILogger<OnnxGeometryNetwork>>(),
@@ -502,9 +555,21 @@ app.MapPost("/engineering/collection", async (
         return Results.BadRequest(new { error = "At least one part is required." });
     }
 
-    var repoRoot = EngineeringOutputBundler.ResolveRepoRoot(env.ContentRootPath);
-    var partsRoot = Path.Combine(repoRoot, "tmp", "engineering", "_collections_parts");
-    Directory.CreateDirectory(partsRoot);
+    string partsRoot;
+    try
+    {
+        var repoRoot = EngineeringOutputBundler.ResolveRepoRoot(env.ContentRootPath)
+            ?? throw new InvalidOperationException("Could not resolve repo root from content root path.");
+        partsRoot = Path.Combine(repoRoot, "tmp", "engineering", "_collections_parts");
+        Directory.CreateDirectory(partsRoot);
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(
+            title: "Failed to initialize collection output directory",
+            detail: ex.Message,
+            statusCode: 500);
+    }
 
     var partArtifacts = new List<EngineeringCollectionPartArtifact>();
 

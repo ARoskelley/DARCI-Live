@@ -23,6 +23,7 @@
     <ProjectReference Include="..\Darci.Engineering\Darci.Engineering.csproj" />
     <ProjectReference Include="..\Darci.Memory.Confidence\Darci.Memory.Confidence.csproj" />
     <ProjectReference Include="..\Darci.Research.Agents\Darci.Research.Agents.csproj" />
+    <ProjectReference Include="..\..\..\Lizzy\Lizzy.Client\Lizzy.Client.csproj" />
   </ItemGroup>
 
 </Project>

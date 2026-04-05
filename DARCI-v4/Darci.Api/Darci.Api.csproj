@@ -22,6 +22,10 @@
     <ProjectReference Include="..\Darci.Engineering\Darci.Engineering.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="lizzy-schema.json" CopyToOutputDirectory="Always" />
+  </ItemGroup>
+
   <!-- Copy ONNX model files from training output on build -->
   <ItemGroup>
     <None Include="..\Darci.Brain.Training\models\*.onnx" CopyToOutputDirectory="PreserveNewest" Link="Models\%(Filename)%(Extension)" />

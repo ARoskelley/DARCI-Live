@@ -259,7 +259,7 @@ public static class EngineeringProviderStatusService
                 ["DARCI_CADCODER_API_KEY"] = "",
                 ["CADCODER_PROVIDER"] = "ollama",
                 ["CADCODER_OLLAMA_URL"] = "http://127.0.0.1:11434/api/generate",
-                ["CADCODER_OLLAMA_MODEL"] = "gemma2:9b",
+                ["CADCODER_OLLAMA_MODEL"] = "gemma4:e4b",
                 ["CADCODER_ADAPTER_API_KEY"] = "",
                 ["DARCI_KITTYCAD_BASE_URL"] = "https://api.zoo.dev",
                 ["DARCI_KITTYCAD_API_KEY"] = "",

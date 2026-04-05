@@ -3,7 +3,11 @@ using Darci.Shared;
 using Darci.Memory;
 using Darci.Goals;
 using Darci.Tools;
+using Lizzy.Client;
+using Lizzy.Core.Models;
 using Microsoft.Extensions.Logging;
+using DarciIntentType  = Darci.Shared.IntentType;
+using LizzyIntentType  = Lizzy.Core.Models.IntentType;
 
 namespace Darci.Core;
 
@@ -23,7 +27,10 @@ public class Awareness
     private readonly Channel<IncomingMessage> _messageChannel;
     private readonly Channel<TaskCompletion> _taskCompletionChannel;
     private readonly IToolkit _toolkit;
+    private readonly LizzyClient _lizzy;
+    private readonly ExtractionSchema? _extractionSchema;
     private readonly List<IncomingMessage> _messageBacklog = new();
+    private readonly List<ProcessedMessage> _processedBacklog = new();
     private DateTime _lastUserContact = DateTime.UtcNow;
     private DateTime _lastAction = DateTime.UtcNow;
 
@@ -34,12 +41,15 @@ public class Awareness
         ILogger<Awareness> logger,
         IMemoryStore memory,
         IGoalManager goals,
-        IToolkit toolkit)
+        IToolkit toolkit,
+        LizzyClient lizzy)
     {
         _logger = logger;
         _memory = memory;
         _goals = goals;
         _toolkit = toolkit;
+        _lizzy = lizzy;
+        _extractionSchema = SchemaLoader.TryLoad();
 
         _messageChannel = Channel.CreateUnbounded<IncomingMessage>(new UnboundedChannelOptions
         {
@@ -87,11 +97,27 @@ public class Awareness
             _messageBacklog.RemoveRange(0, _messageBacklog.Count - maxBacklog);
         }
 
-        var activeGoalsCount = await _goals.GetActiveCount();
+        int activeGoalsCount = 0;
+        int goalsWithPending = 0;
+        IReadOnlyList<GoalEvent> goalEvents = Array.Empty<GoalEvent>();
+        int pendingMemories = 0;
 
-        // v4: query how many active goals have at least one pending step so
-        // the state encoder can populate dimension [13].
-        var goalsWithPending = await _goals.GetGoalsWithPendingStepsCount();
+        try
+        {
+            activeGoalsCount = await _goals.GetActiveCount();
+
+            // v4: query how many active goals have at least one pending step so
+            // the state encoder can populate dimension [13].
+            goalsWithPending = await _goals.GetGoalsWithPendingStepsCount();
+            goalEvents       = await _goals.GetRecentEvents();
+            pendingMemories  = await _memory.GetPendingConsolidationCount();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex,
+                "Perception subsystem query failed — using safe defaults. " +
+                "Living loop will continue.");
+        }
 
         var perception = new Perception
         {
@@ -101,8 +127,8 @@ public class Awareness
             IsQuietHours             = IsQuietHours(now),
             NewMessages              = _messageBacklog.Where(m => !m.IsProcessed).ToList(),
             CompletedTasks           = await DrainCompletions(),
-            GoalEvents               = await _goals.GetRecentEvents(),
-            PendingMemoriesToProcess = await _memory.GetPendingConsolidationCount(),
+            GoalEvents               = goalEvents,
+            PendingMemoriesToProcess = pendingMemories,
             ActiveGoalsCount         = activeGoalsCount,
             GoalsWithPendingSteps    = goalsWithPending
         };
@@ -148,6 +174,13 @@ public class Awareness
         }
     }
 
+    public IReadOnlyList<ProcessedMessage> DrainProcessedMessages()
+    {
+        var result = _processedBacklog.ToList();
+        _processedBacklog.Clear();
+        return result;
+    }
+
     private async Task<List<IncomingMessage>> DrainMessages()
     {
         var messages = new List<IncomingMessage>();
@@ -155,16 +188,72 @@ public class Awareness
         {
             msg.Intent = ClassifyIntent(msg.Content);
 
-            if (msg.Intent.Type == IntentType.Unknown)
+            ComprehensionResult? comprehension = null;
+            ExtractionResult? extraction = null;
+
+            if (_lizzy.IsReachable)
             {
-                _logger.LogDebug("Message needs LLM classification: {Preview}...",
+                comprehension = await _lizzy.ComprehendAsync(msg.Content);
+
+                if (_extractionSchema is not null)
+                    extraction = await _lizzy.ExtractAsync(msg.Content, _extractionSchema);
+
+                // Replace LLM fallback with Lizzy for Unknown intent
+                if (msg.Intent.Type == DarciIntentType.Unknown
+                    && comprehension.PrimaryIntent != LizzyIntentType.Unknown)
+                {
+                    msg.Intent = MapLizzyIntent(comprehension);
+                    _logger.LogDebug("Lizzy classified intent: {Intent} ({Conf:P0})",
+                        msg.Intent.Type, msg.Intent.Confidence);
+                }
+            }
+
+            // LLM fallback — only if still Unknown after Lizzy (or Lizzy unreachable)
+            if (msg.Intent.Type == DarciIntentType.Unknown)
+            {
+                _logger.LogDebug("LLM classification fallback: {Preview}...",
                     msg.Content.Length > 30 ? msg.Content[..30] : msg.Content);
                 msg.Intent = await _toolkit.ClassifyIntent(msg.Content);
             }
 
+            _processedBacklog.Add(new ProcessedMessage
+            {
+                Source = msg,
+                Comprehension = comprehension,
+                Extraction = extraction
+            });
+
             messages.Add(msg);
         }
         return messages;
+    }
+
+    private static MessageIntent MapLizzyIntent(ComprehensionResult c)
+    {
+        var darciIntent = c.PrimaryIntent switch
+        {
+            LizzyIntentType.Conversation          => DarciIntentType.Conversation,
+            LizzyIntentType.Question              => DarciIntentType.Question,
+            LizzyIntentType.Task                  => DarciIntentType.Task,
+            LizzyIntentType.GoalUpdate            => DarciIntentType.GoalUpdate,
+            LizzyIntentType.Research              => DarciIntentType.Research,
+            LizzyIntentType.CAD                   => DarciIntentType.CAD,
+            LizzyIntentType.EngineeringCollection => DarciIntentType.EngineeringCollection,
+            LizzyIntentType.StatusCheck           => DarciIntentType.StatusCheck,
+            LizzyIntentType.Feedback              => DarciIntentType.Feedback,
+            LizzyIntentType.DecisionReference     => DarciIntentType.Question,
+            _                                     => DarciIntentType.Unknown,
+        };
+
+        return new MessageIntent
+        {
+            Type           = darciIntent,
+            ExtractedTopic = c.ExtractedTopic,
+            Confidence     = c.IntentDistribution.Length > (int)c.PrimaryIntent
+                                ? c.IntentDistribution[(int)c.PrimaryIntent]
+                                : 0.7f,
+            Parameters     = c.Entities.Count > 0 ? c.Entities : new()
+        };
     }
 
     private Task<List<TaskCompletion>> DrainCompletions()
@@ -185,7 +274,7 @@ public class Awareness
         {
             return new MessageIntent
             {
-                Type = IntentType.CAD,
+                Type = DarciIntentType.CAD,
                 ExtractedTopic = content,
                 Confidence = 0.85f
             };
@@ -195,7 +284,7 @@ public class Awareness
         {
             return new MessageIntent
             {
-                Type = IntentType.EngineeringCollection,
+                Type = DarciIntentType.EngineeringCollection,
                 ExtractedTopic = ExtractCollectionTopic(content),
                 Confidence = HasEngineeringCollectionTag(lower) ? 0.98f : 0.75f
             };
@@ -205,7 +294,7 @@ public class Awareness
         {
             return new MessageIntent
             {
-                Type = IntentType.Conversation,
+                Type = DarciIntentType.Conversation,
                 Confidence = 0.9f
             };
         }
@@ -214,7 +303,7 @@ public class Awareness
         {
             return new MessageIntent
             {
-                Type = IntentType.Reminder,
+                Type = DarciIntentType.Reminder,
                 ExtractedTopic = ExtractTopicAfter(lower, "remind me", "don't let me forget"),
                 Confidence = 0.9f
             };
@@ -227,7 +316,7 @@ public class Awareness
             _logger.LogDebug("ComplexRequestDetector: routing to EngineeringCollection");
             return new MessageIntent
             {
-                Type = IntentType.EngineeringCollection,
+                Type = DarciIntentType.EngineeringCollection,
                 ExtractedTopic = ExtractCollectionTopic(content),
                 Confidence = 0.9f
             };
@@ -237,14 +326,14 @@ public class Awareness
         {
             return new MessageIntent
             {
-                Type = IntentType.Unknown,
+                Type = DarciIntentType.Unknown,
                 Confidence = 0.0f
             };
         }
 
         return new MessageIntent
         {
-            Type = IntentType.Conversation,
+            Type = DarciIntentType.Conversation,
             Confidence = 0.6f
         };
     }

@@ -1,0 +1,29 @@
+# Secrets — never commit these
+appsettings.Secrets.json
+*.Secrets.json
+.env.local
+.env.*.local
+
+# Build output
+bin/
+obj/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# Trained models (large binary files — deploy separately)
+*.onnx
+!Lizzy.Training/onnx_output/.gitkeep
+
+# Data / experience logs
+Data/
+tmp/
+
+# IDE
+.vscode/settings.json
+.idea/
+*.user

@@ -17,6 +17,7 @@
           "Darci.Research.Agents": "1.0.0",
           "Darci.Shared": "1.0.0",
           "Darci.Tools": "1.0.0",
+          "Lizzy.Client": "1.0.0",
           "Microsoft.Extensions.Hosting.Abstractions": "8.0.0",
           "Microsoft.Extensions.Logging.Abstractions": "8.0.0",
           "System.Threading.Channels": "8.0.0"
@@ -30,6 +31,14 @@
           "lib/net8.0/Dapper.dll": {
             "assemblyVersion": "2.0.0.0",
             "fileVersion": "2.1.66.48463"
+          }
+        }
+      },
+      "Google.Protobuf/3.27.1": {
+        "runtime": {
+          "lib/net5.0/Google.Protobuf.dll": {
+            "assemblyVersion": "3.27.1.0",
+            "fileVersion": "3.27.1.0"
           }
         }
       },
@@ -230,9 +239,9 @@
           }
         }
       },
-      "Microsoft.ML.OnnxRuntime/1.19.2": {
+      "Microsoft.ML.OnnxRuntime/1.20.1": {
         "dependencies": {
-          "Microsoft.ML.OnnxRuntime.Managed": "1.19.2"
+          "Microsoft.ML.OnnxRuntime.Managed": "1.20.1"
         },
         "runtimeTargets": {
           "runtimes/android/native/onnxruntime.aar": {
@@ -278,7 +287,7 @@
           "runtimes/win-arm64/native/onnxruntime.dll": {
             "rid": "win-arm64",
             "assetType": "native",
-            "fileVersion": "1.19.24.830"
+            "fileVersion": "1.20.24.1119"
           },
           "runtimes/win-arm64/native/onnxruntime.lib": {
             "rid": "win-arm64",
@@ -288,7 +297,7 @@
           "runtimes/win-arm64/native/onnxruntime_providers_shared.dll": {
             "rid": "win-arm64",
             "assetType": "native",
-            "fileVersion": "1.19.24.830"
+            "fileVersion": "1.20.24.1119"
           },
           "runtimes/win-arm64/native/onnxruntime_providers_shared.lib": {
             "rid": "win-arm64",
@@ -298,7 +307,7 @@
           "runtimes/win-x64/native/onnxruntime.dll": {
             "rid": "win-x64",
             "assetType": "native",
-            "fileVersion": "1.19.24.830"
+            "fileVersion": "1.20.24.1119"
           },
           "runtimes/win-x64/native/onnxruntime.lib": {
             "rid": "win-x64",
@@ -308,7 +317,7 @@
           "runtimes/win-x64/native/onnxruntime_providers_shared.dll": {
             "rid": "win-x64",
             "assetType": "native",
-            "fileVersion": "1.19.24.830"
+            "fileVersion": "1.20.24.1119"
           },
           "runtimes/win-x64/native/onnxruntime_providers_shared.lib": {
             "rid": "win-x64",
@@ -318,7 +327,7 @@
           "runtimes/win-x86/native/onnxruntime.dll": {
             "rid": "win-x86",
             "assetType": "native",
-            "fileVersion": "1.19.24.830"
+            "fileVersion": "1.20.24.1119"
           },
           "runtimes/win-x86/native/onnxruntime.lib": {
             "rid": "win-x86",
@@ -328,7 +337,7 @@
           "runtimes/win-x86/native/onnxruntime_providers_shared.dll": {
             "rid": "win-x86",
             "assetType": "native",
-            "fileVersion": "1.19.24.830"
+            "fileVersion": "1.20.24.1119"
           },
           "runtimes/win-x86/native/onnxruntime_providers_shared.lib": {
             "rid": "win-x86",
@@ -337,14 +346,26 @@
           }
         }
       },
-      "Microsoft.ML.OnnxRuntime.Managed/1.19.2": {
+      "Microsoft.ML.OnnxRuntime.Managed/1.20.1": {
         "dependencies": {
           "System.Memory": "4.5.5"
         },
         "runtime": {
-          "lib/net6.0/Microsoft.ML.OnnxRuntime.dll": {
-            "assemblyVersion": "1.19.2.0",
-            "fileVersion": "1.19.2.0"
+          "lib/net8.0/Microsoft.ML.OnnxRuntime.dll": {
+            "assemblyVersion": "1.20.1.0",
+            "fileVersion": "1.20.1.0"
+          }
+        }
+      },
+      "Microsoft.ML.Tokenizers/0.22.0": {
+        "dependencies": {
+          "Google.Protobuf": "3.27.1",
+          "System.Text.Json": "8.0.5"
+        },
+        "runtime": {
+          "lib/net8.0/Microsoft.ML.Tokenizers.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "0.2200.24.56302"
           }
         }
       },
@@ -496,7 +517,7 @@
           "Darci.Shared": "1.0.0",
           "Microsoft.Data.Sqlite": "8.0.0",
           "Microsoft.Extensions.Logging.Abstractions": "8.0.0",
-          "Microsoft.ML.OnnxRuntime": "1.19.2"
+          "Microsoft.ML.OnnxRuntime": "1.20.1"
         },
         "runtime": {
           "Darci.Brain.dll": {
@@ -510,7 +531,7 @@
           "Darci.Shared": "1.0.0",
           "Microsoft.Extensions.Http": "8.0.0",
           "Microsoft.Extensions.Logging.Abstractions": "8.0.0",
-          "Microsoft.ML.OnnxRuntime": "1.19.2",
+          "Microsoft.ML.OnnxRuntime": "1.20.1",
           "System.Text.Json": "8.0.5"
         },
         "runtime": {
@@ -643,6 +664,32 @@
             "fileVersion": "1.0.0.0"
           }
         }
+      },
+      "Lizzy.Client/1.0.0": {
+        "dependencies": {
+          "Lizzy.Core": "1.0.0",
+          "Microsoft.Extensions.Http": "8.0.0",
+          "System.Text.Json": "8.0.5"
+        },
+        "runtime": {
+          "Lizzy.Client.dll": {
+            "assemblyVersion": "1.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        }
+      },
+      "Lizzy.Core/1.0.0": {
+        "dependencies": {
+          "Microsoft.Extensions.Logging.Abstractions": "8.0.0",
+          "Microsoft.ML.OnnxRuntime": "1.20.1",
+          "Microsoft.ML.Tokenizers": "0.22.0"
+        },
+        "runtime": {
+          "Lizzy.Core.dll": {
+            "assemblyVersion": "1.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        }
       }
     }
   },
@@ -658,6 +705,13 @@
       "sha512": "sha512-/q77jUgDOS+bzkmk3Vy9SiWMaetTw+NOoPAV0xPBsGVAyljd5S6P+4RUW7R3ZUGGr9lDRyPKgAMj2UAOwvqZYw==",
       "path": "dapper/2.1.66",
       "hashPath": "dapper.2.1.66.nupkg.sha512"
+    },
+    "Google.Protobuf/3.27.1": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-7IVz9TzhYCZ8qY0rPhXUnyJSXYdshUqmmxmTI763XmDDSJJFnyfKH43FFcMJu/CZgBcE98xlFztrKwhzcRkiPg==",
+      "path": "google.protobuf/3.27.1",
+      "hashPath": "google.protobuf.3.27.1.nupkg.sha512"
     },
     "Microsoft.Data.Sqlite/8.0.0": {
       "type": "package",
@@ -778,19 +832,26 @@
       "path": "microsoft.extensions.primitives/8.0.0",
       "hashPath": "microsoft.extensions.primitives.8.0.0.nupkg.sha512"
     },
-    "Microsoft.ML.OnnxRuntime/1.19.2": {
+    "Microsoft.ML.OnnxRuntime/1.20.1": {
       "type": "package",
       "serviceable": true,
-      "sha512": "sha512-V1v8BebP1ZEFcZf2hGWuN7S5jAqmE2zBOq9RbGebZi2jd/aTZpg4PiTDtpQoGAIhZg4EPQUsHAyOJxwue44pBA==",
-      "path": "microsoft.ml.onnxruntime/1.19.2",
-      "hashPath": "microsoft.ml.onnxruntime.1.19.2.nupkg.sha512"
+      "sha512": "sha512-NzUD79BC6R7TKROLyB3XCzXTpbNZ1YfOdVbult7hoFvd/xyRecOMiRO5HTzkPXvaFlcvZ91+WNCiroAPzUE7Dw==",
+      "path": "microsoft.ml.onnxruntime/1.20.1",
+      "hashPath": "microsoft.ml.onnxruntime.1.20.1.nupkg.sha512"
     },
-    "Microsoft.ML.OnnxRuntime.Managed/1.19.2": {
+    "Microsoft.ML.OnnxRuntime.Managed/1.20.1": {
       "type": "package",
       "serviceable": true,
-      "sha512": "sha512-4oNu7/L1ar3PmXNvAnary0/MbyqNkKDmisrG54QVbFoSuW1GNw1CcWDBrlYHbafo41p4/cnVQ3lF/IHuSm8quQ==",
-      "path": "microsoft.ml.onnxruntime.managed/1.19.2",
-      "hashPath": "microsoft.ml.onnxruntime.managed.1.19.2.nupkg.sha512"
+      "sha512": "sha512-+EVcEcKdq3gkw6iu8TYl2coJxfPnMi1YQc6eZ80BGNlw6mbBCxNGe6h4udDCwENYWsXFvYjoBc6412t40tl4ew==",
+      "path": "microsoft.ml.onnxruntime.managed/1.20.1",
+      "hashPath": "microsoft.ml.onnxruntime.managed.1.20.1.nupkg.sha512"
+    },
+    "Microsoft.ML.Tokenizers/0.22.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-a7UXmTZwJt9ph2C0SyREWjIwIQ3srJ/uSXVa3pwV7rgO51geQ/ggwTFXML14GWD7ACAKExlA2sQ/Bmxj2a+OoA==",
+      "path": "microsoft.ml.tokenizers/0.22.0",
+      "hashPath": "microsoft.ml.tokenizers.0.22.0.nupkg.sha512"
     },
     "SQLitePCLRaw.bundle_e_sqlite3/2.1.6": {
       "type": "package",
@@ -899,6 +960,16 @@
       "sha512": ""
     },
     "Darci.Tools/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "Lizzy.Client/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "Lizzy.Core/1.0.0": {
       "type": "project",
       "serviceable": false,
       "sha512": ""

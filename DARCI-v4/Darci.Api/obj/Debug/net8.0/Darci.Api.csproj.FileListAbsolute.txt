@@ -209,3 +209,10 @@ C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\darci-v4\darci.api\ob
 C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\darci-v4\darci.api\obj\Debug\net8.0\Darci.Api.genruntimeconfig.cache
 C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\darci-v4\darci.api\obj\Debug\net8.0\ref\Darci.Api.dll
 C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Api\bin\Debug\net8.0\Models\darci_policy.onnx
+C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Api\bin\Debug\net8.0\lizzy-schema.json
+C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Api\bin\Debug\net8.0\Google.Protobuf.dll
+C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Api\bin\Debug\net8.0\Microsoft.ML.Tokenizers.dll
+C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Api\bin\Debug\net8.0\Lizzy.Client.dll
+C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Api\bin\Debug\net8.0\Lizzy.Core.dll
+C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Api\bin\Debug\net8.0\Lizzy.Client.pdb
+C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Api\bin\Debug\net8.0\Lizzy.Core.pdb
