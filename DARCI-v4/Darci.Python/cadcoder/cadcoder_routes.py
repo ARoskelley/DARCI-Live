@@ -174,7 +174,7 @@ def _generate_via_ollama(prompt: str) -> str:
 
 
 def _ollama_model() -> str:
-    return (os.getenv("CADCODER_OLLAMA_MODEL") or "gemma2:9b").strip()
+    return (os.getenv("CADCODER_OLLAMA_MODEL") or "gemma4:e4b").strip()
 
 
 def _extract_script(output: str) -> str:

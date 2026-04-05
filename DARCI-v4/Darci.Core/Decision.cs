@@ -60,8 +60,14 @@ public class Decision
     /// Otherwise the v3 priority ladder is used as fallback.
     /// Every decision is logged for continuous training data collection.
     /// </summary>
-    public async Task<DarciAction> Decide(State state, Perception perception)
+    public async Task<DarciAction> Decide(
+        State state,
+        Perception perception,
+        IReadOnlyList<ProcessedMessage>? enriched = null)
     {
+        _enrichmentById = enriched?.ToDictionary(p => p.Source.Id)
+                          ?? new Dictionary<int, ProcessedMessage>();
+
         await UpdateResearchTopicConfidenceAsync(state, perception);
         var stateVector = _encoder.Encode(state.ToEncoderInput(perception));
 
@@ -96,6 +102,9 @@ public class Decision
 
         return action;
     }
+
+    // Populated at the start of each Decide() call; cleared between cycles
+    private Dictionary<int, ProcessedMessage> _enrichmentById = new();
 
     // =========================================================
     // Neural decision helpers
@@ -424,11 +433,22 @@ public class Decision
     private async Task<DarciAction> DecideResponseTo(IncomingMessage message, State state)
     {
         var intent = message.Intent ?? new MessageIntent { Type = IntentType.Unknown };
+        _enrichmentById.TryGetValue(message.Id, out var enriched);
+
+        // Urgency boost: if Lizzy detected high linguistic urgency, treat as Now even if tagged Soon
+        var effectiveUrgency = message.Urgency;
+        if (enriched?.Comprehension is { LinguisticUrgency: > 0.7f }
+            && message.Urgency == Urgency.Soon)
+        {
+            effectiveUrgency = Urgency.Now;
+            _logger.LogDebug("Lizzy urgency boost for message {Id} ({U:F2}) → Now",
+                message.Id, enriched.Comprehension.LinguisticUrgency);
+        }
 
         return intent.Type switch
         {
             IntentType.Conversation or IntentType.Question or IntentType.StatusCheck =>
-                await GenerateReplyAction(message, state),
+                await GenerateReplyAction(message, state, enriched),
             IntentType.Research  => await HandleResearchRequest(message, state),
             IntentType.Reminder  => await HandleReminderRequest(message, state),
             IntentType.Task      => await HandleTaskRequest(message, state),
@@ -437,7 +457,7 @@ public class Decision
             IntentType.Feedback  => await HandleFeedback(message, state),
             IntentType.GoalUpdate => await HandleGoalUpdate(message, state),
             IntentType.Unknown   => await HandleUnknownIntent(message, state),
-            _ => await GenerateReplyAction(message, state)
+            _ => await GenerateReplyAction(message, state, enriched)
         };
     }
 
@@ -459,14 +479,35 @@ public class Decision
         => message.Urgency >= Urgency.Now
         || string.Equals(message.Source, "telegram", StringComparison.OrdinalIgnoreCase);
 
-    private async Task<DarciAction> GenerateReplyAction(IncomingMessage message, State state)
+    private async Task<DarciAction> GenerateReplyAction(
+        IncomingMessage message,
+        State state,
+        ProcessedMessage? enriched = null)
     {
+        var intent = message.Intent;
+
+        // Merge any NER entities from Lizzy into the intent parameters so the reply
+        // generator gets richer context without touching Darci.Shared types.
+        if (enriched?.Comprehension is { } comp && comp.Entities.Count > 0 && intent is not null)
+        {
+            var mergedParams = new Dictionary<string, string>(intent.Parameters);
+            foreach (var (k, v) in comp.Entities)
+                mergedParams.TryAdd(k, v);
+            intent = new MessageIntent
+            {
+                Type           = intent.Type,
+                ExtractedTopic = intent.ExtractedTopic ?? comp.ExtractedTopic,
+                Confidence     = intent.Confidence,
+                Parameters     = mergedParams
+            };
+        }
+
         var context = new ReplyContext
         {
             UserMessage = message.Content,
             UserId      = message.UserId,
             DarciState  = state.Describe(),
-            Intent      = message.Intent
+            Intent      = intent
         };
 
         var memories = await _tools.RecallMemories(message.Content, limit: 5);

@@ -1,6 +1,7 @@
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
 namespace Darci.Tools.Ollama;
@@ -27,17 +28,34 @@ public class OllamaClient : IOllamaClient
     public OllamaClient(
         HttpClient http,
         ILogger<OllamaClient> logger,
-        string model = "gemma2:9b",
-        string embeddingModel = "nomic-embed-text")
+        IConfiguration configuration)
     {
         _http = http;
         _logger = logger;
-        _model = model;
-        _embeddingModel = embeddingModel;
+        _model = FirstNonEmpty(
+            Environment.GetEnvironmentVariable("DARCI_OLLAMA_MODEL"),
+            configuration["Darci:OllamaModel"],
+            "gemma4:e4b");
+        _embeddingModel = FirstNonEmpty(
+            Environment.GetEnvironmentVariable("DARCI_OLLAMA_EMBEDDING_MODEL"),
+            configuration["Darci:EmbeddingModel"],
+            "nomic-embed-text");
+
+        var baseUrl = NormalizeBaseUrl(
+            Environment.GetEnvironmentVariable("DARCI_OLLAMA_BASE_URL"),
+            Environment.GetEnvironmentVariable("OLLAMA_HOST"),
+            configuration["Darci:OllamaBaseUrl"],
+            "http://localhost:11434");
 
         // Ollama runs locally
-        _http.BaseAddress = new Uri("http://localhost:11434");
+        _http.BaseAddress = new Uri(baseUrl, UriKind.Absolute);
         _http.Timeout = TimeSpan.FromMinutes(5); // LLM can be slow
+
+        _logger.LogInformation(
+            "Using Ollama at {BaseUrl} with model {Model} and embedding model {EmbeddingModel}",
+            _http.BaseAddress,
+            _model,
+            _embeddingModel);
     }
 
     public async Task<string> Generate(string prompt)
@@ -113,5 +131,31 @@ public class OllamaClient : IOllamaClient
     private class OllamaEmbedResponse
     {
         public List<List<float>>? Embeddings { get; set; }
+    }
+
+    private static string FirstNonEmpty(params string?[] values)
+    {
+        foreach (var value in values)
+        {
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                return value.Trim();
+            }
+        }
+
+        return "";
+    }
+
+    private static string NormalizeBaseUrl(params string?[] values)
+    {
+        var baseUrl = FirstNonEmpty(values);
+
+        if (!baseUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
+            !baseUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+        {
+            baseUrl = $"http://{baseUrl}";
+        }
+
+        return baseUrl.TrimEnd('/');
     }
 }

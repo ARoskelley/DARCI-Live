@@ -88,14 +88,33 @@ public sealed class DeepResearchOrchestrator : IDeepResearchOrchestrator
             return agentOutcome ?? ResearchOutcome.FromAssessment(assessment, trimmed);
         }
 
-        // LearnAndSynthesize — build context package and call Ollama
-        var contextPackage = BuildOllamaContextPackage(trimmed, assessment, agentOutcome);
-        var ollamaPrompt = BuildOllamaPrompt(contextPackage);
-        var finalReply = await _toolbox.GenerateAsync(ollamaPrompt, ct);
-
-        var sessionId = agentOutcome?.SessionId ?? "";
+        // LearnAndSynthesize — build context package and call Ollama.
+        // If Ollama is unavailable we still return the agent findings rather than
+        // losing everything. The caller receives IsSuccess=true with a note in FinalAnswer.
+        var sessionId  = agentOutcome?.SessionId ?? "";
         var confidence = agentOutcome?.Confidence ?? assessment.GraphConfidence;
-        var citations = agentOutcome?.Citations ?? Array.Empty<ResearchCitation>();
+        var citations  = agentOutcome?.Citations ?? Array.Empty<ResearchCitation>();
+
+        string finalReply;
+        try
+        {
+            var contextPackage = BuildOllamaContextPackage(trimmed, assessment, agentOutcome);
+            var ollamaPrompt   = BuildOllamaPrompt(contextPackage);
+            finalReply = await _toolbox.GenerateAsync(ollamaPrompt, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex,
+                "Ollama synthesis failed for question '{Question}'. " +
+                "Returning agent findings without final synthesis.",
+                trimmed);
+
+            // Surface the raw agent findings so the work is not lost
+            finalReply = agentOutcome is { IsSuccess: true, FinalAnswer: { Length: > 0 } answer }
+                ? $"[Synthesis unavailable — raw research findings below]\n\n{answer}"
+                : "[Synthesis unavailable and no agent findings to return. " +
+                  "Check Ollama connectivity and retry.]";
+        }
 
         return new ResearchOutcome
         {

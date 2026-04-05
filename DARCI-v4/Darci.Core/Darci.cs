@@ -151,6 +151,7 @@ public class Darci : BackgroundService
         {
             // 1. PERCEIVE
             var perception = await _awareness.Perceive();
+            var processed  = _awareness.DrainProcessedMessages();
 
             // 2. FEEL
             await _state.React(perception);
@@ -168,7 +169,7 @@ public class Darci : BackgroundService
             }
 
             // 4. DECIDE
-            var action = await _decision.Decide(_state, perception);
+            var action = await _decision.Decide(_state, perception, processed);
 
             // 5. ACT
             var outcome = await Act(action, ct);

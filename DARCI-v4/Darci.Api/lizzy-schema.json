@@ -1,0 +1,43 @@
+{
+  "schemaId": "darci-message",
+  "description": "Extracts structured fields from DARCI incoming messages",
+  "fields": [
+    {
+      "name": "intent",
+      "type": "Enum",
+      "description": "The conversational intent of the message",
+      "required": true,
+      "allowedValues": ["Conversation","Question","Task","GoalUpdate","Research","CAD","EngineeringCollection","StatusCheck","Feedback"],
+      "order": 0
+    },
+    {
+      "name": "topic",
+      "type": "String",
+      "description": "Main topic or subject of the message",
+      "required": false,
+      "order": 1
+    },
+    {
+      "name": "entities",
+      "type": "StringList",
+      "description": "Part names, materials, and components mentioned",
+      "required": false,
+      "order": 2
+    },
+    {
+      "name": "constraints",
+      "type": "StringList",
+      "description": "Dimensions, tolerances, loads, and numeric values",
+      "required": false,
+      "order": 3
+    },
+    {
+      "name": "urgency",
+      "type": "Enum",
+      "description": "Urgency level of the request",
+      "required": false,
+      "allowedValues": ["Whenever","Soon","Now","Interrupt"],
+      "order": 4
+    }
+  ]
+}

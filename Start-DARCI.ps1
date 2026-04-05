@@ -1,6 +1,6 @@
 # Start-DARCI.ps1
 # Double-click this (or run in PowerShell) to start DARCI.
-# Prerequisites: .NET 8 SDK, Ollama running with gemma2:9b + nomic-embed-text pulled.
+# Prerequisites: .NET 8 SDK, Ollama running with gemma4:e4b + nomic-embed-text pulled.
 
 param(
     [switch]$NoBrowser  # pass -NoBrowser to suppress auto-opening the web UI
@@ -35,6 +35,59 @@ function Test-UrlReady {
     return $false
 }
 
+function Normalize-BaseUrl {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Url
+    )
+
+    $trimmed = $Url.Trim().TrimEnd('/')
+    if ($trimmed -notmatch '^https?://') {
+        return "http://$trimmed"
+    }
+
+    return $trimmed
+}
+
+function Get-OllamaBaseUrls {
+    $candidates = New-Object System.Collections.Generic.List[string]
+
+    foreach ($candidate in @(
+        $env:DARCI_OLLAMA_BASE_URL,
+        $env:OLLAMA_HOST,
+        "http://localhost:11434",
+        "http://127.0.0.1:11434"
+    )) {
+        if ([string]::IsNullOrWhiteSpace($candidate)) {
+            continue
+        }
+
+        $normalized = Normalize-BaseUrl -Url $candidate
+        if (-not $candidates.Contains($normalized)) {
+            $null = $candidates.Add($normalized)
+        }
+    }
+
+    return $candidates
+}
+
+function Find-ReadyBaseUrl {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string[]]$BaseUrls
+    )
+
+    foreach ($baseUrl in $BaseUrls) {
+        foreach ($probeUrl in @("$baseUrl/api/tags", $baseUrl)) {
+            if (Test-UrlReady -Url $probeUrl -Attempts 2 -DelaySeconds 1) {
+                return $baseUrl
+            }
+        }
+    }
+
+    return $null
+}
+
 # ── Check .NET ────────────────────────────────────────────────────────────────
 if (-not (Get-Command "dotnet" -ErrorAction SilentlyContinue)) {
     Write-Error ".NET SDK not found. Install from https://dotnet.microsoft.com/download"
@@ -55,9 +108,14 @@ if (-not $dotnetVer.StartsWith("8.")) {
 }
 
 # ── Check Ollama ──────────────────────────────────────────────────────────────
-if (-not (Test-UrlReady -Url "http://localhost:11434" -Attempts 3 -DelaySeconds 1)) {
-    Write-Warning "Ollama doesn't appear to be running at http://localhost:11434."
-    Write-Warning "DARCI's language features will be degraded. Start Ollama first if needed."
+$ollamaCandidates = Get-OllamaBaseUrls
+$ollamaReadyUrl = Find-ReadyBaseUrl -BaseUrls $ollamaCandidates
+if ($ollamaReadyUrl) {
+    $env:DARCI_OLLAMA_BASE_URL = $ollamaReadyUrl
+} else {
+    Write-Warning "Ollama doesn't appear to be reachable at any of: $($ollamaCandidates -join ', ')."
+    Write-Warning "If 'ollama serve' says the socket is already in use, Ollama is probably already running but bound to a different host."
+    Write-Warning "DARCI's language features will be degraded until Ollama responds."
 }
 
 # ── Start DARCI ───────────────────────────────────────────────────────────────
@@ -72,6 +130,9 @@ Write-Host ""
 Write-Host "  Starting on $ApiUrl" -ForegroundColor Cyan
 Write-Host "  Web UI:  $AppUrl" -ForegroundColor Cyan
 Write-Host "  Swagger: $ApiUrl/swagger" -ForegroundColor DarkGray
+if ($ollamaReadyUrl) {
+    Write-Host "  Ollama:  $ollamaReadyUrl" -ForegroundColor DarkGray
+}
 Write-Host ""
 
 # Open browser after the server is actually reachable
