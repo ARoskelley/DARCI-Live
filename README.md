@@ -15,6 +15,20 @@ The older `DARCI-v3` folder still has useful historical notes, but its startup i
   - `gemma4:e4b`
   - `nomic-embed-text`
 
+## Environment Preflight
+
+Before a focused coding session, run:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\Test-DARCIEnvironment.ps1
+```
+
+To include a solution build in the same check:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\Test-DARCIEnvironment.ps1 -Build
+```
+
 ## Fastest Startup on Windows
 
 Open PowerShell in the repo root and run:
@@ -40,6 +54,18 @@ Once DARCI is up:
 - Swagger: `http://localhost:5081/swagger`
 - Status: `http://localhost:5081/status`
 
+## Local Configuration
+
+For local secrets and optional integrations, copy `.env.local.example` to `.env.local` and fill in only what you need. DARCI loads `.env.local` automatically when `Darci.Api` starts.
+
+The core app runs without research keys, but live/deep research should use:
+
+- `DARCI_TAVILY_API_KEY`
+- `DARCI_FIRECRAWL_API_KEY`
+- `DARCI_FIRECRAWL_ENABLED=true`
+
+The default database path is `DARCI-v4/Data/darci.db`. Override it with `DARCI_DB_PATH` if you want to move runtime memory elsewhere.
+
 ## Manual Startup Fallback
 
 If the PowerShell launcher is not convenient, you can run the API directly:
@@ -59,7 +85,7 @@ The core local DARCI demo does not require any of the following:
 - Telegram
 - SMTP email
 - Tavily / Firecrawl
-- Lizzy NLP
+- Optional NLP adapter
 - Python CAD or engineering services
 - `.env.local`
 - `.env.engineering.local`
@@ -75,6 +101,31 @@ cd DARCI-v4\Darci.Python
 pip install -r requirements.txt
 uvicorn main:app --host 127.0.0.1 --port 8000
 ```
+
+## Coding Workspace First Pass
+
+DARCI v4 now has a first-pass coding workspace API. It is infrastructure for DARCI v5's programming loop: import a project folder, scan a safe file manifest, build a context package, run allowlisted build/test commands inside the workspace, and track coding task records.
+
+Suggested local project location:
+
+```powershell
+mkdir DARCI-v4\Workspaces
+```
+
+Primary endpoints:
+
+- `POST /coding/workspaces/import`
+- `GET /coding/workspaces`
+- `GET /coding/workspaces/{id}/files`
+- `GET /coding/workspaces/{id}/context?query=...`
+- `POST /coding/workspaces/{id}/commands`
+- `GET /coding/workspaces/{id}/commands`
+- `POST /coding/tasks`
+- `GET /coding/tasks/{id}`
+
+The command runner is intentionally allowlisted in this first pass. It supports common read/build/test commands such as `dotnet build`, `dotnet test`, `npm test`, `npm run build`, `python -m pytest`, `cargo test`, `go test`, and read-only `git status/diff/log`.
+
+Implementation notes and next steps are kept in `DARCI_CODING_ENVIRONMENT_LOG.md`.
 
 ## Troubleshooting
 

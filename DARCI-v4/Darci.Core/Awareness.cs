@@ -3,11 +3,8 @@ using Darci.Shared;
 using Darci.Memory;
 using Darci.Goals;
 using Darci.Tools;
-using Lizzy.Client;
-using Lizzy.Core.Models;
 using Microsoft.Extensions.Logging;
 using DarciIntentType  = Darci.Shared.IntentType;
-using LizzyIntentType  = Lizzy.Core.Models.IntentType;
 
 namespace Darci.Core;
 
@@ -27,8 +24,7 @@ public class Awareness
     private readonly Channel<IncomingMessage> _messageChannel;
     private readonly Channel<TaskCompletion> _taskCompletionChannel;
     private readonly IToolkit _toolkit;
-    private readonly LizzyClient _lizzy;
-    private readonly ExtractionSchema? _extractionSchema;
+    private readonly INlpClient _nlp;
     private readonly List<IncomingMessage> _messageBacklog = new();
     private readonly List<ProcessedMessage> _processedBacklog = new();
     private DateTime _lastUserContact = DateTime.UtcNow;
@@ -42,14 +38,13 @@ public class Awareness
         IMemoryStore memory,
         IGoalManager goals,
         IToolkit toolkit,
-        LizzyClient lizzy)
+        INlpClient nlp)
     {
         _logger = logger;
         _memory = memory;
         _goals = goals;
         _toolkit = toolkit;
-        _lizzy = lizzy;
-        _extractionSchema = SchemaLoader.TryLoad();
+        _nlp = nlp;
 
         _messageChannel = Channel.CreateUnbounded<IncomingMessage>(new UnboundedChannelOptions
         {
@@ -127,7 +122,7 @@ public class Awareness
             IsQuietHours             = IsQuietHours(now),
             NewMessages              = _messageBacklog.Where(m => !m.IsProcessed).ToList(),
             CompletedTasks           = await DrainCompletions(),
-            GoalEvents               = goalEvents,
+            GoalEvents               = goalEvents.ToList(),
             PendingMemoriesToProcess = pendingMemories,
             ActiveGoalsCount         = activeGoalsCount,
             GoalsWithPendingSteps    = goalsWithPending
@@ -188,27 +183,25 @@ public class Awareness
         {
             msg.Intent = ClassifyIntent(msg.Content);
 
-            ComprehensionResult? comprehension = null;
-            ExtractionResult? extraction = null;
+            NlpComprehensionResult? comprehension = null;
+            NlpExtractionResult? extraction = null;
 
-            if (_lizzy.IsReachable)
+            if (_nlp.IsReachable)
             {
-                comprehension = await _lizzy.ComprehendAsync(msg.Content);
+                comprehension = await _nlp.ComprehendAsync(msg.Content);
+                extraction = await _nlp.ExtractAsync(msg.Content);
 
-                if (_extractionSchema is not null)
-                    extraction = await _lizzy.ExtractAsync(msg.Content, _extractionSchema);
-
-                // Replace LLM fallback with Lizzy for Unknown intent
+                // Replace LLM fallback with optional NLP for Unknown intent
                 if (msg.Intent.Type == DarciIntentType.Unknown
-                    && comprehension.PrimaryIntent != LizzyIntentType.Unknown)
+                    && comprehension is { PrimaryIntent: not NlpIntentType.Unknown })
                 {
-                    msg.Intent = MapLizzyIntent(comprehension);
-                    _logger.LogDebug("Lizzy classified intent: {Intent} ({Conf:P0})",
+                    msg.Intent = MapNlpIntent(comprehension);
+                    _logger.LogDebug("NLP classified intent: {Intent} ({Conf:P0})",
                         msg.Intent.Type, msg.Intent.Confidence);
                 }
             }
 
-            // LLM fallback — only if still Unknown after Lizzy (or Lizzy unreachable)
+            // LLM fallback: only if still Unknown after optional NLP.
             if (msg.Intent.Type == DarciIntentType.Unknown)
             {
                 _logger.LogDebug("LLM classification fallback: {Preview}...",
@@ -228,21 +221,21 @@ public class Awareness
         return messages;
     }
 
-    private static MessageIntent MapLizzyIntent(ComprehensionResult c)
+    private static MessageIntent MapNlpIntent(NlpComprehensionResult c)
     {
         var darciIntent = c.PrimaryIntent switch
         {
-            LizzyIntentType.Conversation          => DarciIntentType.Conversation,
-            LizzyIntentType.Question              => DarciIntentType.Question,
-            LizzyIntentType.Task                  => DarciIntentType.Task,
-            LizzyIntentType.GoalUpdate            => DarciIntentType.GoalUpdate,
-            LizzyIntentType.Research              => DarciIntentType.Research,
-            LizzyIntentType.CAD                   => DarciIntentType.CAD,
-            LizzyIntentType.EngineeringCollection => DarciIntentType.EngineeringCollection,
-            LizzyIntentType.StatusCheck           => DarciIntentType.StatusCheck,
-            LizzyIntentType.Feedback              => DarciIntentType.Feedback,
-            LizzyIntentType.DecisionReference     => DarciIntentType.Question,
-            _                                     => DarciIntentType.Unknown,
+            NlpIntentType.Conversation          => DarciIntentType.Conversation,
+            NlpIntentType.Question              => DarciIntentType.Question,
+            NlpIntentType.Task                  => DarciIntentType.Task,
+            NlpIntentType.GoalUpdate            => DarciIntentType.GoalUpdate,
+            NlpIntentType.Research              => DarciIntentType.Research,
+            NlpIntentType.CAD                   => DarciIntentType.CAD,
+            NlpIntentType.EngineeringCollection => DarciIntentType.EngineeringCollection,
+            NlpIntentType.StatusCheck           => DarciIntentType.StatusCheck,
+            NlpIntentType.Feedback              => DarciIntentType.Feedback,
+            NlpIntentType.DecisionReference     => DarciIntentType.Question,
+            _                                   => DarciIntentType.Unknown,
         };
 
         return new MessageIntent

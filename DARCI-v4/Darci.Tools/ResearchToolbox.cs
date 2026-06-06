@@ -49,7 +49,10 @@ public sealed class ResearchToolbox : IResearchToolbox
 
     public async Task<string> SearchWebAsync(string query, CancellationToken ct = default)
     {
-        var tavilyKey = _config["Research:Tavily:ApiKey"];
+        var tavilyKey = FirstNonEmpty(
+            Environment.GetEnvironmentVariable("DARCI_TAVILY_API_KEY"),
+            Environment.GetEnvironmentVariable("TAVILY_API_KEY"),
+            _config["Research:Tavily:ApiKey"]);
 
         if (!string.IsNullOrWhiteSpace(tavilyKey))
         {
@@ -57,7 +60,7 @@ public sealed class ResearchToolbox : IResearchToolbox
         }
 
         _logger.LogWarning(
-            "Tavily API key not configured (Research:Tavily:ApiKey). " +
+            "Tavily API key not configured (DARCI_TAVILY_API_KEY or Research:Tavily:ApiKey). " +
             "Using local model knowledge for: {Query}. " +
             "Results will not reflect live web data.",
             query);
@@ -73,9 +76,18 @@ public sealed class ResearchToolbox : IResearchToolbox
 
     private async Task<string> SearchViaTavilyAsync(string query, string apiKey, CancellationToken ct)
     {
-        var baseUrl    = _config["Research:Tavily:BaseUrl"]    ?? "https://api.tavily.com";
-        var maxResults = int.TryParse(_config["Research:Tavily:MaxResults"], out var n) ? n : 5;
-        var depth      = _config["Research:Tavily:SearchDepth"] ?? "advanced";
+        var baseUrl = FirstNonEmpty(
+            Environment.GetEnvironmentVariable("DARCI_TAVILY_BASE_URL"),
+            _config["Research:Tavily:BaseUrl"],
+            "https://api.tavily.com");
+        var maxResultsRaw = FirstNonEmpty(
+            Environment.GetEnvironmentVariable("DARCI_TAVILY_MAX_RESULTS"),
+            _config["Research:Tavily:MaxResults"]);
+        var maxResults = int.TryParse(maxResultsRaw, out var n) ? n : 5;
+        var depth = FirstNonEmpty(
+            Environment.GetEnvironmentVariable("DARCI_TAVILY_SEARCH_DEPTH"),
+            _config["Research:Tavily:SearchDepth"],
+            "advanced");
 
         try
         {
@@ -107,7 +119,10 @@ public sealed class ResearchToolbox : IResearchToolbox
 
             // Optionally deepen the top result via Firecrawl
             var firecrawlEnabled = string.Equals(
-                _config["Research:Firecrawl:Enabled"], "true",
+                FirstNonEmpty(
+                    Environment.GetEnvironmentVariable("DARCI_FIRECRAWL_ENABLED"),
+                    _config["Research:Firecrawl:Enabled"]),
+                "true",
                 StringComparison.OrdinalIgnoreCase);
 
             if (firecrawlEnabled)
@@ -201,8 +216,14 @@ public sealed class ResearchToolbox : IResearchToolbox
 
     private async Task<string> ScrapeViaFirecrawlAsync(string url, CancellationToken ct)
     {
-        var firecrawlKey = _config["Research:Firecrawl:ApiKey"];
-        var baseUrl      = _config["Research:Firecrawl:BaseUrl"] ?? "https://api.firecrawl.dev";
+        var firecrawlKey = FirstNonEmpty(
+            Environment.GetEnvironmentVariable("DARCI_FIRECRAWL_API_KEY"),
+            Environment.GetEnvironmentVariable("FIRECRAWL_API_KEY"),
+            _config["Research:Firecrawl:ApiKey"]);
+        var baseUrl = FirstNonEmpty(
+            Environment.GetEnvironmentVariable("DARCI_FIRECRAWL_BASE_URL"),
+            _config["Research:Firecrawl:BaseUrl"],
+            "https://api.firecrawl.dev");
 
         if (string.IsNullOrWhiteSpace(firecrawlKey))
         {
@@ -248,6 +269,19 @@ public sealed class ResearchToolbox : IResearchToolbox
         catch (Exception ex)
         {
             _logger.LogDebug(ex, "Firecrawl scrape failed for {Url} — non-critical", url);
+        }
+
+        return string.Empty;
+    }
+
+    private static string FirstNonEmpty(params string?[] values)
+    {
+        foreach (var value in values)
+        {
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                return value.Trim();
+            }
         }
 
         return string.Empty;

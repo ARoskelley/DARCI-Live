@@ -435,13 +435,13 @@ public class Decision
         var intent = message.Intent ?? new MessageIntent { Type = IntentType.Unknown };
         _enrichmentById.TryGetValue(message.Id, out var enriched);
 
-        // Urgency boost: if Lizzy detected high linguistic urgency, treat as Now even if tagged Soon
+        // Urgency boost: if optional NLP detected high linguistic urgency, treat as Now even if tagged Soon.
         var effectiveUrgency = message.Urgency;
         if (enriched?.Comprehension is { LinguisticUrgency: > 0.7f }
             && message.Urgency == Urgency.Soon)
         {
             effectiveUrgency = Urgency.Now;
-            _logger.LogDebug("Lizzy urgency boost for message {Id} ({U:F2}) → Now",
+            _logger.LogDebug("NLP urgency boost for message {Id} ({U:F2}) -> Now",
                 message.Id, enriched.Comprehension.LinguisticUrgency);
         }
 
@@ -486,7 +486,7 @@ public class Decision
     {
         var intent = message.Intent;
 
-        // Merge any NER entities from Lizzy into the intent parameters so the reply
+        // Merge any extracted entities into the intent parameters so the reply
         // generator gets richer context without touching Darci.Shared types.
         if (enriched?.Comprehension is { } comp && comp.Entities.Count > 0 && intent is not null)
         {
