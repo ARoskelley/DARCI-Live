@@ -12,6 +12,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Darci.Coding\Darci.Coding.csproj" />
     <ProjectReference Include="..\Darci.Core\Darci.Core.csproj" />
     <ProjectReference Include="..\Darci.Brain\Darci.Brain.csproj" />
     <ProjectReference Include="..\Darci.Research\Darci.Research.csproj" />

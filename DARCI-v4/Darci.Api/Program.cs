@@ -1,4 +1,5 @@
 using Darci.Brain;
+using Darci.Coding;
 using Darci.Cloud;
 using Darci.Core;
 using Darci.Engineering;
@@ -13,7 +14,6 @@ using Darci.Memory.Graph;
 using Darci.Memory.Confidence;
 using Darci.Personality;
 using Darci.Tools;
-using Lizzy.Client;
 using Darci.Tools.Cad;
 using Darci.Tools.Engineering;
 using Darci.Tools.Engineering.Providers;
@@ -30,11 +30,23 @@ EnvironmentFileLoader.Load(
 builder.Configuration.AddJsonFile("appsettings.Secrets.json", optional: true, reloadOnChange: false);
 
 // === Configuration ===
-var dbPath = Path.Combine(AppContext.BaseDirectory, "Data", "darci.db");
+var configuredDbPath = Environment.GetEnvironmentVariable("DARCI_DB_PATH")
+    ?? builder.Configuration["Darci:DbPath"];
+var dbPath = string.IsNullOrWhiteSpace(configuredDbPath)
+    ? Path.Combine(builder.Environment.ContentRootPath, "..", "Data", "darci.db")
+    : configuredDbPath;
+if (!Path.IsPathRooted(dbPath))
+{
+    dbPath = Path.Combine(builder.Environment.ContentRootPath, dbPath);
+}
+
+dbPath = Path.GetFullPath(dbPath);
 Directory.CreateDirectory(Path.GetDirectoryName(dbPath)!);
 var connectionString = $"Data Source={dbPath}";
 var telegramBotToken = Environment.GetEnvironmentVariable("DARCI_TELEGRAM_BOT_TOKEN") ?? "";
-var telegramChatId = Environment.GetEnvironmentVariable("DARCI_TELEGRAM_CHAT_ID") ?? "8587072376";
+var telegramChatId = Environment.GetEnvironmentVariable("DARCI_TELEGRAM_CHAT_ID")
+    ?? builder.Configuration["Notifications:Telegram:ChatId"]
+    ?? "";
 
 // === Services Registration ===
 
@@ -96,19 +108,52 @@ builder.Services.AddSingleton<IResponseStore, InMemoryResponseStore>();
 builder.Services.AddSingleton<INotificationLogStore, InMemoryNotificationLogStore>();
 builder.Services.AddSingleton(new DarciNotificationPreferences
 {
-    EmailEnabled = true,
-    TelegramEnabled = true,
-    EmailTo = "aroskelley2112@gmail.com",
-    EmailFrom = "aroskelley2112@gmail.com",
-    SmtpHost = "smtp.gmail.com",
-    SmtpPort = 587,
-    SmtpUseSsl = true,
-    SmtpUsername = "aroskelley2112@gmail.com",
-    SmtpPassword = Environment.GetEnvironmentVariable("DARCI_SMTP_PASSWORD") ?? "smtp-password",
+    EmailEnabled = string.Equals(
+        Environment.GetEnvironmentVariable("DARCI_EMAIL_ENABLED")
+            ?? builder.Configuration["Notifications:Email:Enabled"],
+        "true",
+        StringComparison.OrdinalIgnoreCase),
+    TelegramEnabled = string.Equals(
+        Environment.GetEnvironmentVariable("DARCI_TELEGRAM_ENABLED")
+            ?? builder.Configuration["Notifications:Telegram:Enabled"],
+        "true",
+        StringComparison.OrdinalIgnoreCase),
+    EmailTo = Environment.GetEnvironmentVariable("DARCI_EMAIL_TO")
+        ?? builder.Configuration["Notifications:Email:To"]
+        ?? "",
+    EmailFrom = Environment.GetEnvironmentVariable("DARCI_EMAIL_FROM")
+        ?? builder.Configuration["Notifications:Email:From"]
+        ?? "",
+    SmtpHost = Environment.GetEnvironmentVariable("DARCI_SMTP_HOST")
+        ?? builder.Configuration["Notifications:Email:SmtpHost"]
+        ?? "",
+    SmtpPort = int.TryParse(
+        Environment.GetEnvironmentVariable("DARCI_SMTP_PORT")
+            ?? builder.Configuration["Notifications:Email:SmtpPort"],
+        out var smtpPort)
+        ? smtpPort
+        : 587,
+    SmtpUseSsl = !string.Equals(
+        Environment.GetEnvironmentVariable("DARCI_SMTP_USE_SSL")
+            ?? builder.Configuration["Notifications:Email:SmtpUseSsl"],
+        "false",
+        StringComparison.OrdinalIgnoreCase),
+    SmtpUsername = Environment.GetEnvironmentVariable("DARCI_SMTP_USERNAME")
+        ?? builder.Configuration["Notifications:Email:SmtpUsername"]
+        ?? "",
+    SmtpPassword = Environment.GetEnvironmentVariable("DARCI_SMTP_PASSWORD")
+        ?? builder.Configuration["Notifications:Email:SmtpPassword"]
+        ?? "",
     TelegramBotToken = telegramBotToken,
     TelegramChatId = telegramChatId,
-    TelegramInboundEnabled = true,
-    TelegramInboundUserId = "Tinman"
+    TelegramInboundEnabled = string.Equals(
+        Environment.GetEnvironmentVariable("DARCI_TELEGRAM_INBOUND_ENABLED")
+            ?? builder.Configuration["Notifications:Telegram:InboundEnabled"],
+        "true",
+        StringComparison.OrdinalIgnoreCase),
+    TelegramInboundUserId = Environment.GetEnvironmentVariable("DARCI_TELEGRAM_INBOUND_USER_ID")
+        ?? builder.Configuration["Notifications:Telegram:InboundUserId"]
+        ?? "Tinman"
 });
 builder.Services.AddSingleton<INotificationProvider, EmailNotificationProvider>();
 builder.Services.AddSingleton<INotificationProvider, TelegramNotificationProvider>();
@@ -116,34 +161,40 @@ builder.Services.AddSingleton<INotificationService, NotificationService>();
 builder.Services.AddHostedService<ResponseDispatcher>();
 builder.Services.AddHostedService<TelegramInboundService>();
 
-// === Lizzy NLP Service ===
-builder.Services.AddSingleton(sp =>
+// === Optional NLP Service ===
+builder.Services.AddHttpClient("nlp");
+builder.Services.AddSingleton<INlpClient>(sp =>
 {
-    var baseUrl = builder.Configuration["Lizzy:BaseUrl"] ?? "http://localhost:5200";
-    var client  = new LizzyClient(new LizzyClientOptions { BaseUrl = baseUrl });
-    var logger  = sp.GetRequiredService<ILogger<LizzyClient>>();
+    var enabled = string.Equals(
+        Environment.GetEnvironmentVariable("DARCI_NLP_ENABLED")
+            ?? builder.Configuration["Nlp:Enabled"]
+            ?? builder.Configuration["Lizzy:Enabled"],
+        "true",
+        StringComparison.OrdinalIgnoreCase);
 
-    // Warm-up ping — log a clear warning if Lizzy is unreachable at startup
-    // so intent classification degradation is immediately visible in logs.
-    Task.Run(async () =>
+    if (!enabled)
     {
-        try
+        return NoopNlpClient.Instance;
+    }
+
+    var baseUrl = Environment.GetEnvironmentVariable("DARCI_NLP_BASE_URL")
+        ?? builder.Configuration["Nlp:BaseUrl"]
+        ?? builder.Configuration["Lizzy:BaseUrl"]
+        ?? "http://localhost:5200";
+
+    var client = new OptionalHttpNlpClient(
+        sp.GetRequiredService<IHttpClientFactory>().CreateClient("nlp"),
+        sp.GetRequiredService<ILogger<OptionalHttpNlpClient>>(),
+        baseUrl,
+        enabled);
+
+    _ = Task.Run(async () =>
+    {
+        var reachable = await client.PingAsync();
+        var logger = sp.GetRequiredService<ILogger<OptionalHttpNlpClient>>();
+        if (reachable)
         {
-            var reachable = await client.PingAsync();
-            if (!reachable)
-                logger.LogWarning(
-                    "Lizzy NLP service is not reachable at {BaseUrl}. " +
-                    "Intent classification will fall back to LLM until Lizzy starts.",
-                    baseUrl);
-            else
-                logger.LogInformation("Lizzy NLP service is up at {BaseUrl}.", baseUrl);
-        }
-        catch (Exception ex)
-        {
-            logger.LogWarning(ex,
-                "Lizzy ping failed at startup ({BaseUrl}). " +
-                "Intent classification will fall back to LLM.",
-                baseUrl);
+            logger.LogInformation("Optional NLP service is up at {BaseUrl}.", baseUrl);
         }
     });
 
@@ -255,6 +306,46 @@ builder.Services.AddSingleton<DeepResearchOrchestrator>(sp => new DeepResearchOr
 builder.Services.AddSingleton<IDeepResearchOrchestrator>(sp =>
     sp.GetRequiredService<DeepResearchOrchestrator>());
 
+// === Coding Workspace Services ===
+builder.Services.AddSingleton<ICodingWorkspaceStore>(sp =>
+    new CodingWorkspaceStore(
+        connectionString,
+        sp.GetRequiredService<ILogger<CodingWorkspaceStore>>()));
+
+// Model router — typed HttpClient, reads Ollama model names from env vars.
+builder.Services.AddHttpClient<ModelRouter>();
+builder.Services.AddSingleton<IModelRouter>(sp => sp.GetRequiredService<ModelRouter>());
+
+builder.Services.AddSingleton<ICodingContextBuilder>(sp =>
+    new CodingContextBuilder(
+        sp.GetRequiredService<ICodingWorkspaceStore>(),
+        sp.GetRequiredService<IModelRouter>(),
+        sp.GetRequiredService<IKnowledgeGraph>(),
+        sp.GetRequiredService<ILogger<CodingContextBuilder>>()));
+
+builder.Services.AddSingleton<IWorkspaceEmbeddingService, WorkspaceEmbeddingService>();
+builder.Services.AddSingleton<IKgEnrichmentService, KgEnrichmentService>();
+
+builder.Services.AddSingleton<IWorkspaceScanner>(sp =>
+    new WorkspaceScanner(
+        sp.GetRequiredService<ICodingWorkspaceStore>(),
+        sp.GetRequiredService<IWorkspaceEmbeddingService>(),
+        sp.GetRequiredService<IKgEnrichmentService>(),
+        sp.GetRequiredService<ILogger<WorkspaceScanner>>()));
+
+builder.Services.AddSingleton<ISafeCommandRunner, SafeCommandRunner>();
+builder.Services.AddSingleton<IGitCheckpointService, GitCheckpointService>();
+
+builder.Services.AddSingleton<ICodingTaskService>(sp =>
+    new CodingTaskService(
+        sp.GetRequiredService<ICodingWorkspaceStore>(),
+        sp.GetRequiredService<ICodingContextBuilder>(),
+        sp.GetRequiredService<IModelRouter>()));
+
+builder.Services.AddSingleton<IRoadblockDetector, RoadblockDetector>();
+builder.Services.AddSingleton<PatchApplier>();
+builder.Services.AddSingleton<ICodingAgentLoop, CodingAgentLoop>();
+
 // === Engineering Services ===
 
 // HTTP client for the Python geometry workbench on port 8001
@@ -328,6 +419,9 @@ await knowledgeGraph.InitializeAsync();
 
 var confidenceTracker = app.Services.GetRequiredService<IConfidenceTracker>();
 await confidenceTracker.InitializeAsync();
+
+var codingStore = app.Services.GetRequiredService<ICodingWorkspaceStore>();
+await codingStore.InitializeAsync();
 
 // === Middleware ===
 app.UseCors("DarciApp");
@@ -958,8 +1052,214 @@ app.MapPost("/research/deep", async (
         return Results.BadRequest(new { error = "question is required" });
     }
 
-    var outcome = await orchestrator.RunDeepResearchAsync(request.Question, request.UserId ?? "Tinman", ct);
+var outcome = await orchestrator.RunDeepResearchAsync(request.Question, request.UserId ?? "Tinman", ct);
     return outcome.IsSuccess ? Results.Ok(outcome) : Results.UnprocessableEntity(outcome);
+});
+
+// === Coding Workspace Endpoints ===
+
+app.MapPost("/coding/workspaces/import", async Task<IResult> (
+    CodingWorkspaceImportRequest request,
+    IWorkspaceScanner scanner,
+    CancellationToken ct) =>
+{
+    if (string.IsNullOrWhiteSpace(request.RootPath))
+    {
+        return Results.BadRequest(new { error = "rootPath is required" });
+    }
+
+    try
+    {
+        var result = await scanner.ImportAsync(request, ct);
+        return Results.Created($"/coding/workspaces/{result.Workspace.Id}", result);
+    }
+    catch (Exception ex) when (ex is ArgumentException or DirectoryNotFoundException or InvalidOperationException)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+});
+
+app.MapGet("/coding/workspaces", async Task<IResult> (
+    ICodingWorkspaceStore store,
+    int? limit,
+    CancellationToken ct) =>
+{
+    var workspaces = await store.GetWorkspacesAsync(limit ?? 50, ct);
+    return Results.Ok(workspaces);
+});
+
+app.MapGet("/coding/workspaces/{id}", async Task<IResult> (
+    ICodingWorkspaceStore store,
+    string id,
+    CancellationToken ct) =>
+{
+    var workspace = await store.GetWorkspaceAsync(id, ct);
+    return workspace is null ? Results.NotFound() : Results.Ok(workspace);
+});
+
+app.MapGet("/coding/workspaces/{id}/files", async Task<IResult> (
+    ICodingWorkspaceStore store,
+    string id,
+    int? limit,
+    CancellationToken ct) =>
+{
+    var workspace = await store.GetWorkspaceAsync(id, ct);
+    if (workspace is null)
+    {
+        return Results.NotFound(new { error = "Workspace not found" });
+    }
+
+    var files = await store.GetFilesAsync(id, limit ?? 500, ct);
+    return Results.Ok(files);
+});
+
+app.MapGet("/coding/workspaces/{id}/context", async Task<IResult> (
+    ICodingContextBuilder contextBuilder,
+    string id,
+    string? query,
+    int? limit,
+    CancellationToken ct) =>
+{
+    try
+    {
+        var package = await contextBuilder.BuildAsync(id, query, limit ?? 8, ct);
+        return Results.Ok(package);
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.NotFound(new { error = ex.Message });
+    }
+});
+
+app.MapPost("/coding/workspaces/{id}/commands", async Task<IResult> (
+    ISafeCommandRunner runner,
+    string id,
+    CodingCommandRequest request,
+    CancellationToken ct) =>
+{
+    try
+    {
+        var result = await runner.RunAsync(id, request, ct);
+        return result.WasAllowed ? Results.Ok(result) : Results.BadRequest(result);
+    }
+    catch (Exception ex) when (ex is ArgumentException or DirectoryNotFoundException or InvalidOperationException)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+});
+
+app.MapGet("/coding/workspaces/{id}/commands", async Task<IResult> (
+    ICodingWorkspaceStore store,
+    string id,
+    int? limit,
+    CancellationToken ct) =>
+{
+    var workspace = await store.GetWorkspaceAsync(id, ct);
+    if (workspace is null)
+    {
+        return Results.NotFound(new { error = "Workspace not found" });
+    }
+
+    var runs = await store.GetCommandRunsAsync(id, limit ?? 50, ct);
+    return Results.Ok(runs);
+});
+
+app.MapPost("/coding/tasks", async Task<IResult> (
+    ICodingTaskService taskService,
+    CreateCodingTaskRequest request,
+    CancellationToken ct) =>
+{
+    try
+    {
+        var task = await taskService.CreateTaskAsync(request, ct);
+        return Results.Created($"/coding/tasks/{task.Id}", task);
+    }
+    catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+});
+
+app.MapGet("/coding/tasks", async Task<IResult> (
+    ICodingWorkspaceStore store,
+    string? workspaceId,
+    int? limit,
+    CancellationToken ct) =>
+{
+    var tasks = await store.GetTasksAsync(workspaceId, limit ?? 50, ct);
+    return Results.Ok(tasks);
+});
+
+app.MapGet("/coding/tasks/{id}", async Task<IResult> (
+    ICodingWorkspaceStore store,
+    string id,
+    CancellationToken ct) =>
+{
+    var task = await store.GetTaskAsync(id, ct);
+    return task is null ? Results.NotFound() : Results.Ok(task);
+});
+
+// Run the coding agent loop for a task (async — returns 202 immediately).
+app.MapPost("/coding/tasks/{id}/run", async Task<IResult> (
+    ICodingAgentLoop loop,
+    ICodingWorkspaceStore store,
+    string id,
+    RunCodingTaskRequest? request,
+    CancellationToken ct) =>
+{
+    var task = await store.GetTaskAsync(id, ct);
+    if (task is null) return Results.NotFound(new { error = "Task not found." });
+    if (loop.IsRunning(id)) return Results.Conflict(new { error = "Loop is already running for this task." });
+
+    var started = loop.StartLoop(id, request);
+    return started
+        ? Results.Accepted(null, new { taskId = id, message = "Coding agent loop started." })
+        : Results.Conflict(new { error = "Failed to start loop (possible race condition)." });
+});
+
+// Get current run status for a task.
+app.MapGet("/coding/tasks/{id}/status", async Task<IResult> (
+    ICodingAgentLoop loop,
+    string id,
+    CancellationToken ct) =>
+{
+    var status = await loop.GetStatusAsync(id, ct);
+    return status is null ? Results.NotFound() : Results.Ok(status);
+});
+
+// Create a git checkpoint for a workspace.
+app.MapPost("/coding/workspaces/{id}/checkpoint", async Task<IResult> (
+    IGitCheckpointService checkpoints,
+    string id,
+    CheckpointRequest request,
+    CancellationToken ct) =>
+{
+    try
+    {
+        var checkpoint = await checkpoints.CreateCheckpointAsync(
+            id, request.TaskId ?? "", request.Message ?? "Manual checkpoint", ct);
+        return checkpoint is null
+            ? Results.UnprocessableEntity(new { error = "Could not create checkpoint (git may not be initialised)." })
+            : Results.Created($"/coding/workspaces/{id}/checkpoints/{checkpoint.Id}", checkpoint);
+    }
+    catch (Exception ex) when (ex is InvalidOperationException)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+});
+
+// Rollback a workspace to its latest checkpoint.
+app.MapPost("/coding/workspaces/{id}/rollback", async Task<IResult> (
+    IGitCheckpointService checkpoints,
+    string id,
+    RollbackRequest request,
+    CancellationToken ct) =>
+{
+    var ok = await checkpoints.RollbackToCheckpointAsync(
+        id, request.TaskId ?? "", request.CheckpointId ?? "", ct);
+    return ok
+        ? Results.Ok(new { workspaceId = id, rolledBack = true })
+        : Results.UnprocessableEntity(new { error = "Rollback failed. No checkpoint found or git reset failed." });
 });
 
 // Knowledge graph search
@@ -1195,3 +1495,6 @@ public record EngineeringConnectionMotionRequest(
     int? Steps = null,
     List<double>? PivotMm = null,
     string? MovingPart = null);
+
+public record CheckpointRequest(string? TaskId = null, string? Message = null);
+public record RollbackRequest(string? TaskId = null, string? CheckpointId = null);
