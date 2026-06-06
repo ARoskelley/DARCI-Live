@@ -31,6 +31,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Darci.Memory.Confidence", "
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Darci.Research.Agents", "Darci.Research.Agents\Darci.Research.Agents.csproj", "{5DABE53C-17B7-42DA-9E79-39E7661CDC92}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Darci.Coding", "Darci.Coding\Darci.Coding.csproj", "{853DAF53-41E6-4667-A5BC-CEC103E5957A}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -209,6 +211,18 @@ Global
 		{5DABE53C-17B7-42DA-9E79-39E7661CDC92}.Release|x64.Build.0 = Release|Any CPU
 		{5DABE53C-17B7-42DA-9E79-39E7661CDC92}.Release|x86.ActiveCfg = Release|Any CPU
 		{5DABE53C-17B7-42DA-9E79-39E7661CDC92}.Release|x86.Build.0 = Release|Any CPU
+		{853DAF53-41E6-4667-A5BC-CEC103E5957A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{853DAF53-41E6-4667-A5BC-CEC103E5957A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{853DAF53-41E6-4667-A5BC-CEC103E5957A}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{853DAF53-41E6-4667-A5BC-CEC103E5957A}.Debug|x64.Build.0 = Debug|Any CPU
+		{853DAF53-41E6-4667-A5BC-CEC103E5957A}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{853DAF53-41E6-4667-A5BC-CEC103E5957A}.Debug|x86.Build.0 = Debug|Any CPU
+		{853DAF53-41E6-4667-A5BC-CEC103E5957A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{853DAF53-41E6-4667-A5BC-CEC103E5957A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{853DAF53-41E6-4667-A5BC-CEC103E5957A}.Release|x64.ActiveCfg = Release|Any CPU
+		{853DAF53-41E6-4667-A5BC-CEC103E5957A}.Release|x64.Build.0 = Release|Any CPU
+		{853DAF53-41E6-4667-A5BC-CEC103E5957A}.Release|x86.ActiveCfg = Release|Any CPU
+		{853DAF53-41E6-4667-A5BC-CEC103E5957A}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
