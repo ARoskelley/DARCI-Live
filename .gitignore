@@ -1,0 +1,23 @@
+# Local secrets
+.env.local
+.env.engineering.local
+**/appsettings.Secrets.json
+**/*.Secrets.json
+
+# Build output
+**/bin/
+**/obj/
+.vs/
+
+# Local imported project sandboxes
+DARCI-v4/Workspaces/
+
+# Python
+**/__pycache__/
+**/*.pyc
+**/.venv/
+**/venv/
+
+# IDE/user files
+.idea/
+*.user

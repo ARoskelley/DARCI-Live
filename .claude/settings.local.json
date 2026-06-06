@@ -1,7 +1,12 @@
 {
   "permissions": {
     "allow": [
-      "Bash(dotnet build DARCI.sln)"
+      "Bash(dotnet build DARCI.sln)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(gh pr create --title 'Darci.Coding second-pass: autonomous coding agent loop' --body ' *)",
+      "PowerShell(Get-Command gh -ErrorAction SilentlyContinue; \\(Get-Command git -ErrorAction SilentlyContinue\\).Source)"
     ]
   }
 }

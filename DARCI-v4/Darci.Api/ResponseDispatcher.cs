@@ -9,17 +9,20 @@ public class ResponseDispatcher : BackgroundService
 {
     private readonly Toolkit _toolkit;
     private readonly IResponseStore _responseStore;
+    private readonly DarciHubNotifier _hubNotifier;
     private readonly INotificationService _notifications;
     private readonly ILogger<ResponseDispatcher> _logger;
 
     public ResponseDispatcher(
         Toolkit toolkit,
         IResponseStore responseStore,
+        DarciHubNotifier hubNotifier,
         INotificationService notifications,
         ILogger<ResponseDispatcher> logger)
     {
         _toolkit = toolkit;
         _responseStore = responseStore;
+        _hubNotifier = hubNotifier;
         _notifications = notifications;
         _logger = logger;
     }
@@ -31,6 +34,7 @@ public class ResponseDispatcher : BackgroundService
             try
             {
                 await _responseStore.AddAsync(message, stoppingToken);
+                await _hubNotifier.BroadcastResponse(message);
                 await _notifications.NotifyAsync(message, stoppingToken);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
@@ -40,4 +44,3 @@ public class ResponseDispatcher : BackgroundService
         }
     }
 }
-
