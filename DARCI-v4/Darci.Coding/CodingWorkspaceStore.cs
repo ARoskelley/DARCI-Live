@@ -84,9 +84,6 @@ public sealed class CodingWorkspaceStore : ICodingWorkspaceStore
             CREATE INDEX IF NOT EXISTS ix_coding_command_runs_workspace_started
                 ON coding_command_runs(workspace_id, started_at);
 
-            CREATE INDEX IF NOT EXISTS ix_coding_command_runs_task
-                ON coding_command_runs(task_id, started_at);
-
             CREATE TABLE IF NOT EXISTS coding_tasks (
                 id TEXT PRIMARY KEY,
                 workspace_id TEXT NOT NULL,
@@ -130,6 +127,7 @@ public sealed class CodingWorkspaceStore : ICodingWorkspaceStore
         await TryMigrateAsync(conn, "ALTER TABLE coding_tasks ADD COLUMN last_step_result TEXT NOT NULL DEFAULT ''", ct);
         await TryMigrateAsync(conn, "ALTER TABLE coding_tasks ADD COLUMN roadblock_research TEXT NOT NULL DEFAULT ''", ct);
         await TryMigrateAsync(conn, "ALTER TABLE coding_command_runs ADD COLUMN task_id TEXT NOT NULL DEFAULT ''", ct);
+        await TryMigrateAsync(conn, "CREATE INDEX IF NOT EXISTS ix_coding_command_runs_task ON coding_command_runs(task_id, started_at)", ct);
 
         _logger.LogInformation("Coding workspace store initialized.");
     }
