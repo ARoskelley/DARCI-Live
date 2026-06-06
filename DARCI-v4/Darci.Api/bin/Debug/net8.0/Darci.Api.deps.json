@@ -506,6 +506,8 @@
       },
       "Darci.Coding/1.0.0": {
         "dependencies": {
+          "Darci.Memory.Graph": "1.0.0",
+          "Darci.Research.Agents": "1.0.0",
           "Microsoft.Data.Sqlite": "8.0.0",
           "Microsoft.Extensions.Logging.Abstractions": "8.0.0"
         },

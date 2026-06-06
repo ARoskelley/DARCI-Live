@@ -6,7 +6,9 @@
       "Bash(git commit -m ' *)",
       "Bash(git push *)",
       "Bash(gh pr create --title 'Darci.Coding second-pass: autonomous coding agent loop' --body ' *)",
-      "PowerShell(Get-Command gh -ErrorAction SilentlyContinue; \\(Get-Command git -ErrorAction SilentlyContinue\\).Source)"
+      "PowerShell(Get-Command gh -ErrorAction SilentlyContinue; \\(Get-Command git -ErrorAction SilentlyContinue\\).Source)",
+      "Bash(curl -s http://localhost:11434/api/tags)",
+      "Bash(python -c \"import sys,json; data=json.load\\(sys.stdin\\); [print\\(m['name']\\) for m in data.get\\('models',[]\\)]\")"
     ]
   }
 }
