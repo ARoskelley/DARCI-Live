@@ -86,5 +86,16 @@ public interface ICodingAgentLoop
 /// <summary>Detects roadblocks from repeated command failures and triggers deep research.</summary>
 public interface IRoadblockDetector
 {
+    /// <summary>
+    /// Checks whether a roadblock condition has been reached (repeated failures) and, if so,
+    /// runs deep research. Returns the research summary, or null if no research was triggered.
+    /// </summary>
     Task<string?> CheckAndResearchAsync(string workspaceId, string taskId, string failingCommand, string stderrSnippet, CancellationToken ct = default);
+
+    /// <summary>
+    /// Directly triggers deep research on an arbitrary question, e.g. for proactive
+    /// low-confidence escalation before a failure actually occurs.
+    /// Returns the research summary, or null if research failed or is unavailable.
+    /// </summary>
+    Task<string?> ResearchTopicAsync(string question, CancellationToken ct = default);
 }

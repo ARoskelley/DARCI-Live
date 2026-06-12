@@ -119,7 +119,13 @@ public sealed class CodingTaskService : ICodingTaskService
         }
 
         sb.AppendLine();
-        sb.AppendLine("Produce a numbered list of concrete steps (3-7 steps). Each step should be actionable.");
+        sb.AppendLine("Produce a SHORT plan of 2-4 COARSE steps. Critical rules:");
+        sb.AppendLine("- Each step must produce one or more COMPLETE files, not fragments.");
+        sb.AppendLine("- Do NOT split a single file into multiple steps. 'Create the file', 'define the class',");
+        sb.AppendLine("  and 'add using directives' are NOT separate steps — they are one 'implement' step.");
+        sb.AppendLine("- Prefer this shape: (1) implement the complete feature file(s); (2) write the complete");
+        sb.AppendLine("  test file(s) that exercise runtime behavior; (3) build and run the tests to verify.");
+        sb.AppendLine("- Collapse to fewer steps for small tasks; never pad the plan.");
         sb.AppendLine("Format: '1. <step description>'  — one step per line, nothing else.");
 
         var response = await _router.GenerateAsync(sb.ToString(), ModelTaskType.Coding, ct);
@@ -153,20 +159,20 @@ public sealed class CodingTaskService : ICodingTaskService
 
     private static List<CodingPlanStep> BuildTemplatePlan(CodingContextPackage context)
     {
+        // Coarse, file-complete steps. Each step produces complete files, not fragments —
+        // this avoids the per-fragment NO_EDITS_NEEDED trap and keeps runs short.
         var steps = new List<CodingPlanStep>
         {
-            new() { StepNumber = 1, Description = "Review the workspace context package and inspect the most relevant files.", Status = "pending" },
-            new() { StepNumber = 2, Description = "Choose the smallest safe change that satisfies the task.", Status = "pending" },
-            new() { StepNumber = 3, Description = "Apply the change to the relevant file(s).", Status = "pending" },
-            new() { StepNumber = 4, Description = "Run the most relevant build/test command through the safe command runner.", Status = "pending" },
-            new() { StepNumber = 5, Description = "If the command fails repeatedly or fix depends on unknown API behaviour, escalate to KG/deep research.", Status = "pending" }
+            new() { StepNumber = 1, Description = "Implement the complete feature file(s) required by the task, with correct numeric types and full working content.", Status = "pending" },
+            new() { StepNumber = 2, Description = "Write the complete test file(s) that exercise the runtime behavior of the new code (assert observable results, not just compilation).", Status = "pending" },
+            new() { StepNumber = 3, Description = "Build and run the tests to verify behavior; fix any failures.", Status = "pending" }
         };
 
         if (context.SuggestedCommands.Length > 0)
         {
-            steps[3] = steps[3] with
+            steps[2] = steps[2] with
             {
-                Description = $"Run: {string.Join(" | ", context.SuggestedCommands.Take(3))}"
+                Description = $"Build and run tests to verify behavior, then fix any failures. Commands: {string.Join(" | ", context.SuggestedCommands.Take(2))}"
             };
         }
 

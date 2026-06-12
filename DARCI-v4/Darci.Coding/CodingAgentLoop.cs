@@ -1,6 +1,7 @@
 #nullable enable
 
 using System.Collections.Concurrent;
+using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
@@ -9,13 +10,20 @@ namespace Darci.Coding;
 
 /// <summary>
 /// Drives the autonomous coding agent loop: load context → plan → generate patch →
-/// apply edits → build/test → retry or escalate → mark complete.
+/// apply edits → build → behavioral verification → retry or escalate → mark complete.
 /// </summary>
 public sealed class CodingAgentLoop : ICodingAgentLoop
 {
     private const int MaxRetries = 3;
-    private const int MaxStepPromptContextFiles = 5;
+    // Kept small: a 7B model treats every full file it is shown as a candidate edit target and
+    // will regenerate/corrupt reference files. Fewer reference files = less corruption surface
+    // and faster generation on contended local hardware.
+    private const int MaxStepPromptContextFiles = 3;
     private const int MaxPlanSteps = 20;
+    private const int EarlyEscalationAttempt = 1;   // trigger roadblock research at 2nd attempt
+    private const double LowConfidenceThreshold = 0.4;
+    private const long MaxFullFileBytes = 51_200;    // 50 KB: send complete content below this
+    private const int MaxFullFileChars = 40_000;     // truncate above this
 
     private readonly ICodingWorkspaceStore _store;
     private readonly ICodingContextBuilder _contextBuilder;
@@ -61,6 +69,8 @@ public sealed class CodingAgentLoop : ICodingAgentLoop
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Unhandled exception in coding agent loop for task {TaskId}.", taskId);
+                // Guarantee a terminal status so the task can never be orphaned at "in_progress".
+                await MarkTaskAbortedAsync(taskId, ex);
             }
             finally
             {
@@ -91,6 +101,9 @@ public sealed class CodingAgentLoop : ICodingAgentLoop
                 : null,
             LastStepResult = task.LastStepResult,
             RoadblockResearch = task.RoadblockResearch,
+            VerificationResult = task.VerificationResult,
+            ConfidenceScore = task.ConfidenceScore,
+            ConfidenceNote = task.ConfidenceNote,
             IsRunning = IsRunning(taskId),
             UpdatedAt = task.UpdatedAt
         };
@@ -132,6 +145,11 @@ public sealed class CodingAgentLoop : ICodingAgentLoop
         await _checkpoints.CreateCheckpointAsync(workspace.Id, taskId, $"Pre-run checkpoint for task: {task.Prompt}", ct);
 
         var buildCommand = PickBuildCommand(workspace.DetectedCommands);
+        var testCommand = PickTestCommand(workspace.DetectedCommands);
+
+        // Track total file writes across the whole task so a no-op run can never
+        // be reported as "completed" just because an unchanged tree still builds.
+        var totalFilesWritten = 0;
 
         for (var stepIndex = task.CurrentStepIndex; stepIndex < Math.Min(steps.Count, MaxPlanSteps); stepIndex++)
         {
@@ -158,7 +176,10 @@ public sealed class CodingAgentLoop : ICodingAgentLoop
             // Attempt the step with retries.
             for (var attempt = 0; attempt < MaxRetries; attempt++)
             {
-                var prompt = BuildStepPrompt(task, workspace, step, stepIndex, steps.Count, context, stepResult, attempt);
+                var prompt = await BuildStepPromptAsync(
+                    task, workspace, step, stepIndex, steps.Count,
+                    context, stepResult, attempt, testCommand is not null, ct);
+
                 var llmResponse = await _router.GenerateAsync(prompt, ModelTaskType.Coding, ct);
 
                 if (string.IsNullOrWhiteSpace(llmResponse))
@@ -167,15 +188,33 @@ public sealed class CodingAgentLoop : ICodingAgentLoop
                     continue;
                 }
 
-                // Apply any file edits from the response.
-                var patchResults = await _patchApplier.ApplyAsync(workspace.RootPath, llmResponse, ct);
+                // Parse and store confidence annotation.
+                var (confidence, confidenceNote) = ParseConfidence(llmResponse);
+                if (confidence >= 0)
+                {
+                    task = task with
+                    {
+                        ConfidenceScore = confidence,
+                        ConfidenceNote = confidenceNote,
+                        UpdatedAt = DateTime.UtcNow
+                    };
+                    await _store.UpdateTaskAsync(task, ct);
+                }
+
+                // Strip meta-annotations, then split VERIFY blocks from FILE blocks.
+                var strippedResponse = StripMetaAnnotations(llmResponse);
+                var (codeResponse, verifyResponse) = SplitVerifyBlocks(strippedResponse);
+
+                // Apply code file edits.
+                var patchResults = await _patchApplier.ApplyAsync(workspace.RootPath, codeResponse, ct);
                 var appliedCount = patchResults.Count(r => r.Success);
                 var failedPatches = patchResults.Where(r => !r.Success).Select(r => $"{r.RelativePath}: {r.Error}").ToList();
 
                 _logger.LogInformation("Task {TaskId} step {Step} attempt {Attempt}: applied {Applied}/{Total} patches.",
                     taskId, stepIndex + 1, attempt + 1, appliedCount, patchResults.Count);
 
-                // Run build/test command.
+                totalFilesWritten += appliedCount;
+
                 if (buildCommand is not null)
                 {
                     var (cmd, args) = ParseCommand(buildCommand);
@@ -184,29 +223,92 @@ public sealed class CodingAgentLoop : ICodingAgentLoop
 
                     stepResult = FormatCommandResult(cmdRun);
 
-                    if (cmdRun.ExitCode == 0)
+                    if (cmdRun.ExitCode != 0)
                     {
-                        stepSuccess = true;
-                        break;
+                        // Build failed — check roadblock early (at 2nd attempt onwards).
+                        if (attempt >= EarlyEscalationAttempt)
+                        {
+                            await TryEscalateRoadblockAsync(task, workspace.Id, taskId, buildCommand,
+                                cmdRun.StderrTail, ct,
+                                updated => task = updated);
+                        }
+
+                        if (attempt == MaxRetries - 1)
+                        {
+                            // Final attempt — mark roadblocked.
+                            steps[stepIndex] = step with { Status = "roadblocked", Result = stepResult };
+                            task = task with { Plan = JsonSerializer.Serialize(steps), UpdatedAt = DateTime.UtcNow };
+                            await _store.UpdateTaskAsync(task, ct);
+                            _logger.LogWarning("Task {TaskId} step {Step} roadblocked after build failures.", taskId, stepIndex + 1);
+                        }
+
+                        if (failedPatches.Count > 0)
+                            stepResult += $"\nPatch errors: {string.Join("; ", failedPatches)}";
+                        continue;
                     }
 
-                    // Check for roadblock after enough failures.
-                    if (attempt == MaxRetries - 1)
+                    // Build succeeded — run behavioral verification if we have verify blocks.
+                    if (testCommand is not null && !string.IsNullOrWhiteSpace(verifyResponse))
                     {
-                        var research = await _roadblockDetector.CheckAndResearchAsync(
-                            workspace.Id, taskId, buildCommand, cmdRun.StderrTail, ct);
+                        var verifyApply = await _patchApplier.ApplyAsync(workspace.RootPath, verifyResponse, ct);
+                        var verifyApplied = verifyApply.Count(r => r.Success);
+                        totalFilesWritten += verifyApplied;
+                        _logger.LogInformation("Task {TaskId} step {Step}: applied {V} verify file(s).",
+                            taskId, stepIndex + 1, verifyApplied);
 
-                        if (!string.IsNullOrWhiteSpace(research))
+                        var (tcmd, targs) = ParseCommand(testCommand);
+                        var testRun = await _runner.RunForTaskAsync(workspace.Id, taskId,
+                            new CodingCommandRequest(tcmd, targs, TimeoutSeconds: 180), ct);
+
+                        var verifyOutput = FormatCommandResult(testRun);
+                        task = task with { VerificationResult = verifyOutput, UpdatedAt = DateTime.UtcNow };
+                        await _store.UpdateTaskAsync(task, ct);
+
+                        if (testRun.ExitCode != 0)
                         {
-                            task = task with { RoadblockResearch = research, UpdatedAt = DateTime.UtcNow };
-                            await _store.UpdateTaskAsync(task, ct);
-                            steps[stepIndex] = step with { Status = "roadblocked", Result = stepResult };
-                            task = task with { Plan = JsonSerializer.Serialize(steps) };
-                            await _store.UpdateTaskAsync(task, ct);
-                            _logger.LogWarning("Task {TaskId} step {Step} roadblocked.", taskId, stepIndex + 1);
-                            // Continue to next step — research is saved for review.
+                            // Behavioral failure — treat same as build failure.
+                            stepResult = $"BUILD PASSED but BEHAVIORAL VERIFICATION FAILED:\n{verifyOutput}";
+                            _logger.LogWarning("Task {TaskId} step {Step} attempt {Attempt}: behavioral verification failed.",
+                                taskId, stepIndex + 1, attempt + 1);
+
+                            // Proactive low-confidence research (before spending more retries).
+                            if (confidence >= 0 && confidence < LowConfidenceThreshold
+                                && !string.IsNullOrWhiteSpace(confidenceNote)
+                                && !string.Equals(confidenceNote, "nothing", StringComparison.OrdinalIgnoreCase))
+                            {
+                                await TryProactiveResearchAsync(task, taskId, confidenceNote, ct,
+                                    updated => task = updated);
+                            }
+
+                            if (attempt >= EarlyEscalationAttempt)
+                            {
+                                await TryEscalateRoadblockAsync(task, workspace.Id, taskId, testCommand,
+                                    testRun.StderrTail, ct,
+                                    updated => task = updated);
+                            }
+
+                            if (attempt == MaxRetries - 1)
+                            {
+                                steps[stepIndex] = step with { Status = "roadblocked", Result = stepResult };
+                                task = task with { Plan = JsonSerializer.Serialize(steps), UpdatedAt = DateTime.UtcNow };
+                                await _store.UpdateTaskAsync(task, ct);
+                                _logger.LogWarning("Task {TaskId} step {Step} roadblocked after behavioral failures.", taskId, stepIndex + 1);
+                            }
+
+                            continue;
                         }
                     }
+                    else if (confidence >= 0 && confidence < LowConfidenceThreshold
+                             && !string.IsNullOrWhiteSpace(confidenceNote)
+                             && !string.Equals(confidenceNote, "nothing", StringComparison.OrdinalIgnoreCase))
+                    {
+                        // Build succeeded but model is uncertain and no test was emitted — do proactive research.
+                        await TryProactiveResearchAsync(task, taskId, confidenceNote, ct,
+                            updated => task = updated);
+                    }
+
+                    stepSuccess = true;
+                    break;
                 }
                 else
                 {
@@ -216,10 +318,7 @@ public sealed class CodingAgentLoop : ICodingAgentLoop
                         ? $"Applied {appliedCount} file edit(s)."
                         : string.IsNullOrWhiteSpace(llmResponse) ? "[No edits]" : "[Analysis complete — no file edits]";
                     if (failedPatches.Count > 0)
-                    {
                         stepResult += $"\nPatch errors: {string.Join("; ", failedPatches)}";
-                    }
-
                     if (stepSuccess) break;
                 }
             }
@@ -247,7 +346,39 @@ public sealed class CodingAgentLoop : ICodingAgentLoop
 
         var finalStatus = allComplete && !anyFailed ? "completed" : anyRoadblocked ? "blocked" : "failed";
 
-        // Run success verification if provided.
+        // GUARD 1 — false-success guard. A code task that wrote zero files cannot be
+        // "completed" just because an unchanged tree still builds with exit 0. This is the
+        // core blindness fix: build-exit-0 on a no-op run must NOT read as success.
+        if (finalStatus == "completed" && totalFilesWritten == 0)
+        {
+            finalStatus = "no-op";
+            var msg = "Task produced zero file changes across all steps (model returned NO_EDITS_NEEDED " +
+                      "or unparseable output). An unchanged tree builds successfully, so this is NOT a real success.";
+            task = task with { LastStepResult = msg, UpdatedAt = DateTime.UtcNow };
+            await _store.UpdateTaskAsync(task, ct);
+            _logger.LogWarning("Task {TaskId}: {Msg}", taskId, msg);
+        }
+
+        // GUARD 2 — mandatory end-of-task behavioral verification gate. If the workspace has a
+        // test command and the task wrote files, run the tests as a final gate regardless of
+        // whether the model volunteered any ### VERIFY: blocks. Green build is not enough.
+        if (finalStatus == "completed" && testCommand is not null && totalFilesWritten > 0)
+        {
+            var (tcmd, targs) = ParseCommand(testCommand);
+            var finalTest = await _runner.RunForTaskAsync(workspace.Id, taskId,
+                new CodingCommandRequest(tcmd, targs, TimeoutSeconds: 180), ct);
+            var finalTestOutput = FormatCommandResult(finalTest);
+            task = task with { VerificationResult = finalTestOutput, UpdatedAt = DateTime.UtcNow };
+            await _store.UpdateTaskAsync(task, ct);
+
+            if (finalTest.ExitCode != 0)
+            {
+                finalStatus = "verification-failed";
+                _logger.LogWarning("Task {TaskId}: final behavioral verification gate failed.", taskId);
+            }
+        }
+
+        // Run caller-supplied success verification if provided (additional gate).
         if (finalStatus == "completed" && options?.SuccessVerificationCommand is not null)
         {
             var (vcmd, vargs) = ParseCommand(options.SuccessVerificationCommand);
@@ -270,12 +401,71 @@ public sealed class CodingAgentLoop : ICodingAgentLoop
         };
         await _store.UpdateTaskAsync(task, ct);
 
-        _logger.LogInformation("CodingAgentLoop finished task {TaskId} with status {Status}.", taskId, finalStatus);
+        _logger.LogInformation("CodingAgentLoop finished task {TaskId} with status {Status} ({Files} file write(s)).",
+            taskId, finalStatus, totalFilesWritten);
+    }
+
+    // ── Escalation helpers ─────────────────────────────────────────────────
+
+    private async Task TryEscalateRoadblockAsync(
+        CodingTaskRecord task,
+        string workspaceId,
+        string taskId,
+        string command,
+        string stderrSnippet,
+        CancellationToken ct,
+        Action<CodingTaskRecord> updateTask)
+    {
+        try
+        {
+            var research = await _roadblockDetector.CheckAndResearchAsync(
+                workspaceId, taskId, command, stderrSnippet, ct);
+
+            if (!string.IsNullOrWhiteSpace(research) && research != task.RoadblockResearch)
+            {
+                var updated = task with { RoadblockResearch = research, UpdatedAt = DateTime.UtcNow };
+                await _store.UpdateTaskAsync(updated, ct);
+                updateTask(updated);
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogDebug(ex, "Roadblock escalation check failed (non-fatal).");
+        }
+    }
+
+    private async Task TryProactiveResearchAsync(
+        CodingTaskRecord task,
+        string taskId,
+        string confidenceNote,
+        CancellationToken ct,
+        Action<CodingTaskRecord> updateTask)
+    {
+        try
+        {
+            _logger.LogInformation("Task {TaskId}: low confidence ({Score:F2}), running proactive research on: {Note}",
+                taskId, task.ConfidenceScore, confidenceNote.Length > 80 ? confidenceNote[..80] : confidenceNote);
+
+            var question = $"[Task: {task.Prompt}] After implementing, the model reports uncertainty about: {confidenceNote}. " +
+                           "Provide concrete guidance to resolve this uncertainty correctly.";
+
+            var research = await _roadblockDetector.ResearchTopicAsync(question, ct);
+            if (!string.IsNullOrWhiteSpace(research))
+            {
+                var updated = task with { RoadblockResearch = research, UpdatedAt = DateTime.UtcNow };
+                await _store.UpdateTaskAsync(updated, ct);
+                updateTask(updated);
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogDebug(ex, "Proactive research failed (non-fatal).");
+        }
     }
 
     // ── Prompt building ────────────────────────────────────────────────────
 
-    private static string BuildStepPrompt(
+    private async Task<string> BuildStepPromptAsync(
         CodingTaskRecord task,
         CodingWorkspace workspace,
         CodingPlanStep step,
@@ -283,7 +473,9 @@ public sealed class CodingAgentLoop : ICodingAgentLoop
         int totalSteps,
         CodingContextPackage context,
         string previousCommandOutput,
-        int attempt)
+        int attempt,
+        bool hasTestCommand,
+        CancellationToken ct)
     {
         var sb = new StringBuilder();
         sb.AppendLine("You are an expert software engineer. Your job is to implement a specific step in a coding task.");
@@ -298,15 +490,17 @@ public sealed class CodingAgentLoop : ICodingAgentLoop
         {
             sb.AppendLine();
             sb.AppendLine($"PREVIOUS ATTEMPT FAILED (attempt {attempt}/{MaxRetries}):");
-            sb.AppendLine(previousCommandOutput.Length > 800 ? previousCommandOutput[^800..] : previousCommandOutput);
+            var errWindow = previousCommandOutput.Length > 1200 ? previousCommandOutput[^1200..] : previousCommandOutput;
+            sb.AppendLine(errWindow);
             sb.AppendLine("Please fix the error above.");
         }
 
         if (!string.IsNullOrWhiteSpace(task.RoadblockResearch))
         {
             sb.AppendLine();
-            sb.AppendLine("RESEARCH (from roadblock investigation):");
-            sb.AppendLine(task.RoadblockResearch.Length > 600 ? task.RoadblockResearch[..600] : task.RoadblockResearch);
+            sb.AppendLine("RESEARCH (from roadblock investigation or proactive lookup):");
+            var researchWindow = task.RoadblockResearch.Length > 800 ? task.RoadblockResearch[..800] : task.RoadblockResearch;
+            sb.AppendLine(researchWindow);
         }
 
         if (context.KgHits.Count > 0)
@@ -320,45 +514,208 @@ public sealed class CodingAgentLoop : ICodingAgentLoop
         if (context.Files.Count > 0)
         {
             sb.AppendLine();
-            sb.AppendLine("RELEVANT FILES:");
+            sb.AppendLine("REFERENCE FILES — READ-ONLY CONTEXT. These show existing types and conventions so");
+            sb.AppendLine("your new code compiles against them. You MUST NOT modify, regenerate, reformat, or emit");
+            sb.AppendLine("a FILE block for any of these paths. They are background only — not edit targets.");
             foreach (var f in context.Files.Take(MaxStepPromptContextFiles))
             {
-                sb.AppendLine($"### {f.RelativePath}");
+                sb.AppendLine();
+                sb.AppendLine($"----- REFERENCE (DO NOT EDIT): {f.RelativePath} -----");
                 sb.AppendLine("```");
-                var preview = f.Preview.Length > 1500 ? f.Preview[..1500] + "\n[truncated]" : f.Preview;
-                sb.AppendLine(preview);
+                var content = await ReadFullFileAsync(workspace.RootPath, f.RelativePath, ct);
+                sb.AppendLine(content);
                 sb.AppendLine("```");
             }
         }
 
         sb.AppendLine();
         sb.AppendLine("INSTRUCTIONS:");
+        sb.AppendLine("- Create or modify ONLY the file path(s) explicitly named in the TASK above. Never emit a");
+        sb.AppendLine("  FILE block for a REFERENCE file or any path the task did not ask you to change.");
+        sb.AppendLine("- Use the exact class names, method signatures, and file paths the TASK specifies.");
         sb.AppendLine("- Produce ONLY the file edits needed for this step. Do not include explanations outside code blocks.");
         sb.AppendLine("- For each file you need to create or modify, use this EXACT format:");
         sb.AppendLine();
         sb.AppendLine("### FILE: relative/path/to/file.cs");
         sb.AppendLine("```csharp");
-        sb.AppendLine("// full file content here");
+        sb.AppendLine("// complete file content here");
         sb.AppendLine("```");
         sb.AppendLine();
         sb.AppendLine("- Use the file's actual extension in the code fence language specifier.");
-        sb.AppendLine("- If no file edits are needed for this step, write only: NO_EDITS_NEEDED");
-        sb.AppendLine("- Do NOT write anything outside the FILE blocks except NO_EDITS_NEEDED.");
+        sb.AppendLine("- Write COMPLETE file content — never truncate or leave TODO placeholders.");
+        sb.AppendLine("- This step is part of a larger task. If creating or modifying a code file is implied");
+        sb.AppendLine("  by the overall TASK, you MUST emit the complete file now — even if this specific step");
+        sb.AppendLine("  sounds preparatory (e.g. 'create the file', 'add usings'). Produce the real, working file.");
+        sb.AppendLine("- NO_EDITS_NEEDED is ONLY for purely analytical steps (e.g. 'review the code'). Do NOT use it");
+        sb.AppendLine("  to defer code that the task requires — deferring leaves the task incomplete and will fail.");
+        sb.AppendLine();
+        sb.AppendLine("CONSTRAINTS:");
+        sb.AppendLine("- Prefer double over float or int for numeric results unless integer arithmetic is explicitly required.");
+        sb.AppendLine("- Never insert casts that silently truncate precision (e.g., (int)(2.5 * 4.0) would lose the decimal).");
+        sb.AppendLine("- One class per file; match existing file naming and namespace conventions exactly.");
+        sb.AppendLine("- Do NOT write anything outside FILE and VERIFY blocks except the CONFIDENCE metadata below.");
+
+        if (hasTestCommand)
+        {
+            sb.AppendLine();
+            sb.AppendLine("BEHAVIORAL VERIFICATION:");
+            sb.AppendLine("After your FILE blocks, emit test file(s) that exercise the actual runtime behavior:");
+            sb.AppendLine();
+            sb.AppendLine("### VERIFY: Tests/BehaviorCheck.cs");
+            sb.AppendLine("```csharp");
+            sb.AppendLine("// xUnit or NUnit test — assert observable behavior, not just that the code compiles.");
+            sb.AppendLine("// If no test project exists, also emit a minimal .csproj for it as a separate VERIFY block.");
+            sb.AppendLine("// Focus on the most likely behavioral failure mode (wrong numeric type, off-by-one, null, etc.).");
+            sb.AppendLine("```");
+            sb.AppendLine();
+            sb.AppendLine("These VERIFY files will be written to the workspace and run with the test command.");
+        }
+
+        sb.AppendLine();
+        sb.AppendLine("METADATA (required — place after all FILE and VERIFY blocks, on separate lines):");
+        sb.AppendLine("CONFIDENCE: <0.0–1.0>");
+        sb.AppendLine("UNSURE_ABOUT: <the one thing you are most uncertain about, or 'nothing'>");
 
         return sb.ToString();
     }
 
-    // ── Helpers ────────────────────────────────────────────────────────────
+    // ── Response parsing ───────────────────────────────────────────────────
+
+    private static (double Confidence, string Note) ParseConfidence(string response)
+    {
+        var confidence = -1.0;
+        var note = "";
+
+        foreach (var line in response.Split('\n'))
+        {
+            var trimmed = line.Trim();
+            if (trimmed.StartsWith("CONFIDENCE:", StringComparison.OrdinalIgnoreCase))
+            {
+                var val = trimmed["CONFIDENCE:".Length..].Trim();
+                if (double.TryParse(val, NumberStyles.Float, CultureInfo.InvariantCulture, out var d))
+                    confidence = Math.Clamp(d, 0.0, 1.0);
+            }
+            else if (trimmed.StartsWith("UNSURE_ABOUT:", StringComparison.OrdinalIgnoreCase))
+            {
+                note = trimmed["UNSURE_ABOUT:".Length..].Trim();
+            }
+        }
+
+        return (confidence, note);
+    }
+
+    private static string StripMetaAnnotations(string response)
+    {
+        var lines = response.Split('\n');
+        var result = new List<string>(lines.Length);
+        foreach (var line in lines)
+        {
+            var t = line.Trim();
+            if (t.StartsWith("CONFIDENCE:", StringComparison.OrdinalIgnoreCase)
+                || t.StartsWith("UNSURE_ABOUT:", StringComparison.OrdinalIgnoreCase))
+                continue;
+            result.Add(line);
+        }
+        return string.Join('\n', result);
+    }
+
+    /// <summary>
+    /// Separates <c>### VERIFY: path</c> blocks from <c>### FILE: path</c> blocks.
+    /// VERIFY blocks are converted to FILE-format so PatchApplier can write them.
+    /// Returns (codeOnlyResponse, verifyOnlyResponse).
+    /// </summary>
+    private static (string CodeResponse, string VerifyResponse) SplitVerifyBlocks(string response)
+    {
+        var codeLines = new List<string>();
+        var verifyLines = new List<string>();
+        var inVerify = false;
+        const string verifyPrefix = "### VERIFY:";
+        const string filePrefix = "### FILE:";
+
+        foreach (var line in response.Split('\n'))
+        {
+            var trimmed = line.TrimStart();
+            if (trimmed.StartsWith(verifyPrefix, StringComparison.OrdinalIgnoreCase))
+            {
+                var path = trimmed[verifyPrefix.Length..].Trim();
+                verifyLines.Add($"### FILE: {path}");
+                inVerify = true;
+            }
+            else if (trimmed.StartsWith(filePrefix, StringComparison.OrdinalIgnoreCase))
+            {
+                codeLines.Add(line);
+                inVerify = false;
+            }
+            else if (inVerify)
+            {
+                verifyLines.Add(line);
+            }
+            else
+            {
+                codeLines.Add(line);
+            }
+        }
+
+        return (string.Join('\n', codeLines), string.Join('\n', verifyLines));
+    }
+
+    // ── File reading ───────────────────────────────────────────────────────
+
+    private static async Task<string> ReadFullFileAsync(string rootPath, string relativePath, CancellationToken ct)
+    {
+        try
+        {
+            var fullPath = Path.GetFullPath(Path.Combine(rootPath, relativePath));
+            var normalizedRoot = Path.GetFullPath(rootPath)
+                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+
+            if (!fullPath.StartsWith(normalizedRoot, StringComparison.OrdinalIgnoreCase))
+                return "[File read refused: path resolves outside workspace root.]";
+
+            if (!File.Exists(fullPath))
+                return "[File not found on disk.]";
+
+            var info = new FileInfo(fullPath);
+            if (info.Length > MaxFullFileBytes)
+            {
+                // Large file: send first half + last half with a gap marker.
+                var text = await File.ReadAllTextAsync(fullPath, ct);
+                if (text.Length <= MaxFullFileChars) return text;
+                var half = MaxFullFileChars / 2;
+                return text[..half]
+                    + $"\n\n[... {text.Length - MaxFullFileChars:N0} chars omitted — file exceeds context budget ...]\n\n"
+                    + text[^half..];
+            }
+
+            return await File.ReadAllTextAsync(fullPath, ct);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return $"[Preview unavailable: {ex.Message}]";
+        }
+    }
+
+    // ── Command helpers ────────────────────────────────────────────────────
 
     private static string? PickBuildCommand(string[] commands)
     {
         // Prefer build commands over test commands for iteration speed.
         return commands.FirstOrDefault(c => c.StartsWith("dotnet build", StringComparison.OrdinalIgnoreCase))
-            ?? commands.FirstOrDefault(c => c.StartsWith("dotnet test", StringComparison.OrdinalIgnoreCase))
             ?? commands.FirstOrDefault(c => c.StartsWith("cargo build", StringComparison.OrdinalIgnoreCase))
             ?? commands.FirstOrDefault(c => c.StartsWith("go build", StringComparison.OrdinalIgnoreCase))
             ?? commands.FirstOrDefault(c => c.StartsWith("npm run build", StringComparison.OrdinalIgnoreCase))
             ?? commands.FirstOrDefault();
+    }
+
+    private static string? PickTestCommand(string[] commands)
+    {
+        return commands.FirstOrDefault(c => c.StartsWith("dotnet test", StringComparison.OrdinalIgnoreCase))
+            ?? commands.FirstOrDefault(c => c.StartsWith("pytest", StringComparison.OrdinalIgnoreCase))
+            ?? commands.FirstOrDefault(c => c.StartsWith("py -m pytest", StringComparison.OrdinalIgnoreCase))
+            ?? commands.FirstOrDefault(c => c.StartsWith("python -m pytest", StringComparison.OrdinalIgnoreCase))
+            ?? commands.FirstOrDefault(c => c.StartsWith("npm test", StringComparison.OrdinalIgnoreCase))
+            ?? commands.FirstOrDefault(c => c.StartsWith("cargo test", StringComparison.OrdinalIgnoreCase))
+            ?? commands.FirstOrDefault(c => c.StartsWith("go test", StringComparison.OrdinalIgnoreCase));
     }
 
     private static (string Command, string[] Args) ParseCommand(string fullCommand)
@@ -400,5 +757,30 @@ public sealed class CodingAgentLoop : ICodingAgentLoop
         var updated = task with { Status = status, UpdatedAt = DateTime.UtcNow };
         await _store.UpdateTaskAsync(updated, ct);
         return updated;
+    }
+
+    /// <summary>
+    /// Best-effort terminal status write when the loop aborts with an unhandled exception, so a task
+    /// is never left orphaned at "in_progress". Only overwrites non-terminal statuses.
+    /// </summary>
+    private async Task MarkTaskAbortedAsync(string taskId, Exception ex)
+    {
+        try
+        {
+            var task = await _store.GetTaskAsync(taskId);
+            if (task is null || task.Status is not ("in_progress" or "planned" or "planning")) return;
+
+            await _store.UpdateTaskAsync(task with
+            {
+                Status = "failed",
+                LastStepResult = $"Loop aborted: {ex.GetType().Name}: {ex.Message}",
+                UpdatedAt = DateTime.UtcNow
+            });
+            _logger.LogWarning("Task {TaskId} marked failed after unhandled loop exception.", taskId);
+        }
+        catch (Exception inner)
+        {
+            _logger.LogWarning(inner, "Could not mark task {TaskId} failed after abort.", taskId);
+        }
     }
 }

@@ -111,6 +111,12 @@ public sealed record CodingTaskRecord
     public int CurrentStepIndex { get; init; }
     public string LastStepResult { get; init; } = "";
     public string RoadblockResearch { get; init; } = "";
+    /// <summary>Output of the last behavioral verification run (dotnet test or equivalent).</summary>
+    public string VerificationResult { get; init; } = "";
+    /// <summary>Self-assessed confidence score (0–1) from the last LLM response. -1 = not yet assessed.</summary>
+    public double ConfidenceScore { get; init; } = -1.0;
+    /// <summary>What the model said it was uncertain about in its last response.</summary>
+    public string ConfidenceNote { get; init; } = "";
     public DateTime CreatedAt { get; init; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; init; } = DateTime.UtcNow;
 }
@@ -156,6 +162,9 @@ public sealed record CodingTaskStatusResponse
     public string? CurrentStepDescription { get; init; }
     public string LastStepResult { get; init; } = "";
     public string RoadblockResearch { get; init; } = "";
+    public string VerificationResult { get; init; } = "";
+    public double ConfidenceScore { get; init; } = -1.0;
+    public string ConfidenceNote { get; init; } = "";
     public bool IsRunning { get; init; }
     public DateTime UpdatedAt { get; init; }
 }

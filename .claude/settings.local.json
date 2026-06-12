@@ -8,7 +8,15 @@
       "Bash(gh pr create --title 'Darci.Coding second-pass: autonomous coding agent loop' --body ' *)",
       "PowerShell(Get-Command gh -ErrorAction SilentlyContinue; \\(Get-Command git -ErrorAction SilentlyContinue\\).Source)",
       "Bash(curl -s http://localhost:11434/api/tags)",
-      "Bash(python -c \"import sys,json; data=json.load\\(sys.stdin\\); [print\\(m['name']\\) for m in data.get\\('models',[]\\)]\")"
+      "Bash(python -c \"import sys,json; data=json.load\\(sys.stdin\\); [print\\(m['name']\\) for m in data.get\\('models',[]\\)]\")",
+      "Bash(dotnet new *)",
+      "Bash(dotnet sln *)",
+      "Bash(dotnet restore *)",
+      "Bash(dotnet test *)",
+      "Bash(Remove-Item \"C:\\\\Users\\\\aiden\\\\OneDrive\\\\Documents\\\\GitHub\\\\ProgDS\\\\DARCI-Live\\\\DARCI-v4\\\\Darci.Coding.Tests\\\\UnitTest1.cs\")",
+      "Bash(ls -la \"C:\\\\Users\\\\aiden\\\\DarciTestBench\" 2>&1 | head -40; echo \"--- has Darci.Coding? ---\"; ls \"C:\\\\Users\\\\aiden\\\\DarciTestBench\\\\Darci.Coding\" 2>&1 | head; echo \"--- has tests project? ---\"; ls \"C:\\\\Users\\\\aiden\\\\DarciTestBench\\\\Darci.Coding.Tests\" 2>&1 | head; echo \"--- sln? ---\"; ls \"C:\\\\Users\\\\aiden\\\\DarciTestBench\"/*.sln 2>&1)",
+      "PowerShell(ollama pull qwen2.5-coder:7b 2>&1)",
+      "Bash(iconv -f UTF-16LE -t UTF-8 api_restart.log)"
     ]
   }
 }
