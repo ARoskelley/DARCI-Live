@@ -98,6 +98,9 @@ public sealed class CodingWorkspaceStore : ICodingWorkspaceStore
                 current_step_index INTEGER NOT NULL DEFAULT 0,
                 last_step_result TEXT NOT NULL DEFAULT '',
                 roadblock_research TEXT NOT NULL DEFAULT '',
+                verification_result TEXT NOT NULL DEFAULT '',
+                confidence_score REAL NOT NULL DEFAULT -1.0,
+                confidence_note TEXT NOT NULL DEFAULT '',
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
             );
@@ -128,6 +131,9 @@ public sealed class CodingWorkspaceStore : ICodingWorkspaceStore
         await TryMigrateAsync(conn, "ALTER TABLE coding_tasks ADD COLUMN roadblock_research TEXT NOT NULL DEFAULT ''", ct);
         await TryMigrateAsync(conn, "ALTER TABLE coding_command_runs ADD COLUMN task_id TEXT NOT NULL DEFAULT ''", ct);
         await TryMigrateAsync(conn, "CREATE INDEX IF NOT EXISTS ix_coding_command_runs_task ON coding_command_runs(task_id, started_at)", ct);
+        await TryMigrateAsync(conn, "ALTER TABLE coding_tasks ADD COLUMN verification_result TEXT NOT NULL DEFAULT ''", ct);
+        await TryMigrateAsync(conn, "ALTER TABLE coding_tasks ADD COLUMN confidence_score REAL NOT NULL DEFAULT -1.0", ct);
+        await TryMigrateAsync(conn, "ALTER TABLE coding_tasks ADD COLUMN confidence_note TEXT NOT NULL DEFAULT ''", ct);
 
         _logger.LogInformation("Coding workspace store initialized.");
     }
@@ -440,11 +446,15 @@ public sealed class CodingWorkspaceStore : ICodingWorkspaceStore
             INSERT INTO coding_tasks
             (id, workspace_id, prompt, success_criteria, created_by, status, plan,
              last_context_package_json, plan_generated_by, plan_model,
-             current_step_index, last_step_result, roadblock_research, created_at, updated_at)
+             current_step_index, last_step_result, roadblock_research,
+             verification_result, confidence_score, confidence_note,
+             created_at, updated_at)
             VALUES
             ($id, $workspace_id, $prompt, $success_criteria, $created_by, $status, $plan,
              $last_context_package_json, $plan_generated_by, $plan_model,
-             $current_step_index, $last_step_result, $roadblock_research, $created_at, $updated_at)
+             $current_step_index, $last_step_result, $roadblock_research,
+             $verification_result, $confidence_score, $confidence_note,
+             $created_at, $updated_at)
             """;
         BindTask(cmd, task);
         await cmd.ExecuteNonQueryAsync(ct);
@@ -469,6 +479,9 @@ public sealed class CodingWorkspaceStore : ICodingWorkspaceStore
                 current_step_index = $current_step_index,
                 last_step_result = $last_step_result,
                 roadblock_research = $roadblock_research,
+                verification_result = $verification_result,
+                confidence_score = $confidence_score,
+                confidence_note = $confidence_note,
                 created_at = $created_at,
                 updated_at = $updated_at
             WHERE id = $id
@@ -528,6 +541,9 @@ public sealed class CodingWorkspaceStore : ICodingWorkspaceStore
         cmd.Parameters.AddWithValue("$current_step_index", task.CurrentStepIndex);
         cmd.Parameters.AddWithValue("$last_step_result", task.LastStepResult);
         cmd.Parameters.AddWithValue("$roadblock_research", task.RoadblockResearch);
+        cmd.Parameters.AddWithValue("$verification_result", task.VerificationResult);
+        cmd.Parameters.AddWithValue("$confidence_score", task.ConfidenceScore);
+        cmd.Parameters.AddWithValue("$confidence_note", task.ConfidenceNote);
         cmd.Parameters.AddWithValue("$created_at", ToIso(task.CreatedAt));
         cmd.Parameters.AddWithValue("$updated_at", ToIso(task.UpdatedAt));
     }
@@ -591,6 +607,10 @@ public sealed class CodingWorkspaceStore : ICodingWorkspaceStore
         var csiOrd = reader.GetOrdinal("current_step_index");
         var lsrOrd = reader.GetOrdinal("last_step_result");
         var rrOrd = reader.GetOrdinal("roadblock_research");
+        int vrOrd = -1, csOrd = -1, cnOrd = -1;
+        try { vrOrd = reader.GetOrdinal("verification_result"); } catch { }
+        try { csOrd = reader.GetOrdinal("confidence_score"); } catch { }
+        try { cnOrd = reader.GetOrdinal("confidence_note"); } catch { }
         return new CodingTaskRecord
         {
             Id = reader.GetString(reader.GetOrdinal("id")),
@@ -606,6 +626,9 @@ public sealed class CodingWorkspaceStore : ICodingWorkspaceStore
             CurrentStepIndex = reader.IsDBNull(csiOrd) ? 0 : reader.GetInt32(csiOrd),
             LastStepResult = reader.IsDBNull(lsrOrd) ? "" : reader.GetString(lsrOrd),
             RoadblockResearch = reader.IsDBNull(rrOrd) ? "" : reader.GetString(rrOrd),
+            VerificationResult = vrOrd >= 0 && !reader.IsDBNull(vrOrd) ? reader.GetString(vrOrd) : "",
+            ConfidenceScore = csOrd >= 0 && !reader.IsDBNull(csOrd) ? reader.GetDouble(csOrd) : -1.0,
+            ConfidenceNote = cnOrd >= 0 && !reader.IsDBNull(cnOrd) ? reader.GetString(cnOrd) : "",
             CreatedAt = FromIso(reader.GetString(reader.GetOrdinal("created_at"))),
             UpdatedAt = FromIso(reader.GetString(reader.GetOrdinal("updated_at")))
         };

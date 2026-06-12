@@ -30,7 +30,7 @@ public sealed class ModelRouter : IModelRouter
 
         _codingModel = FirstNonEmpty(
             Environment.GetEnvironmentVariable("DARCI_OLLAMA_CODING_MODEL"),
-            _generalModel);
+            "qwen2.5-coder:7b");
 
         _fastCodingModel = FirstNonEmpty(
             Environment.GetEnvironmentVariable("DARCI_OLLAMA_FAST_CODING_MODEL"),
@@ -47,7 +47,10 @@ public sealed class ModelRouter : IModelRouter
             "http://localhost:11434");
 
         _http.BaseAddress = new Uri(baseUrl, UriKind.Absolute);
-        _http.Timeout = TimeSpan.FromMinutes(8);
+        // Generous timeout: on modest local hardware with a contended Ollama, a full-file coding
+        // prompt can take many minutes. A timeout here is handled gracefully (returns "") so the
+        // agent loop retries rather than dying.
+        _http.Timeout = TimeSpan.FromMinutes(12);
 
         _logger.LogInformation(
             "ModelRouter using Ollama at {BaseUrl} — general={General}, coding={Coding}, fast={Fast}, embed={Embed}",
@@ -86,9 +89,17 @@ public sealed class ModelRouter : IModelRouter
                 ? r.GetString()?.Trim() ?? ""
                 : "";
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
-            _logger.LogWarning(ex, "ModelRouter.Generate failed for model {Model}", model);
+            // Genuine caller cancellation — propagate so the loop can stop cleanly.
+            throw;
+        }
+        catch (Exception ex)
+        {
+            // Includes HttpClient.Timeout, which surfaces as TaskCanceledException even though the
+            // caller's token was NOT cancelled. Treat it (and all transport errors) as a soft failure
+            // so the agent loop can retry the step instead of dying with an unhandled exception.
+            _logger.LogWarning(ex, "ModelRouter.Generate failed/timed out for model {Model}", model);
             return "";
         }
     }
@@ -121,9 +132,14 @@ public sealed class ModelRouter : IModelRouter
 
             return Array.Empty<float>();
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
-            _logger.LogDebug(ex, "ModelRouter.GetEmbedding failed (non-fatal)");
+            throw;
+        }
+        catch (Exception ex)
+        {
+            // HttpClient.Timeout surfaces as TaskCanceledException with the caller token un-cancelled.
+            _logger.LogDebug(ex, "ModelRouter.GetEmbedding failed/timed out (non-fatal)");
             return Array.Empty<float>();
         }
     }

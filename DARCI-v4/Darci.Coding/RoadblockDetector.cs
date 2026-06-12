@@ -83,6 +83,26 @@ public sealed class RoadblockDetector : IRoadblockDetector
         return $"[Roadblock detected: {ConsecutiveFailureThreshold}+ consecutive failures. Research inconclusive.]\nError: {stderrSnippet[..Math.Min(400, stderrSnippet.Length)]}";
     }
 
+    public async Task<string?> ResearchTopicAsync(string question, CancellationToken ct = default)
+    {
+        _logger.LogInformation("Proactive research triggered: {Question}", question.Length > 120 ? question[..120] : question);
+        try
+        {
+            var outcome = await _research.RunDeepResearchAsync(question, "DARCI", ct);
+            if (outcome.IsSuccess && !string.IsNullOrWhiteSpace(outcome.FinalAnswer))
+            {
+                _logger.LogInformation("Proactive research returned synthesis ({Len} chars).", outcome.FinalAnswer.Length);
+                return TruncateSynthesis(outcome.FinalAnswer, 2000);
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "Proactive research failed (non-fatal).");
+        }
+
+        return null;
+    }
+
     private static string BuildResearchQuestion(string workspaceName, string command, string stderr)
     {
         var errorSnippet = stderr.Length > 300 ? stderr[..300] : stderr;
