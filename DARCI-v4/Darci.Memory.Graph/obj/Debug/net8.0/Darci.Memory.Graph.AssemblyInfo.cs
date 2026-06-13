@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Darci.Memory.Graph")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+c0811465d86a08121324eb79af8e3aae66dbe541")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+d0b582cb859f9ab56432b3466652e071c9cdf764")]
 [assembly: System.Reflection.AssemblyProductAttribute("Darci.Memory.Graph")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Darci.Memory.Graph")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
