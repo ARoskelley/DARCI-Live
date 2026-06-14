@@ -128,6 +128,10 @@ public sealed record CodingPlanStep
     public string Description { get; init; } = "";
     public string Status { get; init; } = "pending"; // pending | in_progress | completed | failed | roadblocked
     public string? Result { get; init; }
+    /// <summary>Self-assessed confidence (0–1) from the last LLM response for this step. -1 = not yet assessed.</summary>
+    public double ConfidenceScore { get; init; } = -1.0;
+    /// <summary>What the model reported it was most uncertain about for this step.</summary>
+    public string ConfidenceNote { get; init; } = "";
 }
 
 /// <summary>A git checkpoint created before edits are applied.</summary>

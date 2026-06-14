@@ -346,10 +346,7 @@
           "Microsoft.Extensions.Logging.Abstractions": "8.0.0"
         },
         "runtime": {
-          "Darci.Goals.dll": {
-            "assemblyVersion": "1.0.0",
-            "fileVersion": "1.0.0.0"
-          }
+          "Darci.Goals.dll": {}
         }
       },
       "Darci.Memory/1.0.0": {
@@ -362,10 +359,7 @@
           "Microsoft.Extensions.Logging.Abstractions": "8.0.0"
         },
         "runtime": {
-          "Darci.Memory.dll": {
-            "assemblyVersion": "1.0.0",
-            "fileVersion": "1.0.0.0"
-          }
+          "Darci.Memory.dll": {}
         }
       },
       "Darci.Memory.Confidence/1.0.0": {
@@ -376,10 +370,7 @@
           "Microsoft.Extensions.Logging.Abstractions": "8.0.0"
         },
         "runtime": {
-          "Darci.Memory.Confidence.dll": {
-            "assemblyVersion": "1.0.0",
-            "fileVersion": "1.0.0.0"
-          }
+          "Darci.Memory.Confidence.dll": {}
         }
       },
       "Darci.Memory.Graph/1.0.0": {
@@ -389,10 +380,7 @@
           "Microsoft.Extensions.Logging.Abstractions": "8.0.0"
         },
         "runtime": {
-          "Darci.Memory.Graph.dll": {
-            "assemblyVersion": "1.0.0",
-            "fileVersion": "1.0.0.0"
-          }
+          "Darci.Memory.Graph.dll": {}
         }
       },
       "Darci.Research/1.0.0": {
@@ -403,10 +391,7 @@
           "Microsoft.Extensions.Logging.Abstractions": "8.0.0"
         },
         "runtime": {
-          "Darci.Research.dll": {
-            "assemblyVersion": "1.0.0",
-            "fileVersion": "1.0.0.0"
-          }
+          "Darci.Research.dll": {}
         }
       },
       "Darci.Research.Agents/1.0.0": {
@@ -418,18 +403,12 @@
           "Microsoft.Extensions.Logging.Abstractions": "8.0.0"
         },
         "runtime": {
-          "Darci.Research.Agents.dll": {
-            "assemblyVersion": "1.0.0",
-            "fileVersion": "1.0.0.0"
-          }
+          "Darci.Research.Agents.dll": {}
         }
       },
       "Darci.Shared/1.0.0": {
         "runtime": {
-          "Darci.Shared.dll": {
-            "assemblyVersion": "1.0.0",
-            "fileVersion": "1.0.0.0"
-          }
+          "Darci.Shared.dll": {}
         }
       }
     }

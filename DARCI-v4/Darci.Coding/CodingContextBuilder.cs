@@ -1,6 +1,7 @@
 #nullable enable
 
 using Darci.Memory.Graph;
+using Darci.Memory.Graph.Models;
 using Microsoft.Extensions.Logging;
 
 namespace Darci.Coding;
@@ -48,6 +49,15 @@ public sealed class CodingContextBuilder : ICodingContextBuilder
             scored = await ReRankWithEmbeddingsAsync(workspaceId, query, scored, ct);
         }
 
+        // Fetch KG hits early so they can boost file scores before selection.
+        var kgHits = await FetchKgHitsAsync(query, ct);
+
+        // Boost scores of files that the KG says contain matched symbols.
+        if (kgHits.Count > 0)
+        {
+            scored = await ApplyKgFileBoostAsync(scored, kgHits, ct);
+        }
+
         var selected = scored
             .OrderByDescending(x => x.Score)
             .ThenBy(x => x.File.RelativePath, StringComparer.OrdinalIgnoreCase)
@@ -67,9 +77,6 @@ public sealed class CodingContextBuilder : ICodingContextBuilder
                 Preview = await ReadPreviewAsync(workspace.RootPath, item.File, ct)
             });
         }
-
-        // Fetch KG hits for the query.
-        var kgHits = await FetchKgHitsAsync(query, ct);
 
         var notes = new List<string> { workspace.Summary };
         if (kgHits.Count > 0)
@@ -120,8 +127,9 @@ public sealed class CodingContextBuilder : ICodingContextBuilder
                     }
 
                     var sim = CosineSimilarity(queryEmbedding, fileEmb);
-                    // Blend: 40% cosine similarity + 60% existing heuristic score.
-                    var blended = 0.4f * sim + 0.6f * item.Score;
+                    // Blend: 65% semantic + 35% heuristic. Semantic signal is trusted
+                    // more heavily once embeddings are available — heuristic is a tie-breaker.
+                    var blended = 0.65f * sim + 0.35f * item.Score;
                     return (item.File, blended);
                 })
                 .ToList();
@@ -133,22 +141,86 @@ public sealed class CodingContextBuilder : ICodingContextBuilder
         }
     }
 
+    /// <summary>
+    /// Traverses the KG "defines" relation from each matched symbol back to its containing
+    /// code-file entity and boosts that file's relevance score.
+    /// </summary>
+    private async Task<List<(CodingFileEntry File, float Score)>> ApplyKgFileBoostAsync(
+        List<(CodingFileEntry File, float Score)> scored,
+        IReadOnlyList<CodingKgHit> kgHits,
+        CancellationToken ct)
+    {
+        const float KgFileBoost = 0.8f;
+
+        var boostedPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var hit in kgHits)
+        {
+            if (string.IsNullOrWhiteSpace(hit.EntityId)) continue;
+            try
+            {
+                // Get all code-file entities that "define" this symbol (incoming direction).
+                var relations = await _kg.GetRelationsAsync(hit.EntityId, relationType: "defines", incoming: true, ct);
+                foreach (var rel in relations)
+                {
+                    var fileEntity = await _kg.GetEntityAsync(rel.FromEntityId, ct);
+                    if (fileEntity is { EntityType: "code-file" })
+                    {
+                        boostedPaths.Add(fileEntity.Name);
+                    }
+                }
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogDebug(ex, "KG file-boost traversal failed for symbol '{Name}' (non-fatal).", hit.Name);
+            }
+        }
+
+        if (boostedPaths.Count == 0) return scored;
+
+        _logger.LogDebug("KG file boost applied to {Count} file path(s).", boostedPaths.Count);
+
+        return scored.Select(item =>
+            boostedPaths.Contains(item.File.RelativePath)
+                ? (item.File, item.Score + KgFileBoost)
+                : item
+        ).ToList();
+    }
+
     private async Task<IReadOnlyList<CodingKgHit>> FetchKgHitsAsync(string? query, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(query)) return Array.Empty<CodingKgHit>();
 
         try
         {
-            var entities = await _kg.SearchEntitiesAsync(query, domain: "code", limit: 5, ct: ct);
-            return entities
-                .Select((e, i) => new CodingKgHit
+            // Search per token so multi-word queries ("payment validate") find entities whose
+            // names contain any of the terms ("PaymentGateway.Validate"). A single LIKE on the
+            // full phrase would match nothing because entity names never contain spaces.
+            var tokens = Tokenize(query);
+            if (tokens.Length == 0) return Array.Empty<CodingKgHit>();
+
+            var seen = new Dictionary<string, (KgEntity Entity, float Score)>(StringComparer.OrdinalIgnoreCase);
+            for (var i = 0; i < Math.Min(tokens.Length, 4); i++)
+            {
+                var results = await _kg.SearchEntitiesAsync(tokens[i], domain: "code", limit: 5, ct: ct);
+                var tokenWeight = 1.0f - (i * 0.15f); // earlier tokens = slightly higher weight
+                foreach (var entity in results)
                 {
-                    EntityId = e.Id,
-                    Name = e.Name,
-                    EntityType = e.EntityType,
-                    Domain = e.Domain,
-                    Description = e.Description,
-                    RelevanceScore = 1.0f - (i * 0.1f)
+                    if (!seen.ContainsKey(entity.Id))
+                        seen[entity.Id] = (entity, tokenWeight);
+                }
+            }
+
+            return seen.Values
+                .OrderByDescending(x => x.Score)
+                .Take(5)
+                .Select((x, i) => new CodingKgHit
+                {
+                    EntityId = x.Entity.Id,
+                    Name = x.Entity.Name,
+                    EntityType = x.Entity.EntityType,
+                    Domain = x.Entity.Domain,
+                    Description = x.Entity.Description,
+                    RelevanceScore = x.Score - (i * 0.05f)
                 })
                 .ToArray();
         }
@@ -159,19 +231,25 @@ public sealed class CodingContextBuilder : ICodingContextBuilder
         }
     }
 
-    private static float ScoreFile(CodingFileEntry file, string[] tokens)
+    internal static float ScoreFile(CodingFileEntry file, string[] tokens)
     {
         var path = file.RelativePath.ToLowerInvariant();
+
+        // Source and test files are primary; config/project files are supporting context.
+        // This ordering matters: without any query, the agent should see source before metadata.
         var score = file.Kind switch
         {
-            "project-config" => 0.85f,
-            "build-config" => 0.8f,
-            "documentation" => 0.6f,
-            "test" => 0.55f,
+            "source" => 0.55f,
+            "test" => 0.50f,
+            "config" => 0.30f,
+            "documentation" => 0.20f,
+            "project-config" => 0.15f,
+            "build-config" => 0.12f,
             _ => 0.25f
         };
 
-        if (path.EndsWith("readme.md", StringComparison.OrdinalIgnoreCase)) score += 0.5f;
+        // README is useful for project understanding, but only one of them.
+        if (path.EndsWith("readme.md", StringComparison.OrdinalIgnoreCase)) score += 0.25f;
         if (tokens.Length == 0) return score;
 
         foreach (var token in tokens)
@@ -224,7 +302,7 @@ public sealed class CodingContextBuilder : ICodingContextBuilder
             .ToArray();
     }
 
-    private static float CosineSimilarity(float[] a, float[] b)
+    internal static float CosineSimilarity(float[] a, float[] b)
     {
         if (a.Length != b.Length || a.Length == 0) return 0f;
 

@@ -35,6 +35,12 @@ public sealed class KgEnrichmentService : IKgEnrichmentService
         @"(?:export\s+(?:default\s+)?)?(?:class|interface|function|type|const|let|var)\s+(\w+)",
         RegexOptions.Compiled | RegexOptions.Multiline);
 
+    // .go: function and method declarations
+    private static readonly Regex GoFuncRegex = new(@"^func\s+(?:\(\w+\s+\*?\w+\)\s+)?(\w+)\s*\(", RegexOptions.Compiled | RegexOptions.Multiline);
+
+    // .rs: public function declarations
+    private static readonly Regex RsFuncRegex = new(@"^pub(?:\s+async)?\s+fn\s+(\w+)\s*", RegexOptions.Compiled | RegexOptions.Multiline);
+
     private static readonly HashSet<string> SkipSymbols = new(StringComparer.OrdinalIgnoreCase)
     {
         "if", "else", "for", "while", "do", "switch", "case", "return", "new", "this",
@@ -102,11 +108,19 @@ public sealed class KgEnrichmentService : IKgEnrichmentService
                     if (ct.IsCancellationRequested) break;
                     try
                     {
+                        // Description includes the actual declaration line so KG hits are
+                        // actionable in prompts (e.g. "public async Task<bool> ValidateAsync(...)").
+                        // When the name is class-qualified (e.g. "Foo.Validate"), also store the bare
+                        // name as an alias so SearchEntitiesAsync can find it via partial query ("Validate").
+                        var dotIdx = symbol.Name.IndexOf('.');
+                        string[]? aliases = dotIdx > 0 ? new[] { symbol.Name[(dotIdx + 1)..] } : null;
+
                         var symbolEntity = await _kg.UpsertEntityAsync(
                             name: symbol.Name,
                             entityType: symbol.Kind,
                             domain: "code",
-                            description: $"{symbol.Kind} in {file.RelativePath}",
+                            description: $"`{symbol.Signature}` — {symbol.Kind} in {file.RelativePath}",
+                            aliases: aliases,
                             ct: ct);
 
                         await _kg.UpsertRelationAsync(
@@ -134,33 +148,90 @@ public sealed class KgEnrichmentService : IKgEnrichmentService
         _logger.LogInformation("KG enrichment complete for workspace {Id}: {Count} symbols added.", workspaceId, symbolCount);
     }
 
-    private static IEnumerable<(string Name, string Kind)> ExtractSymbols(string extension, string content)
+    /// <summary>Returns (Name, Kind, Signature) tuples for each symbol in the file content.</summary>
+    internal static IEnumerable<(string Name, string Kind, string Signature)> ExtractSymbols(string extension, string content)
     {
+        if (extension.ToLowerInvariant() == ".cs")
+            return ExtractCsSymbols(content);
+
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        IEnumerable<(string, string)> Yield(Regex rx, string kind)
+        IEnumerable<(string, string, string)> Yield(Regex rx, string kind)
         {
             foreach (Match m in rx.Matches(content))
             {
                 var name = m.Groups[1].Value;
                 if (name.Length >= 2 && !SkipSymbols.Contains(name) && seen.Add(name))
                 {
-                    yield return (name, kind);
+                    yield return (name, kind, TrimSig(m.Value));
                 }
             }
         }
 
         return extension.ToLowerInvariant() switch
         {
-            ".cs" => Yield(CsTypeRegex, "type").Concat(Yield(CsMethodRegex, "method")),
             ".py" => Yield(PyClassRegex, "class").Concat(Yield(PyFuncRegex, "function")),
             ".ts" or ".tsx" or ".js" or ".jsx" => Yield(TsExportRegex, "export"),
-            _ => Enumerable.Empty<(string, string)>()
+            ".go" => Yield(GoFuncRegex, "function"),
+            ".rs" => Yield(RsFuncRegex, "function"),
+            _ => Enumerable.Empty<(string, string, string)>()
         };
     }
 
+    /// <summary>
+    /// C#-specific extraction that qualifies method names with their containing class
+    /// (e.g., "Foo.Validate" instead of "Validate") to prevent KG entity collisions
+    /// when two classes define a method with the same name.
+    /// </summary>
+    private static IEnumerable<(string Name, string Kind, string Signature)> ExtractCsSymbols(string content)
+    {
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        // Collect all type declarations with their file positions for context tracking.
+        var typeMatches = CsTypeRegex.Matches(content)
+            .Cast<Match>()
+            .Where(m => m.Groups[1].Value.Length >= 2 && !SkipSymbols.Contains(m.Groups[1].Value))
+            .Select(m => (Position: m.Index, Name: m.Groups[1].Value, Sig: TrimSig(m.Value)))
+            .ToList();
+
+        // Types are emitted with their unqualified names (PaymentProcessor, not Namespace.PaymentProcessor).
+        foreach (var t in typeMatches)
+        {
+            if (seen.Add(t.Name))
+                yield return (t.Name, "type", t.Sig);
+        }
+
+        // Methods are emitted with their containing class as qualifier (Foo.Validate).
+        // This prevents two classes that both define "Validate" from colliding in the KG.
+        // If no containing class can be determined (top-level code), the name stays unqualified.
+        foreach (Match m in CsMethodRegex.Matches(content))
+        {
+            var name = m.Groups[1].Value;
+            if (name.Length < 2 || SkipSymbols.Contains(name)) continue;
+
+            var containingType = typeMatches
+                .Where(t => t.Position < m.Index)
+                .OrderByDescending(t => t.Position)
+                .Select(t => t.Name)
+                .FirstOrDefault();
+
+            var qualifiedName = !string.IsNullOrEmpty(containingType)
+                ? $"{containingType}.{name}"
+                : name;
+
+            if (seen.Add(qualifiedName))
+                yield return (qualifiedName, "method", TrimSig(m.Value));
+        }
+    }
+
+    private static string TrimSig(string value)
+    {
+        var trimmed = value.Trim();
+        return trimmed.Length > 120 ? trimmed[..120] : trimmed;
+    }
+
     private static bool IsCodeFile(string extension) =>
-        extension.ToLowerInvariant() is ".cs" or ".py" or ".ts" or ".tsx" or ".js" or ".jsx";
+        extension.ToLowerInvariant() is ".cs" or ".py" or ".ts" or ".tsx" or ".js" or ".jsx" or ".go" or ".rs";
 
     private static string ReadContent(string rootPath, CodingFileEntry file)
     {
