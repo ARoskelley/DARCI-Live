@@ -11,7 +11,10 @@ namespace Darci.Coding;
 /// </summary>
 public sealed class RoadblockDetector : IRoadblockDetector
 {
-    private const int ConsecutiveFailureThreshold = 3;
+    // 2 consecutive failures (not 3) so research can still be used on the final retry.
+    // With MaxRetries = 3: after attempt 1 fails we have 2 runs → threshold met → research
+    // triggered → attempt 2 has the research in context.
+    private const int ConsecutiveFailureThreshold = 2;
 
     private readonly ICodingWorkspaceStore _store;
     private readonly IDeepResearchOrchestrator _research;

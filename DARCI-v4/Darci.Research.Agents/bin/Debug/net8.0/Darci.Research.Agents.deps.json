@@ -345,10 +345,7 @@
           "Microsoft.Extensions.Logging.Abstractions": "8.0.0"
         },
         "runtime": {
-          "Darci.Memory.Confidence.dll": {
-            "assemblyVersion": "1.0.0",
-            "fileVersion": "1.0.0.0"
-          }
+          "Darci.Memory.Confidence.dll": {}
         }
       },
       "Darci.Memory.Graph/1.0.0": {
@@ -358,10 +355,7 @@
           "Microsoft.Extensions.Logging.Abstractions": "8.0.0"
         },
         "runtime": {
-          "Darci.Memory.Graph.dll": {
-            "assemblyVersion": "1.0.0",
-            "fileVersion": "1.0.0.0"
-          }
+          "Darci.Memory.Graph.dll": {}
         }
       },
       "Darci.Research/1.0.0": {
@@ -372,18 +366,12 @@
           "Microsoft.Extensions.Logging.Abstractions": "8.0.0"
         },
         "runtime": {
-          "Darci.Research.dll": {
-            "assemblyVersion": "1.0.0",
-            "fileVersion": "1.0.0.0"
-          }
+          "Darci.Research.dll": {}
         }
       },
       "Darci.Shared/1.0.0": {
         "runtime": {
-          "Darci.Shared.dll": {
-            "assemblyVersion": "1.0.0",
-            "fileVersion": "1.0.0.0"
-          }
+          "Darci.Shared.dll": {}
         }
       }
     }

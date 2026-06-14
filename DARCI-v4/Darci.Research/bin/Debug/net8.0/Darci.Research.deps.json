@@ -202,10 +202,7 @@
       "System.Memory/4.5.3": {},
       "Darci.Shared/1.0.0": {
         "runtime": {
-          "Darci.Shared.dll": {
-            "assemblyVersion": "1.0.0",
-            "fileVersion": "1.0.0.0"
-          }
+          "Darci.Shared.dll": {}
         }
       }
     }

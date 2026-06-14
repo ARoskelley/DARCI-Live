@@ -188,14 +188,20 @@ public sealed class CodingAgentLoop : ICodingAgentLoop
                     continue;
                 }
 
-                // Parse and store confidence annotation.
+                // Parse and store confidence annotation — both at task level and per step.
                 var (confidence, confidenceNote) = ParseConfidence(llmResponse);
                 if (confidence >= 0)
                 {
+                    steps[stepIndex] = steps[stepIndex] with
+                    {
+                        ConfidenceScore = confidence,
+                        ConfidenceNote = confidenceNote
+                    };
                     task = task with
                     {
                         ConfidenceScore = confidence,
                         ConfidenceNote = confidenceNote,
+                        Plan = JsonSerializer.Serialize(steps),
                         UpdatedAt = DateTime.UtcNow
                     };
                     await _store.UpdateTaskAsync(task, ct);
@@ -423,7 +429,8 @@ public sealed class CodingAgentLoop : ICodingAgentLoop
 
             if (!string.IsNullOrWhiteSpace(research) && research != task.RoadblockResearch)
             {
-                var updated = task with { RoadblockResearch = research, UpdatedAt = DateTime.UtcNow };
+                var combined = AppendResearch(task.RoadblockResearch, research);
+                var updated = task with { RoadblockResearch = combined, UpdatedAt = DateTime.UtcNow };
                 await _store.UpdateTaskAsync(updated, ct);
                 updateTask(updated);
             }
@@ -452,7 +459,8 @@ public sealed class CodingAgentLoop : ICodingAgentLoop
             var research = await _roadblockDetector.ResearchTopicAsync(question, ct);
             if (!string.IsNullOrWhiteSpace(research))
             {
-                var updated = task with { RoadblockResearch = research, UpdatedAt = DateTime.UtcNow };
+                var combined = AppendResearch(task.RoadblockResearch, research);
+                var updated = task with { RoadblockResearch = combined, UpdatedAt = DateTime.UtcNow };
                 await _store.UpdateTaskAsync(updated, ct);
                 updateTask(updated);
             }
@@ -693,6 +701,19 @@ public sealed class CodingAgentLoop : ICodingAgentLoop
         {
             return $"[Preview unavailable: {ex.Message}]";
         }
+    }
+
+    // ── Research helpers ───────────────────────────────────────────────────
+
+    /// <summary>
+    /// Appends new research to existing research, separated by a divider.
+    /// Caps the total at 4000 chars by truncating the oldest (front) portion.
+    /// </summary>
+    private static string AppendResearch(string existing, string incoming, int maxChars = 4000)
+    {
+        if (string.IsNullOrWhiteSpace(existing)) return incoming.Length <= maxChars ? incoming : incoming[..maxChars];
+        var combined = existing.TrimEnd() + "\n\n---\n\n" + incoming.TrimStart();
+        return combined.Length <= maxChars ? combined : combined[^maxChars..];
     }
 
     // ── Command helpers ────────────────────────────────────────────────────

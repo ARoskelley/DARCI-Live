@@ -10,7 +10,9 @@ namespace Darci.Coding;
 /// </summary>
 public sealed class WorkspaceEmbeddingService : IWorkspaceEmbeddingService
 {
-    private const int PreviewChars = 500;
+    // 1500 chars captures namespace + class header + first several method signatures,
+    // giving the embedding model enough signal to distinguish files by content rather than just namespace.
+    private const int PreviewChars = 1500;
 
     private readonly ICodingWorkspaceStore _store;
     private readonly IModelRouter _router;

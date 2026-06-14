@@ -456,7 +456,7 @@ public sealed class DeepResearchOrchestrator : IDeepResearchOrchestrator
         }
 
         return response
-            .Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Split(new char[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Select(line => line.TrimStart('-', '*', '1', '2', '3', '4', '5', '6', '.', ' '))
             .Where(line => !string.IsNullOrWhiteSpace(line))
             .Distinct(StringComparer.OrdinalIgnoreCase)

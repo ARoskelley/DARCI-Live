@@ -13,6 +13,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+      <_Parameter1>Darci.Coding.Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- IKnowledgeGraph for KG context enrichment -->
     <ProjectReference Include="..\Darci.Memory.Graph\Darci.Memory.Graph.csproj" />
     <!-- IDeepResearchOrchestrator for roadblock research (also gives IKnowledgeGraph transitively) -->
