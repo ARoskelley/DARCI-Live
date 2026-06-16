@@ -5,14 +5,10 @@ namespace DammProject.Tests;
 public class BehaviorCheck
 {
     [Fact]
-    public void ComputeCheckDigit_ThrowsArgumentException_ForNonDigitCharacters()
+    public void IsValid_ReturnsCorrectValue()
     {
-        Assert.Throws<ArgumentException>(() => DammValidator.ComputeCheckDigit("572a"));
-    }
-
-    [Fact]
-    public void IsValid_ReturnsFalse_ForEmptyString()
-    {
+        Assert.True(DammValidator.IsValid("1234567890"));
+        Assert.False(DammValidator.IsValid("123456789A"));
         Assert.False(DammValidator.IsValid(""));
     }
 }

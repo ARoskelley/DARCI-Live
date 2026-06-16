@@ -32,7 +32,8 @@
       "Bash(Stop-Process -Force)",
       "Bash(Start-Sleep -Seconds 1)",
       "Bash(echo \"Started PID=$!\")",
-      "Bash(dir \"C:/Users/ROG/Documents/GitHub/DARCI-Live/tmp/dammproject/\")"
+      "Bash(dir \"C:/Users/ROG/Documents/GitHub/DARCI-Live/tmp/dammproject/\")",
+      "Bash(grep -m 3 \"model\\\\|Model\" \"C:/Users/ROG/AppData/Local/Temp/darci-api6.log\" 2>/dev/null | head -5)"
     ]
   }
 }
