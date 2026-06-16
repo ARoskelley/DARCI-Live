@@ -244,6 +244,7 @@ public sealed class WorkspaceScanner : IWorkspaceScanner
             if (csproj is not null)
             {
                 commands.Add($"dotnet build \"{csproj.RelativePath}\"");
+                commands.Add($"dotnet test \"{csproj.RelativePath}\"");
             }
         }
 
