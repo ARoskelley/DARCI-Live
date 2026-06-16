@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Darci.Research.Agents")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+c661cb07ea0a0178e9241edc8166f90fc40b4b9c")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+8708f98996097d39d15bd92de314ccf8fbfb6725")]
 [assembly: System.Reflection.AssemblyProductAttribute("Darci.Research.Agents")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Darci.Research.Agents")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
