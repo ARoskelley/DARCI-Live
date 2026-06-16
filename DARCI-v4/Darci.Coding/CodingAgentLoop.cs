@@ -292,8 +292,11 @@ public sealed class CodingAgentLoop : ICodingAgentLoop
 
                             if (attempt >= EarlyEscalationAttempt)
                             {
+                                // Pass stepResult (full test output) not just stderr — test assertion
+                                // failures go to stdout and stderr is empty, so using stepResult
+                                // gives Tavily the actual "Expected X, Actual Y" context to search on.
                                 await TryEscalateRoadblockAsync(task, workspace.Id, taskId, testCommand,
-                                    testRun.StderrTail, ct,
+                                    stepResult, ct,
                                     updated => task = updated);
                             }
 

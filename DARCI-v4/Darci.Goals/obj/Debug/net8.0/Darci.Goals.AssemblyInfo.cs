@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Darci.Goals")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+8708f98996097d39d15bd92de314ccf8fbfb6725")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+436a12ddb051249bde401ea896ec2f2622c6435d")]
 [assembly: System.Reflection.AssemblyProductAttribute("Darci.Goals")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Darci.Goals")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
