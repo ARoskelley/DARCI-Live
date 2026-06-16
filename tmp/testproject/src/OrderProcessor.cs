@@ -1,4 +1,4 @@
-namespace TestProject;
+﻿namespace TestProject;
 
 public class OrderProcessor
 {
@@ -23,6 +23,11 @@ public class OrderProcessor
     {
         if (!Validate(order))
             return OrderResult.Failure("Validation failed");
+
+        // Add input validation for TotalAmount
+        decimal calculatedTotal = order.Items.Sum(item => item.Quantity * item.UnitPrice);
+        if (order.TotalAmount != calculatedTotal)
+            return OrderResult.Failure("Amount mismatch");
 
         var payment = await _gateway.ChargeAsync(order.CustomerId, order.TotalAmount);
         if (!payment.Success)

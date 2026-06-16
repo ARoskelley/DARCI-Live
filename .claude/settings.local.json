@@ -27,7 +27,11 @@
       "Bash(Start-Sleep 8)",
       "Bash(curl -s http://localhost:5081/)",
       "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d, indent=2\\)\\)\")",
-      "Bash(curl -sv -X POST http://localhost:5081/coding/workspaces/import -H 'Content-Type: application/json' -d '{\"rootPath\":\"C:\\\\\\\\Users\\\\\\\\ROG\\\\\\\\Documents\\\\\\\\GitHub\\\\\\\\DARCI-Live\\\\\\\\tmp\\\\\\\\testproject\",\"name\":\"testproject\",\"description\":\"Small test project for accuracy validation\",\"language\":\"csharp\"}')"
+      "Bash(curl -sv -X POST http://localhost:5081/coding/workspaces/import -H 'Content-Type: application/json' -d '{\"rootPath\":\"C:\\\\\\\\Users\\\\\\\\ROG\\\\\\\\Documents\\\\\\\\GitHub\\\\\\\\DARCI-Live\\\\\\\\tmp\\\\\\\\testproject\",\"name\":\"testproject\",\"description\":\"Small test project for accuracy validation\",\"language\":\"csharp\"}')",
+      "Bash(Get-Process -Name \"dotnet\" -ErrorAction SilentlyContinue)",
+      "Bash(Stop-Process -Force)",
+      "Bash(Start-Sleep -Seconds 1)",
+      "Bash(echo \"Started PID=$!\")"
     ]
   }
 }
