@@ -31,7 +31,8 @@
       "Bash(Get-Process -Name \"dotnet\" -ErrorAction SilentlyContinue)",
       "Bash(Stop-Process -Force)",
       "Bash(Start-Sleep -Seconds 1)",
-      "Bash(echo \"Started PID=$!\")"
+      "Bash(echo \"Started PID=$!\")",
+      "Bash(dir \"C:/Users/ROG/Documents/GitHub/DARCI-Live/tmp/dammproject/\")"
     ]
   }
 }
