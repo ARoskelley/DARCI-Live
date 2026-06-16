@@ -253,14 +253,18 @@ public sealed class CodingAgentLoop : ICodingAgentLoop
                         continue;
                     }
 
-                    // Build succeeded — run behavioral verification if we have verify blocks.
-                    if (testCommand is not null && !string.IsNullOrWhiteSpace(verifyResponse))
+                    // Build succeeded — always run tests when a test command is available.
+                    // Apply any ### VERIFY: blocks first (agent-written test files), then run.
+                    if (testCommand is not null)
                     {
-                        var verifyApply = await _patchApplier.ApplyAsync(workspace.RootPath, verifyResponse, ct);
-                        var verifyApplied = verifyApply.Count(r => r.Success);
-                        totalFilesWritten += verifyApplied;
-                        _logger.LogInformation("Task {TaskId} step {Step}: applied {V} verify file(s).",
-                            taskId, stepIndex + 1, verifyApplied);
+                        if (!string.IsNullOrWhiteSpace(verifyResponse))
+                        {
+                            var verifyApply = await _patchApplier.ApplyAsync(workspace.RootPath, verifyResponse, ct);
+                            var verifyApplied = verifyApply.Count(r => r.Success);
+                            totalFilesWritten += verifyApplied;
+                            _logger.LogInformation("Task {TaskId} step {Step}: applied {V} verify file(s).",
+                                taskId, stepIndex + 1, verifyApplied);
+                        }
 
                         var (tcmd, targs) = ParseCommand(testCommand);
                         var testRun = await _runner.RunForTaskAsync(workspace.Id, taskId,
@@ -304,11 +308,12 @@ public sealed class CodingAgentLoop : ICodingAgentLoop
                             continue;
                         }
                     }
-                    else if (confidence >= 0 && confidence < LowConfidenceThreshold
+                    else if (testCommand is null
+                             && confidence >= 0 && confidence < LowConfidenceThreshold
                              && !string.IsNullOrWhiteSpace(confidenceNote)
                              && !string.Equals(confidenceNote, "nothing", StringComparison.OrdinalIgnoreCase))
                     {
-                        // Build succeeded but model is uncertain and no test was emitted — do proactive research.
+                        // Build succeeded, no test command, model is uncertain — do proactive research.
                         await TryProactiveResearchAsync(task, taskId, confidenceNote, ct,
                             updated => task = updated);
                     }
