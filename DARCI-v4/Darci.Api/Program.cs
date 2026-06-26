@@ -1,5 +1,6 @@
 using Darci.Brain;
 using Darci.Coding;
+using Darci.Nodes;
 using Darci.Cloud;
 using Darci.Core;
 using Darci.Engineering;
@@ -237,7 +238,8 @@ builder.Services.AddSingleton<Decision>(sp =>
         sp.GetRequiredService<IDecisionNetwork>(),
         sp.GetService<EngineeringGoalDetector>(),
         sp.GetService<IConfidenceTracker>(),
-        sp.GetService<GoalDecomposer>()));
+        sp.GetService<GoalDecomposer>(),
+        sp.GetService<CodingGoalDetector>()));
 
 // DARCI herself - the background service
 // BomGenerator + AutonomousBundler (autonomous engineering path)
@@ -265,7 +267,8 @@ builder.Services.AddSingleton<Darci.Core.Darci>(sp =>
         sp.GetRequiredService<ConstraintExtractor>(),
         sp.GetRequiredService<IAutonomousBundler>(),
         sp.GetRequiredService<BomGenerator>(),
-        sp.GetRequiredService<IGoalManager>()));
+        sp.GetRequiredService<IGoalManager>(),
+        sp.GetService<INodeRouter>()));
 builder.Services.AddHostedService(sp => sp.GetRequiredService<Darci.Core.Darci>());
 
 // Controllers
@@ -305,6 +308,23 @@ builder.Services.AddSingleton<DeepResearchOrchestrator>(sp => new DeepResearchOr
     sp.GetRequiredService<ILogger<DeepResearchOrchestrator>>()));
 builder.Services.AddSingleton<IDeepResearchOrchestrator>(sp =>
     sp.GetRequiredService<DeepResearchOrchestrator>());
+
+// === Node Packet Protocol (Phase 0) ===
+// Shared envelope + state machine + watchdog. Currently only the coding node emits packets, but the
+// store/watchdog are app-wide so later nodes (engineering, knowledge, living loop) plug straight in.
+builder.Services.AddSingleton<INodePacketStore>(sp =>
+    new SqliteNodePacketStore(
+        connectionString,
+        sp.GetRequiredService<ILogger<SqliteNodePacketStore>>()));
+builder.Services.AddSingleton<NodeWatchdog>();
+builder.Services.AddHostedService<NodeWatchdogService>();
+
+// Nodes registered with the router (Step B). CodingNode takes a Lazy<ICodingAgentLoop> to break the
+// DI cycle (router → CodingNode → loop → router). New nodes (engineering, biomed) register here.
+builder.Services.AddSingleton(sp => new Lazy<ICodingAgentLoop>(sp.GetRequiredService<ICodingAgentLoop>));
+builder.Services.AddSingleton<INode, CodingNode>();
+builder.Services.AddSingleton<INode, KnowledgeNode>();
+builder.Services.AddSingleton<INodeRouter, NodeRouter>();
 
 // === Coding Workspace Services ===
 builder.Services.AddSingleton<ICodingWorkspaceStore>(sp =>
@@ -370,6 +390,9 @@ builder.Services.AddSingleton<IEngineeringNetwork>(sp =>
 // Engineering goal detector (keyword-based)
 builder.Services.AddSingleton<EngineeringGoalDetector>();
 
+// Coding goal detector (keyword-based) — lets the living loop route coding goals to the coding node
+builder.Services.AddSingleton<CodingGoalDetector>();
+
 // Engineering orchestrator — wires workbench + network together
 builder.Services.AddSingleton<EngineeringOrchestrator>(sp =>
     new EngineeringOrchestrator(
@@ -422,6 +445,12 @@ await confidenceTracker.InitializeAsync();
 
 var codingStore = app.Services.GetRequiredService<ICodingWorkspaceStore>();
 await codingStore.InitializeAsync();
+
+// === Initialize Node Packet store + reap any packets orphaned by a previous run ===
+var nodePacketStore = app.Services.GetRequiredService<INodePacketStore>();
+await nodePacketStore.InitializeAsync();
+var nodeWatchdog = app.Services.GetRequiredService<NodeWatchdog>();
+await nodeWatchdog.SweepStartupOrphansAsync();
 
 // === Middleware ===
 app.UseCors("DarciApp");
@@ -1225,6 +1254,37 @@ app.MapGet("/coding/tasks/{id}/status", async Task<IResult> (
 {
     var status = await loop.GetStatusAsync(id, ct);
     return status is null ? Results.NotFound() : Results.Ok(status);
+});
+
+// === Node Packet endpoints (Phase 0) ===
+// Pollable state surface (decision 1): callers poll packet state rather than firing check requests.
+// A coding task's packet shares its id as correlation id, so GET by correlation = the task's packet.
+app.MapGet("/nodes/packets/{id}", async Task<IResult> (
+    INodePacketStore store,
+    string id,
+    CancellationToken ct) =>
+{
+    var packet = await store.GetPacketAsync(id, ct);
+    return packet is null ? Results.NotFound() : Results.Ok(packet);
+});
+
+app.MapGet("/nodes/packets/{id}/status", async Task<IResult> (
+    INodePacketStore store,
+    string id,
+    CancellationToken ct) =>
+{
+    var status = await store.GetStatusAsync(id, ct);
+    return status is null ? Results.NotFound() : Results.Ok(status);
+});
+
+// Retrievability for learning (decision 3): all packets sharing a correlation id (parent + children).
+app.MapGet("/nodes/correlations/{correlationId}", async Task<IResult> (
+    INodePacketStore store,
+    string correlationId,
+    CancellationToken ct) =>
+{
+    var packets = await store.GetByCorrelationAsync(correlationId, ct);
+    return Results.Ok(packets);
 });
 
 // Create a git checkpoint for a workspace.

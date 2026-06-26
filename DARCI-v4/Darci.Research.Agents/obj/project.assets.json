@@ -489,6 +489,20 @@
           "bin/placeholder/Darci.Memory.Graph.dll": {}
         }
       },
+      "Darci.Nodes/1.0.0": {
+        "type": "project",
+        "framework": ".NETCoreApp,Version=v8.0",
+        "dependencies": {
+          "Microsoft.Data.Sqlite": "8.0.0",
+          "Microsoft.Extensions.Logging.Abstractions": "8.0.0"
+        },
+        "compile": {
+          "bin/placeholder/Darci.Nodes.dll": {}
+        },
+        "runtime": {
+          "bin/placeholder/Darci.Nodes.dll": {}
+        }
+      },
       "Darci.Research/1.0.0": {
         "type": "project",
         "framework": ".NETCoreApp,Version=v8.0",
@@ -1184,6 +1198,11 @@
       "path": "../Darci.Memory.Graph/Darci.Memory.Graph.csproj",
       "msbuildProject": "../Darci.Memory.Graph/Darci.Memory.Graph.csproj"
     },
+    "Darci.Nodes/1.0.0": {
+      "type": "project",
+      "path": "../Darci.Nodes/Darci.Nodes.csproj",
+      "msbuildProject": "../Darci.Nodes/Darci.Nodes.csproj"
+    },
     "Darci.Research/1.0.0": {
       "type": "project",
       "path": "../Darci.Research/Darci.Research.csproj",
@@ -1199,6 +1218,7 @@
     "net8.0": [
       "Darci.Memory.Confidence >= 1.0.0",
       "Darci.Memory.Graph >= 1.0.0",
+      "Darci.Nodes >= 1.0.0",
       "Darci.Research >= 1.0.0",
       "Microsoft.Extensions.Http >= 8.0.0",
       "Microsoft.Extensions.Logging.Abstractions >= 8.0.0"
@@ -1234,6 +1254,9 @@
             },
             "C:\\Users\\ROG\\Documents\\GitHub\\DARCI-Live\\DARCI-v4\\Darci.Memory.Graph\\Darci.Memory.Graph.csproj": {
               "projectPath": "C:\\Users\\ROG\\Documents\\GitHub\\DARCI-Live\\DARCI-v4\\Darci.Memory.Graph\\Darci.Memory.Graph.csproj"
+            },
+            "C:\\Users\\ROG\\Documents\\GitHub\\DARCI-Live\\DARCI-v4\\Darci.Nodes\\Darci.Nodes.csproj": {
+              "projectPath": "C:\\Users\\ROG\\Documents\\GitHub\\DARCI-Live\\DARCI-v4\\Darci.Nodes\\Darci.Nodes.csproj"
             },
             "C:\\Users\\ROG\\Documents\\GitHub\\DARCI-Live\\DARCI-v4\\Darci.Research\\Darci.Research.csproj": {
               "projectPath": "C:\\Users\\ROG\\Documents\\GitHub\\DARCI-Live\\DARCI-v4\\Darci.Research\\Darci.Research.csproj"

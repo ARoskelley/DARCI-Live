@@ -36,6 +36,9 @@ public enum ActionType
     // Neural Engineering (geometry workbench + ONNX network)
     Engineering,
 
+    // Coding (routed to the coding node via the node packet protocol)
+    Code,
+
     // Meta
     Rest,
     Observe,
@@ -307,6 +310,12 @@ public class DarciAction
 
     // Neural Engineering fields (v4 workbench + ONNX path)
     public EngineeringGoalSpec? EngineeringSpec { get; init; }
+
+    // Coding fields (routed to the coding node). CodingIntent = what to build/fix;
+    // CodingWorkspaceId = which workspace the coding node operates on.
+    public string? CodingIntent { get; init; }
+    public string? CodingWorkspaceId { get; init; }
+    public string? CodingSuccessCriteria { get; init; }
 
     public static DarciAction Rest(TimeSpan? duration = null, string? reason = null) => new()
     {

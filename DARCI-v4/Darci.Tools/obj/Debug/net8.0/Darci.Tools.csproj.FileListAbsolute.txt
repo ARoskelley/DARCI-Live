@@ -54,3 +54,5 @@ C:\Users\ROG\Documents\GitHub\DARCI-Live\DARCI-v4\Darci.Tools\bin\Debug\net8.0\D
 C:\Users\ROG\Documents\GitHub\DARCI-Live\DARCI-v4\Darci.Tools\bin\Debug\net8.0\Darci.Memory.Confidence.pdb
 C:\Users\ROG\Documents\GitHub\DARCI-Live\DARCI-v4\Darci.Tools\bin\Debug\net8.0\Darci.Memory.Graph.pdb
 C:\Users\ROG\Documents\GitHub\DARCI-Live\DARCI-v4\Darci.Tools\bin\Debug\net8.0\Darci.Research.pdb
+C:\Users\ROG\Documents\GitHub\DARCI-Live\DARCI-v4\Darci.Tools\bin\Debug\net8.0\Darci.Nodes.dll
+C:\Users\ROG\Documents\GitHub\DARCI-Live\DARCI-v4\Darci.Tools\bin\Debug\net8.0\Darci.Nodes.pdb

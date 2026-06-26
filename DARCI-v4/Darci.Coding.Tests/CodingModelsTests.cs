@@ -1,6 +1,7 @@
 #nullable enable
 
 using System.Text;
+using Darci.Nodes;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Darci.Coding.Tests;
@@ -10,10 +11,14 @@ namespace Darci.Coding.Tests;
 public class CodingModelDefaultsTests
 {
     [Fact]
-    public void CodingTaskRecord_DefaultConfidenceScore_IsNegativeOne()
+    public void CodingTaskRecord_DefaultConfidence_IsUnassessedGap()
     {
         var record = new CodingTaskRecord();
-        Assert.Equal(-1.0, record.ConfidenceScore);
+        // Unified type: default is Unassessed (-1), which counts as a gap but not "low".
+        Assert.Equal(-1.0, record.Confidence.Score);
+        Assert.False(record.Confidence.IsAssessed);
+        Assert.True(record.Confidence.IsGap);
+        Assert.False(record.Confidence.IsLow);
     }
 
     [Fact]
@@ -24,17 +29,12 @@ public class CodingModelDefaultsTests
     }
 
     [Fact]
-    public void CodingPlanStep_DefaultConfidenceScore_IsNegativeOne()
+    public void CodingPlanStep_DefaultConfidence_IsUnassessed()
     {
         var step = new CodingPlanStep();
-        Assert.Equal(-1.0, step.ConfidenceScore);
-    }
-
-    [Fact]
-    public void CodingPlanStep_DefaultConfidenceNote_IsEmpty()
-    {
-        var step = new CodingPlanStep();
-        Assert.Equal("", step.ConfidenceNote);
+        Assert.Equal(-1.0, step.Confidence.Score);
+        Assert.False(step.Confidence.IsAssessed);
+        Assert.Null(step.Confidence.Note);
     }
 }
 

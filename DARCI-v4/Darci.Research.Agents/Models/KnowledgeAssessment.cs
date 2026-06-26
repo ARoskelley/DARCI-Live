@@ -2,6 +2,7 @@
 
 using Darci.Memory.Confidence.Models;
 using Darci.Memory.Graph.Models;
+using Darci.Nodes;
 
 namespace Darci.Research.Agents.Models;
 
@@ -15,10 +16,10 @@ public sealed record KnowledgeAssessment
     public string Topic { get; init; } = "";
 
     /// <summary>
-    /// Aggregate confidence 0..1 across all relevant graph claims.
-    /// 0.0 = no knowledge. 1.0 = complete, highly corroborated knowledge.
+    /// Aggregate confidence across all relevant graph claims (unified <see cref="Darci.Nodes.Confidence"/>).
+    /// 0.0 = no knowledge. 1.0 = complete, highly corroborated knowledge. Unassessed = no claims found.
     /// </summary>
-    public float GraphConfidence { get; init; }
+    public Confidence Confidence { get; init; } = Confidence.Unassessed;
 
     /// <summary>Top relevant claims from the confidence tracker.</summary>
     public IReadOnlyList<KnowledgeClaim> SupportingClaims { get; init; }

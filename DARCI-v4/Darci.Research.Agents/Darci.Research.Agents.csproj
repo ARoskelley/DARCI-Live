@@ -16,6 +16,8 @@
     <ProjectReference Include="..\Darci.Research\Darci.Research.csproj" />
     <ProjectReference Include="..\Darci.Memory.Graph\Darci.Memory.Graph.csproj" />
     <ProjectReference Include="..\Darci.Memory.Confidence\Darci.Memory.Confidence.csproj" />
+    <!-- Unified Confidence value type (Step A: confidence unification) -->
+    <ProjectReference Include="..\Darci.Nodes\Darci.Nodes.csproj" />
   </ItemGroup>
 
 </Project>

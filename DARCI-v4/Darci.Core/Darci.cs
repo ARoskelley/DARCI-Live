@@ -1,6 +1,7 @@
 using Darci.Brain;
 using Darci.Engineering;
 using Darci.Goals;
+using Darci.Nodes;
 using Darci.Research.Agents;
 using Darci.Shared;
 using Darci.Tools;
@@ -44,6 +45,7 @@ public class Darci : BackgroundService
     private readonly IAutonomousBundler? _bundler;
     private readonly BomGenerator? _bomGenerator;
     private readonly IGoalManager? _goalManager;
+    private readonly INodeRouter? _nodeRouter;
 
     private long _cycleCount = 0;
     private readonly Stopwatch _uptime = new();
@@ -70,7 +72,8 @@ public class Darci : BackgroundService
         ConstraintExtractor? constraintExtractor = null,
         IAutonomousBundler? bundler = null,
         BomGenerator? bomGenerator = null,
-        IGoalManager? goalManager = null)
+        IGoalManager? goalManager = null,
+        INodeRouter? nodeRouter = null)
     {
         _logger                   = logger;
         _awareness                = awareness;
@@ -85,6 +88,7 @@ public class Darci : BackgroundService
         _bundler                  = bundler;
         _bomGenerator             = bomGenerator;
         _goalManager              = goalManager;
+        _nodeRouter               = nodeRouter;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -350,6 +354,8 @@ public class Darci : BackgroundService
             or ActionType.ReviewGoals => (int)BrainAction.CreateGoal,
         ActionType.GenerateCAD
             or ActionType.Engineer
+            or ActionType.Engineering
+            or ActionType.Code
             or ActionType.ReadFile
             or ActionType.WriteFile => (int)BrainAction.WorkOnGoal,
         _                      => (int)BrainAction.Think
@@ -381,6 +387,7 @@ public class Darci : BackgroundService
                 ActionType.GenerateCAD  => await DoCADWork(action),
                 ActionType.Engineer    => await DoEngineerWork(action),
                 ActionType.Engineering => await DoNeuralEngineeringWork(action, ct),
+                ActionType.Code        => await DoCodeWork(action, ct),
                 ActionType.Rest        => null,
                 ActionType.Observe    => null,
                 _ => null
@@ -516,8 +523,8 @@ public class Darci : BackgroundService
                 ct: ct);
 
             var prefix = outcome.IsUncertain
-                ? $"[Confidence: {outcome.Confidence:P0} - UNCERTAIN] "
-                : $"[Confidence: {outcome.Confidence:P0}] ";
+                ? $"[Confidence: {outcome.Confidence.Score:P0} - UNCERTAIN] "
+                : $"[Confidence: {outcome.Confidence.Score:P0}] ";
 
             var result = prefix + outcome.FinalAnswer;
             await _tools.StoreMemory(
@@ -592,7 +599,7 @@ public class Darci : BackgroundService
             if (outcome.IsSuccess)
                 _logger.LogDebug(
                     "Knowledge gap filled: '{Topic}' (confidence {Conf:P0})",
-                    topic, outcome.Confidence);
+                    topic, outcome.Confidence.Score);
             else
                 _logger.LogDebug("Knowledge gap fill failed for: '{Topic}'", topic);
 
@@ -849,6 +856,49 @@ public class Darci : BackgroundService
         }
 
         return result;
+    }
+
+    /// <summary>
+    /// Handles ActionType.Code — routes the coding intent to the coding node through the generic node
+    /// router (Step B). Non-blocking: the coding node starts the agent loop and returns the packet in
+    /// Working; DARCI can poll the packet state later (decision 1). Built generically — the same
+    /// router will carry engineering/biomed packets once those nodes register.
+    /// </summary>
+    private async Task<object?> DoCodeWork(DarciAction action, CancellationToken ct)
+    {
+        if (_nodeRouter is null)
+        {
+            _logger.LogWarning("Code action received but the node router is not configured.");
+            return null;
+        }
+
+        var intent = action.CodingIntent ?? action.Reasoning;
+        if (string.IsNullOrWhiteSpace(intent))
+        {
+            _logger.LogWarning("Code action has no intent — skipping.");
+            return null;
+        }
+
+        var slots = new Dictionary<string, string>();
+        if (!string.IsNullOrWhiteSpace(action.CodingWorkspaceId))
+            slots[PacketSlots.WorkspaceId] = action.CodingWorkspaceId!;
+
+        var packet = NodePacket.Create(
+            intent: intent,
+            successCriteria: action.CodingSuccessCriteria,
+            capability: Capability.WriteCode,
+            slots: slots);
+
+        _logger.LogInformation("Routing coding intent to coding node (packet {PacketId}): {Intent}",
+            packet.Id, intent.Length > 80 ? intent[..80] : intent);
+
+        var routed = await _nodeRouter.DispatchAsync(packet, ct);
+
+        await _tools.StoreMemory(
+            $"Dispatched coding task to coding node: '{intent}' → packet {routed.Id} (state {routed.State}).",
+            new[] { "coding", "node", "dispatch" });
+
+        return routed;
     }
 
     private static string BuildGoalStepProgressNote(DarciAction action) => action.Type switch

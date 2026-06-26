@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using Darci.Memory.Confidence;
 using Darci.Memory.Graph;
+using Darci.Nodes;
 using Darci.Research;
 using Darci.Research.Agents.Models;
 using Microsoft.Extensions.Logging;
@@ -77,7 +78,7 @@ public sealed class DeepResearchOrchestrator : IDeepResearchOrchestrator
                 _ = _confidence.AddClaimAsync(
                     agentOutcome.FinalAnswer, domain, "research",
                     sourceRef: agentOutcome.SessionId,
-                    sourceQuality: agentOutcome.Confidence,
+                    sourceQuality: (float)agentOutcome.Confidence.Score,
                     ct: ct);
             }
         }
@@ -92,7 +93,7 @@ public sealed class DeepResearchOrchestrator : IDeepResearchOrchestrator
         // If Ollama is unavailable we still return the agent findings rather than
         // losing everything. The caller receives IsSuccess=true with a note in FinalAnswer.
         var sessionId  = agentOutcome?.SessionId ?? "";
-        var confidence = agentOutcome?.Confidence ?? assessment.GraphConfidence;
+        var confidence = agentOutcome?.Confidence ?? assessment.Confidence;
         var citations  = agentOutcome?.Citations ?? Array.Empty<ResearchCitation>();
 
         string finalReply;
@@ -125,7 +126,6 @@ public sealed class DeepResearchOrchestrator : IDeepResearchOrchestrator
             Confidence = confidence,
             AgentReports = agentOutcome?.AgentReports ?? Array.Empty<AgentReport>(),
             Citations = citations,
-            IsUncertain = confidence < 0.45f
         };
     }
 
@@ -218,10 +218,10 @@ public sealed class DeepResearchOrchestrator : IDeepResearchOrchestrator
             SessionId = session.Id,
             Question = question,
             FinalAnswer = intermediateSynthesis,
-            Confidence = aggregateConfidence,
+            // Aggregate of raw per-agent scores, wrapped into the unified confidence type at this boundary.
+            Confidence = Confidence.Of(aggregateConfidence),
             AgentReports = reports,
             Citations = citations,
-            IsUncertain = aggregateConfidence < 0.45f
         };
     }
 
@@ -251,12 +251,12 @@ public sealed class DeepResearchOrchestrator : IDeepResearchOrchestrator
                 .ToList()
             : new List<string>();
 
-        var confidence = agentOutcome?.Confidence ?? assessment.GraphConfidence;
+        var confidence = (agentOutcome?.Confidence ?? assessment.Confidence).Score;
 
         return new OllamaContextPackage(
             Question: question,
-            Confidence: confidence,
-            IsUncertain: confidence < 0.45f,
+            Confidence: (float)confidence,
+            IsUncertain: confidence < 0.45,
             GraphClaims: graphClaims,
             ResearchFindings: researchFindings,
             Contradictions: Array.Empty<string>(),

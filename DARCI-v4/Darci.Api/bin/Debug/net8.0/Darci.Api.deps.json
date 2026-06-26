@@ -508,6 +508,7 @@
       "Darci.Coding/1.0.0": {
         "dependencies": {
           "Darci.Memory.Graph": "1.0.0",
+          "Darci.Nodes": "1.0.0",
           "Darci.Research.Agents": "1.0.0",
           "Microsoft.Data.Sqlite": "8.0.0",
           "Microsoft.Extensions.Logging.Abstractions": "8.0.0"
@@ -523,6 +524,7 @@
           "Darci.Goals": "1.0.0",
           "Darci.Memory": "1.0.0",
           "Darci.Memory.Confidence": "1.0.0",
+          "Darci.Nodes": "1.0.0",
           "Darci.Personality": "1.0.0",
           "Darci.Research.Agents": "1.0.0",
           "Darci.Shared": "1.0.0",
@@ -592,6 +594,15 @@
           "Darci.Memory.Graph.dll": {}
         }
       },
+      "Darci.Nodes/1.0.0": {
+        "dependencies": {
+          "Microsoft.Data.Sqlite": "8.0.0",
+          "Microsoft.Extensions.Logging.Abstractions": "8.0.0"
+        },
+        "runtime": {
+          "Darci.Nodes.dll": {}
+        }
+      },
       "Darci.Personality/1.0.0": {
         "dependencies": {
           "Dapper": "2.1.66",
@@ -618,6 +629,7 @@
         "dependencies": {
           "Darci.Memory.Confidence": "1.0.0",
           "Darci.Memory.Graph": "1.0.0",
+          "Darci.Nodes": "1.0.0",
           "Darci.Research": "1.0.0",
           "Microsoft.Extensions.Http": "8.0.0",
           "Microsoft.Extensions.Logging.Abstractions": "8.0.0"
@@ -952,6 +964,11 @@
       "sha512": ""
     },
     "Darci.Memory.Graph/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "Darci.Nodes/1.0.0": {
       "type": "project",
       "serviceable": false,
       "sha512": ""
