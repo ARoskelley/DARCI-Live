@@ -23,6 +23,8 @@
     <ProjectReference Include="..\Darci.Memory.Graph\Darci.Memory.Graph.csproj" />
     <!-- IDeepResearchOrchestrator for roadblock research (also gives IKnowledgeGraph transitively) -->
     <ProjectReference Include="..\Darci.Research.Agents\Darci.Research.Agents.csproj" />
+    <!-- Node packet envelope + state machine + watchdog (Phase 0 node protocol) -->
+    <ProjectReference Include="..\Darci.Nodes\Darci.Nodes.csproj" />
   </ItemGroup>
 
 </Project>

@@ -34,7 +34,9 @@
       "Bash(echo \"Started PID=$!\")",
       "Bash(dir \"C:/Users/ROG/Documents/GitHub/DARCI-Live/tmp/dammproject/\")",
       "Bash(grep -m 3 \"model\\\\|Model\" \"C:/Users/ROG/AppData/Local/Temp/darci-api6.log\" 2>/dev/null | head -5)",
-      "Bash(grep \"\\\\.cs$\")"
+      "Bash(grep \"\\\\.cs$\")",
+      "Bash(rm -rf /c/Users/ROG/Documents/GitHub/DARCI-Live/tmp/levenshtein/levenshtein/)",
+      "Bash(rm -f /c/Users/ROG/Documents/GitHub/DARCI-Live/tmp/levenshtein/Levenshtein.cs)"
     ]
   }
 }
