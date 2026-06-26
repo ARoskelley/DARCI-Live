@@ -4,6 +4,7 @@ using System.Collections.Concurrent;
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
+using Darci.Nodes;
 using Microsoft.Extensions.Logging;
 
 namespace Darci.Coding;
@@ -33,6 +34,7 @@ public sealed class CodingAgentLoop : ICodingAgentLoop
     private readonly IRoadblockDetector _roadblockDetector;
     private readonly PatchApplier _patchApplier;
     private readonly ILogger<CodingAgentLoop> _logger;
+    private readonly CodingNodeTracker _nodes;
 
     private readonly ConcurrentDictionary<string, Task> _runningTasks = new();
 
@@ -44,7 +46,8 @@ public sealed class CodingAgentLoop : ICodingAgentLoop
         IGitCheckpointService checkpoints,
         IRoadblockDetector roadblockDetector,
         PatchApplier patchApplier,
-        ILogger<CodingAgentLoop> logger)
+        ILogger<CodingAgentLoop> logger,
+        INodePacketStore? packetStore = null)
     {
         _store = store;
         _contextBuilder = contextBuilder;
@@ -54,6 +57,9 @@ public sealed class CodingAgentLoop : ICodingAgentLoop
         _roadblockDetector = roadblockDetector;
         _patchApplier = patchApplier;
         _logger = logger;
+        // Phase 0: every run is mirrored as a node packet. Optional (null store) so the loop still
+        // works in environments that haven't wired the packet store; all calls are best-effort.
+        _nodes = new CodingNodeTracker(packetStore, logger);
     }
 
     public bool StartLoop(string taskId, RunCodingTaskRequest? options = null)
@@ -71,6 +77,7 @@ public sealed class CodingAgentLoop : ICodingAgentLoop
                 _logger.LogError(ex, "Unhandled exception in coding agent loop for task {TaskId}.", taskId);
                 // Guarantee a terminal status so the task can never be orphaned at "in_progress".
                 await MarkTaskAbortedAsync(taskId, ex);
+                await _nodes.AbortAsync(taskId, $"{ex.GetType().Name}: {ex.Message}");
             }
             finally
             {
@@ -133,11 +140,15 @@ public sealed class CodingAgentLoop : ICodingAgentLoop
 
         task = await UpdateTaskStatusAsync(task, "in_progress", ct);
 
+        // Phase 0: mirror this run as a node packet (Working state, leased) for audit + orphan reaping.
+        await _nodes.BeginAsync(taskId, workspace.Id, task.Prompt, task.SuccessCriteria, ct);
+
         var steps = DeserializeSteps(task.Plan);
         if (steps.Count == 0)
         {
             _logger.LogWarning("Task {TaskId} has no plan steps.", taskId);
             task = await UpdateTaskStatusAsync(task, "failed", ct);
+            await _nodes.CompleteAsync(taskId, "failed", ct);
             return;
         }
 
@@ -338,9 +349,10 @@ public sealed class CodingAgentLoop : ICodingAgentLoop
             }
 
             // Update step status.
+            var finalStepStatus = stepSuccess ? "completed" : steps[stepIndex].Status == "roadblocked" ? "roadblocked" : "failed";
             steps[stepIndex] = steps[stepIndex] with
             {
-                Status = stepSuccess ? "completed" : steps[stepIndex].Status == "roadblocked" ? "roadblocked" : "failed",
+                Status = finalStepStatus,
                 Result = stepResult
             };
             task = task with
@@ -351,6 +363,14 @@ public sealed class CodingAgentLoop : ICodingAgentLoop
                 UpdatedAt = DateTime.UtcNow
             };
             await _store.UpdateTaskAsync(task, ct);
+
+            // Append a node-packet log entry for this step (audit + lease renewal).
+            await _nodes.RecordAsync(taskId,
+                decision: $"Step {stepIndex + 1}/{steps.Count} '{step.Description}' → {finalStepStatus}",
+                confidenceScore: steps[stepIndex].ConfidenceScore,
+                confidenceNote: steps[stepIndex].ConfidenceNote,
+                success: stepSuccess,
+                ct: ct);
         }
 
         // Determine final status.
@@ -414,6 +434,9 @@ public sealed class CodingAgentLoop : ICodingAgentLoop
             UpdatedAt = DateTime.UtcNow
         };
         await _store.UpdateTaskAsync(task, ct);
+
+        // Drive the node packet to its terminal state mirroring the coding outcome.
+        await _nodes.CompleteAsync(taskId, finalStatus, ct);
 
         _logger.LogInformation("CodingAgentLoop finished task {TaskId} with status {Status} ({Files} file write(s)).",
             taskId, finalStatus, totalFilesWritten);

@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Darci.Cloud")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+2fe83e22f8675b832337d5bcb9f1c97dff21b256")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+5cdfb98ce1dd5158a4ff72407586e91dca10206b")]
 [assembly: System.Reflection.AssemblyProductAttribute("Darci.Cloud")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Darci.Cloud")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

@@ -814,6 +814,7 @@
         "framework": ".NETCoreApp,Version=v8.0",
         "dependencies": {
           "Darci.Memory.Graph": "1.0.0",
+          "Darci.Nodes": "1.0.0",
           "Darci.Research.Agents": "1.0.0",
           "Microsoft.Data.Sqlite": "8.0.0",
           "Microsoft.Extensions.Logging.Abstractions": "8.0.0"
@@ -929,6 +930,20 @@
         },
         "runtime": {
           "bin/placeholder/Darci.Memory.Graph.dll": {}
+        }
+      },
+      "Darci.Nodes/1.0.0": {
+        "type": "project",
+        "framework": ".NETCoreApp,Version=v8.0",
+        "dependencies": {
+          "Microsoft.Data.Sqlite": "8.0.0",
+          "Microsoft.Extensions.Logging.Abstractions": "8.0.0"
+        },
+        "compile": {
+          "bin/placeholder/Darci.Nodes.dll": {}
+        },
+        "runtime": {
+          "bin/placeholder/Darci.Nodes.dll": {}
         }
       },
       "Darci.Personality/1.0.0": {
@@ -2401,6 +2416,11 @@
       "type": "project",
       "path": "../Darci.Memory.Graph/Darci.Memory.Graph.csproj",
       "msbuildProject": "../Darci.Memory.Graph/Darci.Memory.Graph.csproj"
+    },
+    "Darci.Nodes/1.0.0": {
+      "type": "project",
+      "path": "../Darci.Nodes/Darci.Nodes.csproj",
+      "msbuildProject": "../Darci.Nodes/Darci.Nodes.csproj"
     },
     "Darci.Personality/1.0.0": {
       "type": "project",
