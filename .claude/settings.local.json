@@ -36,7 +36,9 @@
       "Bash(grep -m 3 \"model\\\\|Model\" \"C:/Users/ROG/AppData/Local/Temp/darci-api6.log\" 2>/dev/null | head -5)",
       "Bash(grep \"\\\\.cs$\")",
       "Bash(rm -rf /c/Users/ROG/Documents/GitHub/DARCI-Live/tmp/levenshtein/levenshtein/)",
-      "Bash(rm -f /c/Users/ROG/Documents/GitHub/DARCI-Live/tmp/levenshtein/Levenshtein.cs)"
+      "Bash(rm -f /c/Users/ROG/Documents/GitHub/DARCI-Live/tmp/levenshtein/Levenshtein.cs)",
+      "Bash(git commit *)",
+      "Bash(gh pr create --base main --head feat/node-packet-protocol --title 'Unify confidence type and add generic node routing for coding' --body ' *)"
     ]
   }
 }

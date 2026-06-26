@@ -70,3 +70,5 @@ C:\Users\ROG\Documents\GitHub\DARCI-Live\DARCI-v4\Darci.Core\bin\Debug\net8.0\Da
 C:\Users\ROG\Documents\GitHub\DARCI-Live\DARCI-v4\Darci.Core\bin\Debug\net8.0\Darci.Research.Agents.pdb
 C:\Users\ROG\Documents\GitHub\DARCI-Live\DARCI-v4\Darci.Core\bin\Debug\net8.0\Darci.Memory.Graph.pdb
 C:\Users\ROG\Documents\GitHub\DARCI-Live\DARCI-v4\Darci.Core\bin\Debug\net8.0\Darci.Research.pdb
+C:\Users\ROG\Documents\GitHub\DARCI-Live\DARCI-v4\Darci.Core\bin\Debug\net8.0\Darci.Nodes.dll
+C:\Users\ROG\Documents\GitHub\DARCI-Live\DARCI-v4\Darci.Core\bin\Debug\net8.0\Darci.Nodes.pdb

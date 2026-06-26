@@ -42,3 +42,5 @@ C:\Users\ROG\Documents\GitHub\DARCI-Live\DARCI-v4\Darci.Research.Agents\bin\Debu
 C:\Users\ROG\Documents\GitHub\DARCI-Live\DARCI-v4\Darci.Research.Agents\bin\Debug\net8.0\Darci.Shared.pdb
 C:\Users\ROG\Documents\GitHub\DARCI-Live\DARCI-v4\Darci.Research.Agents\obj\Debug\net8.0\Darci.Re.4CD35EA4.Up2Date
 C:\Users\ROG\Documents\GitHub\DARCI-Live\DARCI-v4\Darci.Research.Agents\obj\Debug\net8.0\ref\Darci.Research.Agents.dll
+C:\Users\ROG\Documents\GitHub\DARCI-Live\DARCI-v4\Darci.Research.Agents\bin\Debug\net8.0\Darci.Nodes.dll
+C:\Users\ROG\Documents\GitHub\DARCI-Live\DARCI-v4\Darci.Research.Agents\bin\Debug\net8.0\Darci.Nodes.pdb
