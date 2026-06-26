@@ -22,7 +22,8 @@ public sealed class CodingAgentLoop : ICodingAgentLoop
     private const int MaxStepPromptContextFiles = 3;
     private const int MaxPlanSteps = 20;
     private const int EarlyEscalationAttempt = 1;   // trigger roadblock research at 2nd attempt
-    private const double LowConfidenceThreshold = 0.4;
+    // Low-confidence threshold now lives on the unified Confidence type (Confidence.LowThreshold = 0.4);
+    // see ShouldResearchOnLowConfidence which uses Confidence.IsLow.
     private const long MaxFullFileBytes = 51_200;    // 50 KB: send complete content below this
     private const int MaxFullFileChars = 40_000;     // truncate above this
 
@@ -35,6 +36,7 @@ public sealed class CodingAgentLoop : ICodingAgentLoop
     private readonly PatchApplier _patchApplier;
     private readonly ILogger<CodingAgentLoop> _logger;
     private readonly CodingNodeTracker _nodes;
+    private readonly INodeRouter? _nodeRouter;
 
     private readonly ConcurrentDictionary<string, Task> _runningTasks = new();
 
@@ -47,7 +49,8 @@ public sealed class CodingAgentLoop : ICodingAgentLoop
         IRoadblockDetector roadblockDetector,
         PatchApplier patchApplier,
         ILogger<CodingAgentLoop> logger,
-        INodePacketStore? packetStore = null)
+        INodePacketStore? packetStore = null,
+        INodeRouter? nodeRouter = null)
     {
         _store = store;
         _contextBuilder = contextBuilder;
@@ -60,9 +63,11 @@ public sealed class CodingAgentLoop : ICodingAgentLoop
         // Phase 0: every run is mirrored as a node packet. Optional (null store) so the loop still
         // works in environments that haven't wired the packet store; all calls are best-effort.
         _nodes = new CodingNodeTracker(packetStore, logger);
+        // Step B: knowledge handoff routes through the generic node router when available.
+        _nodeRouter = nodeRouter;
     }
 
-    public bool StartLoop(string taskId, RunCodingTaskRequest? options = null)
+    public bool StartLoop(string taskId, RunCodingTaskRequest? options = null, NodePacket? rootPacket = null)
     {
         if (_runningTasks.ContainsKey(taskId)) return false;
 
@@ -70,7 +75,7 @@ public sealed class CodingAgentLoop : ICodingAgentLoop
         {
             try
             {
-                await RunLoopAsync(taskId, options, CancellationToken.None);
+                await RunLoopAsync(taskId, options, rootPacket, CancellationToken.None);
             }
             catch (Exception ex)
             {
@@ -109,8 +114,7 @@ public sealed class CodingAgentLoop : ICodingAgentLoop
             LastStepResult = task.LastStepResult,
             RoadblockResearch = task.RoadblockResearch,
             VerificationResult = task.VerificationResult,
-            ConfidenceScore = task.ConfidenceScore,
-            ConfidenceNote = task.ConfidenceNote,
+            Confidence = task.Confidence,
             IsRunning = IsRunning(taskId),
             UpdatedAt = task.UpdatedAt
         };
@@ -118,7 +122,7 @@ public sealed class CodingAgentLoop : ICodingAgentLoop
 
     // ── Core loop ──────────────────────────────────────────────────────────
 
-    private async Task RunLoopAsync(string taskId, RunCodingTaskRequest? options, CancellationToken ct)
+    private async Task RunLoopAsync(string taskId, RunCodingTaskRequest? options, NodePacket? rootPacket, CancellationToken ct)
     {
         var task = await _store.GetTaskAsync(taskId, ct);
         if (task is null)
@@ -140,8 +144,12 @@ public sealed class CodingAgentLoop : ICodingAgentLoop
 
         task = await UpdateTaskStatusAsync(task, "in_progress", ct);
 
-        // Phase 0: mirror this run as a node packet (Working state, leased) for audit + orphan reaping.
-        await _nodes.BeginAsync(taskId, workspace.Id, task.Prompt, task.SuccessCriteria, ct);
+        // Mirror this run as a node packet (Working state, leased) for audit + orphan reaping.
+        // If routed here via the node router, continue that packet; otherwise mint a fresh one.
+        if (rootPacket is not null)
+            await _nodes.AdoptAsync(taskId, rootPacket, ct);
+        else
+            await _nodes.BeginAsync(taskId, workspace.Id, task.Prompt, task.SuccessCriteria, ct);
 
         var steps = DeserializeSteps(task.Plan);
         if (steps.Count == 0)
@@ -200,18 +208,13 @@ public sealed class CodingAgentLoop : ICodingAgentLoop
                 }
 
                 // Parse and store confidence annotation — both at task level and per step.
-                var (confidence, confidenceNote) = ParseConfidence(llmResponse);
-                if (confidence >= 0)
+                var confidence = ParseConfidence(llmResponse);
+                if (confidence.IsAssessed)
                 {
-                    steps[stepIndex] = steps[stepIndex] with
-                    {
-                        ConfidenceScore = confidence,
-                        ConfidenceNote = confidenceNote
-                    };
+                    steps[stepIndex] = steps[stepIndex] with { Confidence = confidence };
                     task = task with
                     {
-                        ConfidenceScore = confidence,
-                        ConfidenceNote = confidenceNote,
+                        Confidence = confidence,
                         Plan = JsonSerializer.Serialize(steps),
                         UpdatedAt = DateTime.UtcNow
                     };
@@ -242,11 +245,12 @@ public sealed class CodingAgentLoop : ICodingAgentLoop
 
                     if (cmdRun.ExitCode != 0)
                     {
-                        // Build failed — check roadblock early (at 2nd attempt onwards).
+                        // Build failed — escalate early (at 2nd attempt onwards). The gating classifier
+                        // decides between targeted duplicate-guidance and routed knowledge research.
                         if (attempt >= EarlyEscalationAttempt)
                         {
-                            await TryEscalateRoadblockAsync(task, workspace.Id, taskId, buildCommand,
-                                cmdRun.StderrTail, ct,
+                            await TryKnowledgeHandoffAsync(task, workspace.Id, taskId, buildCommand,
+                                stepResult, ct,
                                 updated => task = updated);
                         }
 
@@ -293,11 +297,9 @@ public sealed class CodingAgentLoop : ICodingAgentLoop
                                 taskId, stepIndex + 1, attempt + 1);
 
                             // Proactive low-confidence research (before spending more retries).
-                            if (confidence >= 0 && confidence < LowConfidenceThreshold
-                                && !string.IsNullOrWhiteSpace(confidenceNote)
-                                && !string.Equals(confidenceNote, "nothing", StringComparison.OrdinalIgnoreCase))
+                            if (ShouldResearchOnLowConfidence(confidence))
                             {
-                                await TryProactiveResearchAsync(task, taskId, confidenceNote, ct,
+                                await TryProactiveResearchAsync(task, taskId, confidence.Note!, ct,
                                     updated => task = updated);
                             }
 
@@ -305,8 +307,8 @@ public sealed class CodingAgentLoop : ICodingAgentLoop
                             {
                                 // Pass stepResult (full test output) not just stderr — test assertion
                                 // failures go to stdout and stderr is empty, so using stepResult
-                                // gives Tavily the actual "Expected X, Actual Y" context to search on.
-                                await TryEscalateRoadblockAsync(task, workspace.Id, taskId, testCommand,
+                                // gives the knowledge node the actual "Expected X, Actual Y" context.
+                                await TryKnowledgeHandoffAsync(task, workspace.Id, taskId, testCommand,
                                     stepResult, ct,
                                     updated => task = updated);
                             }
@@ -322,13 +324,10 @@ public sealed class CodingAgentLoop : ICodingAgentLoop
                             continue;
                         }
                     }
-                    else if (testCommand is null
-                             && confidence >= 0 && confidence < LowConfidenceThreshold
-                             && !string.IsNullOrWhiteSpace(confidenceNote)
-                             && !string.Equals(confidenceNote, "nothing", StringComparison.OrdinalIgnoreCase))
+                    else if (testCommand is null && ShouldResearchOnLowConfidence(confidence))
                     {
                         // Build succeeded, no test command, model is uncertain — do proactive research.
-                        await TryProactiveResearchAsync(task, taskId, confidenceNote, ct,
+                        await TryProactiveResearchAsync(task, taskId, confidence.Note!, ct,
                             updated => task = updated);
                     }
 
@@ -367,8 +366,7 @@ public sealed class CodingAgentLoop : ICodingAgentLoop
             // Append a node-packet log entry for this step (audit + lease renewal).
             await _nodes.RecordAsync(taskId,
                 decision: $"Step {stepIndex + 1}/{steps.Count} '{step.Description}' → {finalStepStatus}",
-                confidenceScore: steps[stepIndex].ConfidenceScore,
-                confidenceNote: steps[stepIndex].ConfidenceNote,
+                confidence: steps[stepIndex].Confidence,
                 success: stepSuccess,
                 ct: ct);
         }
@@ -444,32 +442,101 @@ public sealed class CodingAgentLoop : ICodingAgentLoop
 
     // ── Escalation helpers ─────────────────────────────────────────────────
 
-    private async Task TryEscalateRoadblockAsync(
+    /// <summary>
+    /// Gated escalation (Step B). Classifies the failure first: a self-inflicted duplicate
+    /// (CS0101/CS0111) gets targeted guidance and NO research — research is reserved for genuine
+    /// knowledge gaps, which are routed to the knowledge node as a child packet through the generic
+    /// router. Falls back to the legacy roadblock detector if the router is not wired.
+    /// </summary>
+    private async Task TryKnowledgeHandoffAsync(
         CodingTaskRecord task,
         string workspaceId,
         string taskId,
         string command,
-        string stderrSnippet,
+        string failureOutput,
         CancellationToken ct,
         Action<CodingTaskRecord> updateTask)
     {
         try
         {
-            var research = await _roadblockDetector.CheckAndResearchAsync(
-                workspaceId, taskId, command, stderrSnippet, ct);
+            // GATE: is this a self-inflicted duplicate (CS0101/CS0111)? If so, skip research entirely.
+            var classification = BuildFailureClassifier.Classify(failureOutput);
+            if (!classification.ShouldResearch && classification.TargetedGuidance is not null)
+            {
+                _logger.LogInformation(
+                    "Task {TaskId}: self-inflicted duplicate ({Symbols}) — injecting targeted guidance, skipping research.",
+                    taskId, string.Join(", ", classification.DuplicateSymbols));
 
+                await _nodes.RecordAsync(taskId,
+                    decision: "Gated escalation: self-inflicted duplicate (CS0101/CS0111) — skipped research, injected guidance.",
+                    success: false,
+                    artifacts: classification.DuplicatePaths,
+                    ct: ct);
+
+                ApplyEscalationResult(task, classification.TargetedGuidance, updateTask, out task);
+                await _store.UpdateTaskAsync(task, ct);
+                return;
+            }
+
+            // GENUINE GAP: route to the knowledge node via the generic router (packet handoff).
+            if (_nodeRouter is not null)
+            {
+                var findings = await RouteKnowledgeGapAsync(task, taskId, command, failureOutput, ct);
+                if (!string.IsNullOrWhiteSpace(findings))
+                {
+                    await _nodes.RecordAsync(taskId,
+                        decision: "Gated escalation: routed knowledge gap to knowledge node.",
+                        ct: ct);
+                    ApplyEscalationResult(task, findings, updateTask, out task);
+                    await _store.UpdateTaskAsync(task, ct);
+                }
+                return;
+            }
+
+            // FALLBACK: no router wired — use the legacy roadblock detector directly.
+            var research = await _roadblockDetector.CheckAndResearchAsync(
+                workspaceId, taskId, command, failureOutput, ct);
             if (!string.IsNullOrWhiteSpace(research) && research != task.RoadblockResearch)
             {
-                var combined = AppendResearch(task.RoadblockResearch, research);
-                var updated = task with { RoadblockResearch = combined, UpdatedAt = DateTime.UtcNow };
-                await _store.UpdateTaskAsync(updated, ct);
-                updateTask(updated);
+                ApplyEscalationResult(task, research, updateTask, out task);
+                await _store.UpdateTaskAsync(task, ct);
             }
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            _logger.LogDebug(ex, "Roadblock escalation check failed (non-fatal).");
+            _logger.LogDebug(ex, "Knowledge handoff failed (non-fatal).");
         }
+    }
+
+    /// <summary>Routes a FillKnowledgeGap child packet to the knowledge node and returns its findings.</summary>
+    private async Task<string?> RouteKnowledgeGapAsync(
+        CodingTaskRecord task, string taskId, string command, string failureOutput, CancellationToken ct)
+    {
+        var question = $"Task: {task.Prompt}. The command '{command}' is failing — what is the correct implementation?";
+        var failureContext = failureOutput.Length > 600 ? failureOutput[^600..] : failureOutput;
+
+        var child = NodePacket.Create(
+            intent: question,
+            capability: Capability.FillKnowledgeGap,
+            correlationId: _nodes.CurrentCorrelationId(taskId),
+            slots: new Dictionary<string, string>
+            {
+                [PacketSlots.Question] = question,
+                [PacketSlots.FailureContext] = failureContext,
+            });
+
+        var result = await _nodeRouter!.DispatchAsync(child, ct);
+        return result.Payload.Slot(PacketSlots.KnowledgeFindings);
+    }
+
+    /// <summary>Appends escalation output to the task's research field (capped) and publishes the update.</summary>
+    private static void ApplyEscalationResult(
+        CodingTaskRecord task, string addition, Action<CodingTaskRecord> updateTask,
+        out CodingTaskRecord updated)
+    {
+        var combined = AppendResearch(task.RoadblockResearch, addition);
+        updated = task with { RoadblockResearch = combined, UpdatedAt = DateTime.UtcNow };
+        updateTask(updated);
     }
 
     private async Task TryProactiveResearchAsync(
@@ -482,7 +549,7 @@ public sealed class CodingAgentLoop : ICodingAgentLoop
         try
         {
             _logger.LogInformation("Task {TaskId}: low confidence ({Score:F2}), running proactive research on: {Note}",
-                taskId, task.ConfidenceScore, confidenceNote.Length > 80 ? confidenceNote[..80] : confidenceNote);
+                taskId, task.Confidence.Score, confidenceNote.Length > 80 ? confidenceNote[..80] : confidenceNote);
 
             var question = $"[Task: {task.Prompt}] After implementing, the model reports uncertainty about: {confidenceNote}. " +
                            "Provide concrete guidance to resolve this uncertainty correctly.";
@@ -620,10 +687,14 @@ public sealed class CodingAgentLoop : ICodingAgentLoop
 
     // ── Response parsing ───────────────────────────────────────────────────
 
-    private static (double Confidence, string Note) ParseConfidence(string response)
+    /// <summary>
+    /// Parses the model's self-assessed CONFIDENCE/UNSURE_ABOUT annotations into the unified
+    /// <see cref="Confidence"/> type. Returns <see cref="Confidence.Unassessed"/> if no score was given.
+    /// </summary>
+    private static Confidence ParseConfidence(string response)
     {
-        var confidence = -1.0;
-        var note = "";
+        var score = -1.0;
+        string? note = null;
 
         foreach (var line in response.Split('\n'))
         {
@@ -632,7 +703,7 @@ public sealed class CodingAgentLoop : ICodingAgentLoop
             {
                 var val = trimmed["CONFIDENCE:".Length..].Trim();
                 if (double.TryParse(val, NumberStyles.Float, CultureInfo.InvariantCulture, out var d))
-                    confidence = Math.Clamp(d, 0.0, 1.0);
+                    score = Math.Clamp(d, 0.0, 1.0);
             }
             else if (trimmed.StartsWith("UNSURE_ABOUT:", StringComparison.OrdinalIgnoreCase))
             {
@@ -640,8 +711,18 @@ public sealed class CodingAgentLoop : ICodingAgentLoop
             }
         }
 
-        return (confidence, note);
+        return Confidence.Of(score, note);
     }
+
+    /// <summary>
+    /// Whether a low-confidence signal warrants proactive research: the model assessed itself low
+    /// (preserves the prior 0.4 threshold via <see cref="Confidence.IsLow"/>) AND named a concrete
+    /// uncertainty (not blank, not "nothing").
+    /// </summary>
+    internal static bool ShouldResearchOnLowConfidence(Confidence confidence) =>
+        confidence.IsLow
+        && !string.IsNullOrWhiteSpace(confidence.Note)
+        && !string.Equals(confidence.Note, "nothing", StringComparison.OrdinalIgnoreCase);
 
     private static string StripMetaAnnotations(string response)
     {

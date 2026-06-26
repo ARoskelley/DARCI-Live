@@ -65,15 +65,19 @@ public static class NodeStateMachine
     {
         if (from.IsTerminal()) return false;          // terminal is forever
         if (from == to) return true;                  // idempotent re-write of same state is allowed
-        if (to == NodeState.Aborted) return true;     // anything active can always be aborted
 
+        // Anything active can always fail or be aborted — a node may reject at routing/acceptance, the
+        // watchdog may reap at any active point, and resolution can fail before work starts.
+        if (to is NodeState.Aborted or NodeState.Failed) return true;
+
+        // Succeeded requires having actually worked.
         return from switch
         {
             NodeState.Created => to is NodeState.Routed,
             NodeState.Routed => to is NodeState.Accepted,
             NodeState.Accepted => to is NodeState.Working,
-            NodeState.Working => to is NodeState.AwaitingDependency or NodeState.Succeeded or NodeState.Failed,
-            NodeState.AwaitingDependency => to is NodeState.Working or NodeState.Succeeded or NodeState.Failed,
+            NodeState.Working => to is NodeState.AwaitingDependency or NodeState.Succeeded,
+            NodeState.AwaitingDependency => to is NodeState.Working or NodeState.Succeeded,
             _ => false,
         };
     }

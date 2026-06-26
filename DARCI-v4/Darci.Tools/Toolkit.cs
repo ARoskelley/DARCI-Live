@@ -178,8 +178,8 @@ Be concise and factual. If you don't know something, say so.";
         }
 
         var prefix = outcome.IsUncertain
-            ? $"[Confidence: {outcome.Confidence:P0} - UNCERTAIN] "
-            : $"[Confidence: {outcome.Confidence:P0}] ";
+            ? $"[Confidence: {outcome.Confidence.Score:P0} - UNCERTAIN] "
+            : $"[Confidence: {outcome.Confidence.Score:P0}] ";
 
         return prefix + outcome.FinalAnswer;
     }

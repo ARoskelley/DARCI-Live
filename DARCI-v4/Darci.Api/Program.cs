@@ -238,7 +238,8 @@ builder.Services.AddSingleton<Decision>(sp =>
         sp.GetRequiredService<IDecisionNetwork>(),
         sp.GetService<EngineeringGoalDetector>(),
         sp.GetService<IConfidenceTracker>(),
-        sp.GetService<GoalDecomposer>()));
+        sp.GetService<GoalDecomposer>(),
+        sp.GetService<CodingGoalDetector>()));
 
 // DARCI herself - the background service
 // BomGenerator + AutonomousBundler (autonomous engineering path)
@@ -266,7 +267,8 @@ builder.Services.AddSingleton<Darci.Core.Darci>(sp =>
         sp.GetRequiredService<ConstraintExtractor>(),
         sp.GetRequiredService<IAutonomousBundler>(),
         sp.GetRequiredService<BomGenerator>(),
-        sp.GetRequiredService<IGoalManager>()));
+        sp.GetRequiredService<IGoalManager>(),
+        sp.GetService<INodeRouter>()));
 builder.Services.AddHostedService(sp => sp.GetRequiredService<Darci.Core.Darci>());
 
 // Controllers
@@ -316,6 +318,13 @@ builder.Services.AddSingleton<INodePacketStore>(sp =>
         sp.GetRequiredService<ILogger<SqliteNodePacketStore>>()));
 builder.Services.AddSingleton<NodeWatchdog>();
 builder.Services.AddHostedService<NodeWatchdogService>();
+
+// Nodes registered with the router (Step B). CodingNode takes a Lazy<ICodingAgentLoop> to break the
+// DI cycle (router → CodingNode → loop → router). New nodes (engineering, biomed) register here.
+builder.Services.AddSingleton(sp => new Lazy<ICodingAgentLoop>(sp.GetRequiredService<ICodingAgentLoop>));
+builder.Services.AddSingleton<INode, CodingNode>();
+builder.Services.AddSingleton<INode, KnowledgeNode>();
+builder.Services.AddSingleton<INodeRouter, NodeRouter>();
 
 // === Coding Workspace Services ===
 builder.Services.AddSingleton<ICodingWorkspaceStore>(sp =>
@@ -380,6 +389,9 @@ builder.Services.AddSingleton<IEngineeringNetwork>(sp =>
 
 // Engineering goal detector (keyword-based)
 builder.Services.AddSingleton<EngineeringGoalDetector>();
+
+// Coding goal detector (keyword-based) — lets the living loop route coding goals to the coding node
+builder.Services.AddSingleton<CodingGoalDetector>();
 
 // Engineering orchestrator — wires workbench + network together
 builder.Services.AddSingleton<EngineeringOrchestrator>(sp =>

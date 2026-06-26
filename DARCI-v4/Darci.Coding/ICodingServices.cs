@@ -76,8 +76,12 @@ public interface IKgEnrichmentService
 /// <summary>Drives the autonomous edit–test–debug loop for a coding task.</summary>
 public interface ICodingAgentLoop
 {
-    /// <summary>Starts the loop for the given task in the background. Returns false if already running.</summary>
-    bool StartLoop(string taskId, RunCodingTaskRequest? options = null);
+    /// <summary>
+    /// Starts the loop for the given task in the background. Returns false if already running.
+    /// When <paramref name="rootPacket"/> is supplied (the loop was reached via the node router), the
+    /// run's audit log continues on that packet; otherwise a fresh packet is minted (direct REST path).
+    /// </summary>
+    bool StartLoop(string taskId, RunCodingTaskRequest? options = null, Darci.Nodes.NodePacket? rootPacket = null);
     /// <summary>Returns true if a loop is currently running for the given task.</summary>
     bool IsRunning(string taskId);
     Task<CodingTaskStatusResponse?> GetStatusAsync(string taskId, CancellationToken ct = default);
