@@ -16,7 +16,29 @@
       "Bash(Remove-Item \"C:\\\\Users\\\\aiden\\\\OneDrive\\\\Documents\\\\GitHub\\\\ProgDS\\\\DARCI-Live\\\\DARCI-v4\\\\Darci.Coding.Tests\\\\UnitTest1.cs\")",
       "Bash(ls -la \"C:\\\\Users\\\\aiden\\\\DarciTestBench\" 2>&1 | head -40; echo \"--- has Darci.Coding? ---\"; ls \"C:\\\\Users\\\\aiden\\\\DarciTestBench\\\\Darci.Coding\" 2>&1 | head; echo \"--- has tests project? ---\"; ls \"C:\\\\Users\\\\aiden\\\\DarciTestBench\\\\Darci.Coding.Tests\" 2>&1 | head; echo \"--- sln? ---\"; ls \"C:\\\\Users\\\\aiden\\\\DarciTestBench\"/*.sln 2>&1)",
       "PowerShell(ollama pull qwen2.5-coder:7b 2>&1)",
-      "Bash(iconv -f UTF-16LE -t UTF-8 api_restart.log)"
+      "Bash(iconv -f UTF-16LE -t UTF-8 api_restart.log)",
+      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\ROG\\\\Documents\\\\GitHub\\\\DARCI-Live\\\\DARCI-v4\\\\Darci.Api\\\\\" | Where-Object { $_.Name -notlike \"obj\" } | Select-Object Name)",
+      "Bash(dotnet build *)",
+      "Bash(grep -v \"^Build\\\\|^$\\\\|assets\\\\|Skipping\\\\|up-to-date\")",
+      "PowerShell(& \"C:\\\\Users\\\\ROG\\\\Documents\\\\GitHub\\\\DARCI-Live\\\\Test-DARCIEnvironment.ps1\" 2>&1)",
+      "Bash(python -c \"import sys,json; data=json.load\\(sys.stdin\\); [print\\(m['name']\\) for m in data.get\\('models', []\\)]\")",
+      "Bash(dotnet run *)",
+      "Bash(echo \"API starting in background, PID=$!\")",
+      "Bash(Start-Sleep 8)",
+      "Bash(curl -s http://localhost:5081/)",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d, indent=2\\)\\)\")",
+      "Bash(curl -sv -X POST http://localhost:5081/coding/workspaces/import -H 'Content-Type: application/json' -d '{\"rootPath\":\"C:\\\\\\\\Users\\\\\\\\ROG\\\\\\\\Documents\\\\\\\\GitHub\\\\\\\\DARCI-Live\\\\\\\\tmp\\\\\\\\testproject\",\"name\":\"testproject\",\"description\":\"Small test project for accuracy validation\",\"language\":\"csharp\"}')",
+      "Bash(Get-Process -Name \"dotnet\" -ErrorAction SilentlyContinue)",
+      "Bash(Stop-Process -Force)",
+      "Bash(Start-Sleep -Seconds 1)",
+      "Bash(echo \"Started PID=$!\")",
+      "Bash(dir \"C:/Users/ROG/Documents/GitHub/DARCI-Live/tmp/dammproject/\")",
+      "Bash(grep -m 3 \"model\\\\|Model\" \"C:/Users/ROG/AppData/Local/Temp/darci-api6.log\" 2>/dev/null | head -5)",
+      "Bash(grep \"\\\\.cs$\")",
+      "Bash(rm -rf /c/Users/ROG/Documents/GitHub/DARCI-Live/tmp/levenshtein/levenshtein/)",
+      "Bash(rm -f /c/Users/ROG/Documents/GitHub/DARCI-Live/tmp/levenshtein/Levenshtein.cs)",
+      "Bash(git commit *)",
+      "Bash(gh pr create --base main --head feat/node-packet-protocol --title 'Unify confidence type and add generic node routing for coding' --body ' *)"
     ]
   }
 }

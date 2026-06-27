@@ -21,3 +21,6 @@ DARCI-v4/Workspaces/
 # IDE/user files
 .idea/
 *.user
+
+# Local scratch / test sandboxes
+tmp/
