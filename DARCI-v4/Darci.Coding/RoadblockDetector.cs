@@ -11,7 +11,10 @@ namespace Darci.Coding;
 /// </summary>
 public sealed class RoadblockDetector : IRoadblockDetector
 {
-    private const int ConsecutiveFailureThreshold = 3;
+    // 2 consecutive failures (not 3) so research can still be used on the final retry.
+    // With MaxRetries = 3: after attempt 1 fails we have 2 runs → threshold met → research
+    // triggered → attempt 2 has the research in context.
+    private const int ConsecutiveFailureThreshold = 2;
 
     private readonly ICodingWorkspaceStore _store;
     private readonly IDeepResearchOrchestrator _research;
@@ -34,9 +37,14 @@ public sealed class RoadblockDetector : IRoadblockDetector
         string stderrSnippet,
         CancellationToken ct = default)
     {
-        var recentRuns = await _store.GetRecentCommandRunsForTaskAsync(taskId, ConsecutiveFailureThreshold + 2, ct);
+        // Filter to runs of the same command type so that a passing build between two
+        // test failures doesn't break the consecutive-failure streak.
+        var commandPrefix = string.Join(" ", failingCommand.Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2));
+        var recentRuns = (await _store.GetRecentCommandRunsForTaskAsync(taskId, ConsecutiveFailureThreshold + 4, ct))
+            .Where(r => r.DisplayCommand.StartsWith(commandPrefix, StringComparison.OrdinalIgnoreCase))
+            .ToList();
 
-        // Check if last N runs are all failures.
+        // Check if last N runs of this command type are all failures.
         var lastRuns = recentRuns.Take(ConsecutiveFailureThreshold).ToList();
         var allFailed = lastRuns.Count >= ConsecutiveFailureThreshold
             && lastRuns.All(r => r.ExitCode != 0 || r.TimedOut);
