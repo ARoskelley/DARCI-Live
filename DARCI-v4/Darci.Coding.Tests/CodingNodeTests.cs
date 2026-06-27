@@ -37,15 +37,27 @@ public class CodingNodeTests
             => Task.FromResult<CodingTaskStatusResponse?>(null);
     }
 
-    private static CodingNode MakeNode(FakeTaskService ts, FakeLoop loop) =>
-        new(ts, new Lazy<ICodingAgentLoop>(() => loop), NullLogger<CodingNode>.Instance);
+    private sealed class FakeResolver : IWorkContextResolver
+    {
+        private readonly WorkContextResolution _resolution;
+        public string? AskedIntent;
+        public FakeResolver(WorkContextResolution resolution) => _resolution = resolution;
+        public Task<WorkContextResolution> ResolveAsync(string intent, CancellationToken ct = default)
+        {
+            AskedIntent = intent;
+            return Task.FromResult(_resolution);
+        }
+    }
+
+    private static CodingNode MakeNode(FakeTaskService ts, FakeLoop loop, IWorkContextResolver? resolver = null) =>
+        new(ts, new Lazy<ICodingAgentLoop>(() => loop), NullLogger<CodingNode>.Instance, resolver);
 
     [Fact]
-    public async Task MissingWorkspace_FailsPacket_WithoutCreatingTask()
+    public async Task MissingWorkspace_NoResolver_FailsPacket()
     {
         var ts = new FakeTaskService();
         var loop = new FakeLoop();
-        var node = MakeNode(ts, loop);
+        var node = MakeNode(ts, loop);   // no resolver wired
 
         var packet = NodePacket.Create("implement something", capability: Capability.WriteCode)
             .Transition(NodeId.Orchestrator, NodeState.Routed, "routed");
@@ -55,6 +67,52 @@ public class CodingNodeTests
         Assert.Equal(NodeState.Failed, result.State);
         Assert.Null(ts.LastRequest);          // no task created
         Assert.Null(loop.StartedTaskId);      // loop never started
+    }
+
+    [Fact]
+    public async Task MissingWorkspace_WithResolver_ResolvesLogsAndProceeds()
+    {
+        var ts = new FakeTaskService();
+        var loop = new FakeLoop();
+        var resolver = new FakeResolver(new WorkContextResolution(
+            ContextId: "ws-new", Created: true, Confidence: Confidence.Of(0.2),
+            Reasoning: "Best existing match 0.20 below reuse threshold; created a fresh workspace."));
+        var node = MakeNode(ts, loop, resolver);
+
+        var packet = NodePacket.Create("implement a Damm checksum", capability: Capability.WriteCode)
+            .Transition(NodeId.Orchestrator, NodeState.Routed, "routed");
+
+        var result = await node.HandleAsync(packet);
+
+        // Resolver consulted with the intent; chosen workspace used for the task + slot.
+        Assert.Equal("implement a Damm checksum", resolver.AskedIntent);
+        Assert.Equal("ws-new", ts.LastRequest!.WorkspaceId);
+        Assert.Equal("ws-new", result.Payload.Slot(PacketSlots.WorkspaceId));
+        Assert.Equal(NodeState.Working, result.State);
+
+        // The selection decision landed in the packet log: a Working entry with the reasoning,
+        // the match confidence, and the workspace recorded as an artifact.
+        var entry = result.Log.Last(e => e.Decision.Contains("Workspace", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains("created", entry.Decision, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(0.2, entry.Confidence.Score, 5);
+        Assert.Contains("ws-new", entry.Artifacts);
+    }
+
+    [Fact]
+    public async Task MissingWorkspace_ResolverReturnsEmpty_FailsPacket()
+    {
+        var ts = new FakeTaskService();
+        var loop = new FakeLoop();
+        var resolver = new FakeResolver(new WorkContextResolution("", false, Confidence.Unassessed, "could not resolve"));
+        var node = MakeNode(ts, loop, resolver);
+
+        var packet = NodePacket.Create("do coding", capability: Capability.WriteCode)
+            .Transition(NodeId.Orchestrator, NodeState.Routed, "routed");
+
+        var result = await node.HandleAsync(packet);
+
+        Assert.Equal(NodeState.Failed, result.State);
+        Assert.Null(ts.LastRequest);
     }
 
     [Fact]

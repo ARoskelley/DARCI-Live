@@ -353,6 +353,18 @@ builder.Services.AddSingleton<IWorkspaceScanner>(sp =>
         sp.GetRequiredService<IKgEnrichmentService>(),
         sp.GetRequiredService<ILogger<WorkspaceScanner>>()));
 
+// Workspace-selection seam: lets the coding node pick or create a workspace for an autonomous
+// coding goal. Auto-created workspaces land under the gitignored DARCI-v4/Workspaces directory.
+var codingWorkspacesRoot = Environment.GetEnvironmentVariable("DARCI_CODING_WORKSPACES_ROOT")
+    ?? Path.GetFullPath(Path.Combine(builder.Environment.ContentRootPath, "..", "Workspaces"));
+builder.Services.AddSingleton<IWorkContextResolver>(sp =>
+    new CodingWorkspaceResolver(
+        sp.GetRequiredService<ICodingWorkspaceStore>(),
+        sp.GetRequiredService<IModelRouter>(),
+        sp.GetRequiredService<IWorkspaceScanner>(),
+        codingWorkspacesRoot,
+        sp.GetRequiredService<ILogger<CodingWorkspaceResolver>>()));
+
 builder.Services.AddSingleton<ISafeCommandRunner, SafeCommandRunner>();
 builder.Services.AddSingleton<IGitCheckpointService, GitCheckpointService>();
 
