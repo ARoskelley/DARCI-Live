@@ -1,8 +1,17 @@
-# Local secrets
-.env.local
-.env.engineering.local
+# Local secrets / environment files (NEVER commit real keys)
+# Ignore all env files everywhere, but keep *.example templates tracked.
+.env
+.env.*
+**/.env
+**/.env.*
+!**/*.example
+!*.example
+# Local app secrets / per-machine overrides
 **/appsettings.Secrets.json
 **/*.Secrets.json
+**/appsettings.*.local.json
+**/secrets.json
+secrets.json
 
 # Build output
 **/bin/
