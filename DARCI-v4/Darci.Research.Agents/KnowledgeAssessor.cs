@@ -3,6 +3,7 @@
 using Darci.Memory.Confidence;
 using Darci.Memory.Graph;
 using Darci.Memory.Graph.Models;
+using Darci.Nodes;
 using Darci.Research.Agents.Models;
 using Microsoft.Extensions.Logging;
 
@@ -70,7 +71,7 @@ public sealed class KnowledgeAssessor
             return new KnowledgeAssessment
             {
                 Topic = topic,
-                GraphConfidence = graphConfidence,
+                Confidence = Confidence.Of(graphConfidence),
                 SupportingClaims = synthesis.SupportingClaims,
                 RelevantEntities = entities,
                 Decision = DispatchDecision.SkipAgents,
@@ -86,7 +87,7 @@ public sealed class KnowledgeAssessor
             return new KnowledgeAssessment
             {
                 Topic = topic,
-                GraphConfidence = graphConfidence,
+                Confidence = Confidence.Of(graphConfidence),
                 SupportingClaims = synthesis.SupportingClaims,
                 RelevantEntities = entities,
                 Decision = DispatchDecision.RunAgents,
@@ -128,7 +129,7 @@ Answer YES if external research is needed. Answer NO if existing knowledge is su
         return new KnowledgeAssessment
         {
             Topic = topic,
-            GraphConfidence = graphConfidence,
+            Confidence = Confidence.Of(graphConfidence),
             SupportingClaims = synthesis.SupportingClaims,
             RelevantEntities = entities,
             LlmClassifiedAsGap = llmClassified,
