@@ -16,7 +16,11 @@ public static class PacketSlots
     public const string Question = "question";
     public const string FailureContext = "failureContext";
 
+    // Knowledge node — request
+    public const string KnowledgeKind = "knowledgeKind";
+
     // Knowledge node — response
-    public const string KnowledgeFindings = "knowledgeFindings";
+    public const string KnowledgeFindings = "knowledgeFindings";          // human/agent-readable rendering (legacy/compat)
     public const string KnowledgeConfidence = "knowledgeConfidence";
+    public const string KnowledgeResponse = "knowledgeResponse";          // structured KnowledgeResponse as JSON (decision 4)
 }

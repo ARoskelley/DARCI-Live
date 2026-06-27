@@ -9,7 +9,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Darci.Research.Agents;
 
-public sealed class KnowledgeAssessor
+public sealed class KnowledgeAssessor : IKnowledgeAssessor
 {
     /// <summary>Graph confidence at or above this = skip agents entirely.</summary>
     public const float HighConfidenceThreshold = 0.65f;

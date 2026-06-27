@@ -13,6 +13,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+      <_Parameter1>Darci.Research.Agents.Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Darci.Research\Darci.Research.csproj" />
     <ProjectReference Include="..\Darci.Memory.Graph\Darci.Memory.Graph.csproj" />
     <ProjectReference Include="..\Darci.Memory.Confidence\Darci.Memory.Confidence.csproj" />

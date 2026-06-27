@@ -309,6 +309,14 @@ builder.Services.AddSingleton<DeepResearchOrchestrator>(sp => new DeepResearchOr
 builder.Services.AddSingleton<IDeepResearchOrchestrator>(sp =>
     sp.GetRequiredService<DeepResearchOrchestrator>());
 
+// Phase 2: rigid KG/DR pipeline — admin/KG (assessor) + review agent + compiler agent, behind the
+// KnowledgeNode, producing a structured KnowledgeResponse.
+builder.Services.AddSingleton<IKnowledgeAssessor>(sp => sp.GetRequiredService<KnowledgeAssessor>());
+builder.Services.AddSingleton<IKnowledgeReviewAgent, OllamaKnowledgeReviewAgent>();
+builder.Services.AddSingleton<IKnowledgeCompilerAgent, OllamaKnowledgeCompilerAgent>();
+builder.Services.AddSingleton(new KnowledgePipelineOptions());
+builder.Services.AddSingleton<IKnowledgePipeline, KnowledgePipeline>();
+
 // === Node Packet Protocol (Phase 0) ===
 // Shared envelope + state machine + watchdog. Currently only the coding node emits packets, but the
 // store/watchdog are app-wide so later nodes (engineering, knowledge, living loop) plug straight in.

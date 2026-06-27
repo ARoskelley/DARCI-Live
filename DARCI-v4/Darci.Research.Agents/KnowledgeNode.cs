@@ -1,29 +1,34 @@
 #nullable enable
 
+using System.Text.Json;
 using Darci.Nodes;
+using Darci.Research.Agents.Models;
 using Microsoft.Extensions.Logging;
 
 namespace Darci.Research.Agents;
 
 /// <summary>
-/// The KG / deep-research node as an <see cref="INode"/> (Step B). Wraps the existing
-/// <see cref="IDeepResearchOrchestrator"/> behind the packet contract so other nodes reach it by
-/// routing a packet (capability <see cref="Capability.FillKnowledgeGap"/> /
-/// <see cref="Capability.AnswerKnowledge"/>) instead of calling it directly — the packet-routed
-/// replacement for the hardcoded eng→research handoff.
+/// The KG / deep-research node as an <see cref="INode"/>, hardened in Phase 2 into a rigid black box:
+/// a <see cref="KnowledgeRequest"/> in, a structured <see cref="KnowledgeResponse"/> out (decision 4).
+/// The pipeline (admin/KG → review → escalate → compile → review) runs inside; the node only translates
+/// between the packet and the contract.
 ///
-/// Input slots:  <see cref="PacketSlots.Question"/> (required), <see cref="PacketSlots.FailureContext"/> (optional).
-/// Output slots: <see cref="PacketSlots.KnowledgeFindings"/>, <see cref="PacketSlots.KnowledgeConfidence"/>.
-/// Runs to completion synchronously (research is bounded), then returns the packet in a terminal state.
+/// Input slots:  <see cref="PacketSlots.Question"/> (falls back to Intent), <see cref="PacketSlots.FailureContext"/>,
+///               <see cref="PacketSlots.KnowledgeKind"/> (optional).
+/// Output slots: <see cref="PacketSlots.KnowledgeResponse"/> (structured JSON),
+///               <see cref="PacketSlots.KnowledgeFindings"/> (compat rendering),
+///               <see cref="PacketSlots.KnowledgeConfidence"/>.
 /// </summary>
 public sealed class KnowledgeNode : INode
 {
-    private readonly IDeepResearchOrchestrator _research;
+    private static readonly JsonSerializerOptions JsonOpts = new() { WriteIndented = false };
+
+    private readonly IKnowledgePipeline _pipeline;
     private readonly ILogger<KnowledgeNode> _logger;
 
-    public KnowledgeNode(IDeepResearchOrchestrator research, ILogger<KnowledgeNode> logger)
+    public KnowledgeNode(IKnowledgePipeline pipeline, ILogger<KnowledgeNode> logger)
     {
-        _research = research;
+        _pipeline = pipeline;
         _logger = logger;
     }
 
@@ -34,46 +39,52 @@ public sealed class KnowledgeNode : INode
 
     public async Task<NodePacket> HandleAsync(NodePacket packet, CancellationToken ct = default)
     {
-        // Drive Routed → Accepted → Working.
         packet = AdvanceToWorking(packet);
 
-        var question = packet.Payload.Slot(PacketSlots.Question) ?? packet.Payload.Intent;
-        var failureContext = packet.Payload.Slot(PacketSlots.FailureContext);
-        var fullQuestion = string.IsNullOrWhiteSpace(failureContext)
-            ? question
-            : $"{question}\n\nObserved failure context:\n{failureContext}";
-
+        var request = BuildRequest(packet);
         _logger.LogInformation("KnowledgeNode handling packet {Id}: {Q}",
-            packet.Id, question.Length > 100 ? question[..100] : question);
+            packet.Id, request.Question.Length > 100 ? request.Question[..100] : request.Question);
 
         try
         {
-            var outcome = await _research.RunDeepResearchAsync(fullQuestion, "DARCI", ct);
+            var response = await _pipeline.RunAsync(request, ct);
 
-            if (outcome.IsSuccess && !string.IsNullOrWhiteSpace(outcome.FinalAnswer))
-            {
-                packet = packet
-                    .WithSlot(PacketSlots.KnowledgeFindings, outcome.FinalAnswer)
-                    .WithSlot(PacketSlots.KnowledgeConfidence, outcome.Confidence.Score.ToString("0.###"));
+            packet = packet
+                .WithSlot(PacketSlots.KnowledgeResponse, JsonSerializer.Serialize(response, JsonOpts))
+                .WithSlot(PacketSlots.KnowledgeFindings, response.ToReviewText())
+                .WithSlot(PacketSlots.KnowledgeConfidence, response.Confidence.Score.ToString("0.###"));
 
-                return packet.Transition(NodeId.Knowledge, NodeState.Succeeded,
-                    "Research synthesized findings.",
-                    confidence: outcome.Confidence,
-                    success: true);
-            }
+            // The node SUCCEEDS at producing a structured response even when that response reports gaps —
+            // "answered=false with explicit gaps" is a useful, trustworthy result for the caller.
+            var decision = response.Answered
+                ? "Structured knowledge response produced (answered)."
+                : $"Structured knowledge response produced with {response.Gaps.Count} gap(s).";
 
-            return packet.Transition(NodeId.Knowledge, NodeState.Failed,
-                "Research produced no usable findings.",
-                confidence: outcome.Confidence,
-                success: false,
-                error: outcome.Error ?? "No findings.");
+            return packet.Transition(NodeId.Knowledge, NodeState.Succeeded,
+                decision, confidence: response.Confidence, success: true);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            _logger.LogWarning(ex, "KnowledgeNode research failed for packet {Id}.", packet.Id);
+            _logger.LogWarning(ex, "KnowledgeNode pipeline failed for packet {Id}.", packet.Id);
             return packet.Transition(NodeId.Knowledge, NodeState.Failed,
-                "Research threw.", success: false, error: $"{ex.GetType().Name}: {ex.Message}");
+                "Knowledge pipeline threw.", success: false, error: $"{ex.GetType().Name}: {ex.Message}");
         }
+    }
+
+    private static KnowledgeRequest BuildRequest(NodePacket packet)
+    {
+        var question = packet.Payload.Slot(PacketSlots.Question) ?? packet.Payload.Intent;
+        var failureContext = packet.Payload.Slot(PacketSlots.FailureContext);
+
+        // Kind: explicit slot wins; else infer from the requested capability.
+        var kind = KnowledgeKind.GapFill;
+        var kindSlot = packet.Payload.Slot(PacketSlots.KnowledgeKind);
+        if (!string.IsNullOrWhiteSpace(kindSlot) && Enum.TryParse<KnowledgeKind>(kindSlot, ignoreCase: true, out var parsed))
+            kind = parsed;
+        else if (packet.RequestedCapability == Capability.AnswerKnowledge)
+            kind = KnowledgeKind.FactLookup;
+
+        return new KnowledgeRequest(question, packet.Payload.Intent, failureContext, kind);
     }
 
     private static NodePacket AdvanceToWorking(NodePacket packet)
