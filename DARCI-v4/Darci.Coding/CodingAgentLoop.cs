@@ -523,6 +523,9 @@ public sealed class CodingAgentLoop : ICodingAgentLoop
             {
                 [PacketSlots.Question] = question,
                 [PacketSlots.FailureContext] = failureContext,
+                // A coding roadblock is on the critical path — the task can't proceed accurately
+                // without this, so the knowledge node should attempt an immediate fill.
+                [PacketSlots.Blocking] = "true",
             });
 
         var result = await _nodeRouter!.DispatchAsync(child, ct);

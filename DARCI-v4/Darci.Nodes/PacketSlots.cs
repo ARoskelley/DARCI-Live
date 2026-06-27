@@ -16,6 +16,11 @@ public static class PacketSlots
     public const string Question = "question";
     public const string FailureContext = "failureContext";
 
+    // Gap handling — whether the requesting work is blocked on this (critical path) and how many
+    // immediate-fill hops deep we are (recursion guard).
+    public const string Blocking = "blocking";
+    public const string GapFillDepth = "gapFillDepth";
+
     // Knowledge node — request
     public const string KnowledgeKind = "knowledgeKind";
 

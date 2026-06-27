@@ -334,6 +334,15 @@ builder.Services.AddSingleton<INode, CodingNode>();
 builder.Services.AddSingleton<INode, KnowledgeNode>();
 builder.Services.AddSingleton<INodeRouter, NodeRouter>();
 
+// Gap-driven action: persist gaps, decide immediate-fill vs deferred auto-goal. The handler routes via
+// a Lazy<INodeRouter> to break the cycle (KnowledgeNode → GapHandler → router → KnowledgeNode).
+builder.Services.AddSingleton<IGapStore>(sp =>
+    new SqliteGapStore(connectionString, sp.GetRequiredService<ILogger<SqliteGapStore>>()));
+builder.Services.AddSingleton(new GapHandlerOptions());
+builder.Services.AddSingleton<IGapGoalSink, GoalManagerGapSink>();
+builder.Services.AddSingleton(sp => new Lazy<INodeRouter>(sp.GetRequiredService<INodeRouter>));
+builder.Services.AddSingleton<IGapHandler, GapHandler>();
+
 // === Coding Workspace Services ===
 builder.Services.AddSingleton<ICodingWorkspaceStore>(sp =>
     new CodingWorkspaceStore(
@@ -469,6 +478,8 @@ await codingStore.InitializeAsync();
 // === Initialize Node Packet store + reap any packets orphaned by a previous run ===
 var nodePacketStore = app.Services.GetRequiredService<INodePacketStore>();
 await nodePacketStore.InitializeAsync();
+var gapStore = app.Services.GetRequiredService<IGapStore>();
+await gapStore.InitializeAsync();
 var nodeWatchdog = app.Services.GetRequiredService<NodeWatchdog>();
 await nodeWatchdog.SweepStartupOrphansAsync();
 

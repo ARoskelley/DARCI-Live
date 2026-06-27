@@ -10,26 +10,28 @@ namespace Darci.Research.Agents;
 /// <summary>
 /// The KG / deep-research node as an <see cref="INode"/>, hardened in Phase 2 into a rigid black box:
 /// a <see cref="KnowledgeRequest"/> in, a structured <see cref="KnowledgeResponse"/> out (decision 4).
-/// The pipeline (admin/KG → review → escalate → compile → review) runs inside; the node only translates
-/// between the packet and the contract.
+/// When the response still has gaps, the node makes them actionable via the generic
+/// <see cref="IGapHandler"/>: blocking gaps get an immediate fill (merged back in), non-blocking gaps
+/// become deferred auto-goals for the living loop to learn from later.
 ///
 /// Input slots:  <see cref="PacketSlots.Question"/> (falls back to Intent), <see cref="PacketSlots.FailureContext"/>,
-///               <see cref="PacketSlots.KnowledgeKind"/> (optional).
+///               <see cref="PacketSlots.KnowledgeKind"/>, <see cref="PacketSlots.Blocking"/>, <see cref="PacketSlots.GapFillDepth"/>.
 /// Output slots: <see cref="PacketSlots.KnowledgeResponse"/> (structured JSON),
-///               <see cref="PacketSlots.KnowledgeFindings"/> (compat rendering),
-///               <see cref="PacketSlots.KnowledgeConfidence"/>.
+///               <see cref="PacketSlots.KnowledgeFindings"/> (compat), <see cref="PacketSlots.KnowledgeConfidence"/>.
 /// </summary>
 public sealed class KnowledgeNode : INode
 {
     private static readonly JsonSerializerOptions JsonOpts = new() { WriteIndented = false };
 
     private readonly IKnowledgePipeline _pipeline;
+    private readonly IGapHandler? _gapHandler;
     private readonly ILogger<KnowledgeNode> _logger;
 
-    public KnowledgeNode(IKnowledgePipeline pipeline, ILogger<KnowledgeNode> logger)
+    public KnowledgeNode(IKnowledgePipeline pipeline, ILogger<KnowledgeNode> logger, IGapHandler? gapHandler = null)
     {
         _pipeline = pipeline;
         _logger = logger;
+        _gapHandler = gapHandler;
     }
 
     public NodeId Id => NodeId.Knowledge;
@@ -49,13 +51,27 @@ public sealed class KnowledgeNode : INode
         {
             var response = await _pipeline.RunAsync(request, ct);
 
+            // Make gaps actionable. Only at the top level (depth 0); a nested immediate-fill packet is a
+            // leaf and must not trigger further gap handling (recursion guard).
+            if (response.Gaps.Count > 0 && _gapHandler is not null && Depth(packet) == 0)
+            {
+                var blocking = string.Equals(packet.Payload.Slot(PacketSlots.Blocking), "true", StringComparison.OrdinalIgnoreCase);
+                var ctx = new GapContext(request.Question, request.Intent, response.Gaps, response.Confidence, blocking, NodeId.Knowledge);
+                var outcome = await _gapHandler.HandleAsync(packet, ctx, ct);
+                packet = outcome.Packet;
+
+                if (outcome.Disposition == GapDisposition.Immediate && outcome.FillResult is not null)
+                {
+                    var fill = ParseResponse(outcome.FillResult);
+                    if (fill is not null) response = Merge(response, fill);
+                }
+            }
+
             packet = packet
                 .WithSlot(PacketSlots.KnowledgeResponse, JsonSerializer.Serialize(response, JsonOpts))
                 .WithSlot(PacketSlots.KnowledgeFindings, response.ToReviewText())
                 .WithSlot(PacketSlots.KnowledgeConfidence, response.Confidence.Score.ToString("0.###"));
 
-            // The node SUCCEEDS at producing a structured response even when that response reports gaps —
-            // "answered=false with explicit gaps" is a useful, trustworthy result for the caller.
             var decision = response.Answered
                 ? "Structured knowledge response produced (answered)."
                 : $"Structured knowledge response produced with {response.Gaps.Count} gap(s).";
@@ -71,12 +87,36 @@ public sealed class KnowledgeNode : INode
         }
     }
 
+    /// <summary>Merge an immediate-fill response into the original: union the structured content, take the
+    /// fill's residual gaps + answered/confidence (it is the more recent, focused result).</summary>
+    internal static KnowledgeResponse Merge(KnowledgeResponse original, KnowledgeResponse fill) => original with
+    {
+        DirectAnswer = string.IsNullOrWhiteSpace(fill.DirectAnswer) ? original.DirectAnswer : fill.DirectAnswer,
+        Findings = original.Findings.Concat(fill.Findings).Distinct(StringComparer.OrdinalIgnoreCase).ToList(),
+        Steps = original.Steps.Concat(fill.Steps).Distinct(StringComparer.OrdinalIgnoreCase).ToList(),
+        Examples = original.Examples.Concat(fill.Examples).ToList(),
+        Citations = original.Citations.Concat(fill.Citations).ToList(),
+        Gaps = fill.Gaps,
+        Answered = fill.Answered || original.Answered,
+        Confidence = fill.Confidence.IsAssessed ? fill.Confidence : original.Confidence,
+    };
+
+    private static KnowledgeResponse? ParseResponse(NodePacket packet)
+    {
+        var json = packet.Payload.Slot(PacketSlots.KnowledgeResponse);
+        if (string.IsNullOrWhiteSpace(json)) return null;
+        try { return JsonSerializer.Deserialize<KnowledgeResponse>(json); }
+        catch { return null; }
+    }
+
+    private static int Depth(NodePacket packet)
+        => int.TryParse(packet.Payload.Slot(PacketSlots.GapFillDepth), out var d) ? d : 0;
+
     private static KnowledgeRequest BuildRequest(NodePacket packet)
     {
         var question = packet.Payload.Slot(PacketSlots.Question) ?? packet.Payload.Intent;
         var failureContext = packet.Payload.Slot(PacketSlots.FailureContext);
 
-        // Kind: explicit slot wins; else infer from the requested capability.
         var kind = KnowledgeKind.GapFill;
         var kindSlot = packet.Payload.Slot(PacketSlots.KnowledgeKind);
         if (!string.IsNullOrWhiteSpace(kindSlot) && Enum.TryParse<KnowledgeKind>(kindSlot, ignoreCase: true, out var parsed))
