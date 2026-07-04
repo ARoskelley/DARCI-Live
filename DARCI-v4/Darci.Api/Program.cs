@@ -343,6 +343,13 @@ builder.Services.AddSingleton<IGapGoalSink, GoalManagerGapSink>();
 builder.Services.AddSingleton(sp => new Lazy<INodeRouter>(sp.GetRequiredService<INodeRouter>));
 builder.Services.AddSingleton<IGapHandler, GapHandler>();
 
+// Innovation Phase A: provenance-tagged innovated-knowledge store + the empirical outcome-feedback
+// loop (coding terminal → automatic staged promotion / retraction, all bounded by the ≤0.4 cap).
+builder.Services.AddSingleton<IInnovatedKnowledgeStore>(sp =>
+    new SqliteInnovatedKnowledgeStore(connectionString, sp.GetRequiredService<ILogger<SqliteInnovatedKnowledgeStore>>()));
+builder.Services.AddSingleton(new OutcomeFeedbackOptions());
+builder.Services.AddSingleton<IOutcomeFeedbackSink, InnovatedKnowledgeOutcomeSink>();
+
 // === Coding Workspace Services ===
 builder.Services.AddSingleton<ICodingWorkspaceStore>(sp =>
     new CodingWorkspaceStore(
@@ -480,6 +487,8 @@ var nodePacketStore = app.Services.GetRequiredService<INodePacketStore>();
 await nodePacketStore.InitializeAsync();
 var gapStore = app.Services.GetRequiredService<IGapStore>();
 await gapStore.InitializeAsync();
+var innovatedStore = app.Services.GetRequiredService<IInnovatedKnowledgeStore>();
+await innovatedStore.InitializeAsync();
 var nodeWatchdog = app.Services.GetRequiredService<NodeWatchdog>();
 await nodeWatchdog.SweepStartupOrphansAsync();
 

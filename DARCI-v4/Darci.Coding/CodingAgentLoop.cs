@@ -37,6 +37,7 @@ public sealed class CodingAgentLoop : ICodingAgentLoop
     private readonly ILogger<CodingAgentLoop> _logger;
     private readonly CodingNodeTracker _nodes;
     private readonly INodeRouter? _nodeRouter;
+    private readonly IOutcomeFeedbackSink? _outcomeSink;
 
     private readonly ConcurrentDictionary<string, Task> _runningTasks = new();
 
@@ -50,7 +51,8 @@ public sealed class CodingAgentLoop : ICodingAgentLoop
         PatchApplier patchApplier,
         ILogger<CodingAgentLoop> logger,
         INodePacketStore? packetStore = null,
-        INodeRouter? nodeRouter = null)
+        INodeRouter? nodeRouter = null,
+        IOutcomeFeedbackSink? outcomeSink = null)
     {
         _store = store;
         _contextBuilder = contextBuilder;
@@ -65,6 +67,9 @@ public sealed class CodingAgentLoop : ICodingAgentLoop
         _nodes = new CodingNodeTracker(packetStore, logger);
         // Step B: knowledge handoff routes through the generic node router when available.
         _nodeRouter = nodeRouter;
+        // Phase A (innovation): emit the empirical outcome so an innovated hypothesis this run relied
+        // on gets its confidence updated by reality. No-op unless the run's correlation matches one.
+        _outcomeSink = outcomeSink;
     }
 
     public bool StartLoop(string taskId, RunCodingTaskRequest? options = null, NodePacket? rootPacket = null)
@@ -436,8 +441,33 @@ public sealed class CodingAgentLoop : ICodingAgentLoop
         // Drive the node packet to its terminal state mirroring the coding outcome.
         await _nodes.CompleteAsync(taskId, finalStatus, ct);
 
+        // Emit the empirical outcome for the innovation feedback loop. Success bar = "works and works
+        // well": the final behavioral test gate passed (status "completed"). No-op unless this run's
+        // correlation matches an innovated hypothesis.
+        await EmitOutcomeFeedbackAsync(taskId, finalStatus, ct);
+
         _logger.LogInformation("CodingAgentLoop finished task {TaskId} with status {Status} ({Files} file write(s)).",
             taskId, finalStatus, totalFilesWritten);
+    }
+
+    private async Task EmitOutcomeFeedbackAsync(string taskId, string finalStatus, CancellationToken ct)
+    {
+        if (_outcomeSink is null) return;
+        try
+        {
+            var success = string.Equals(finalStatus, "completed", StringComparison.OrdinalIgnoreCase);
+            await _outcomeSink.ApplyAsync(
+                new OutcomeFeedback(
+                    CorrelationId: _nodes.CurrentCorrelationId(taskId),
+                    Success: success,
+                    Evidence: $"coding run terminal status '{finalStatus}'",
+                    TerminalStatus: finalStatus),
+                ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogDebug(ex, "Outcome-feedback emit failed for task {TaskId} (non-fatal).", taskId);
+        }
     }
 
     // ── Escalation helpers ─────────────────────────────────────────────────
