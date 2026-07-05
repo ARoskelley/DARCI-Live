@@ -368,6 +368,11 @@ builder.Services.AddSingleton<IProposalStore>(sp =>
     new SqliteProposalStore(connectionString, sp.GetRequiredService<ILogger<SqliteProposalStore>>()));
 builder.Services.AddSingleton<IHumanGate, HumanGateService>();
 
+// Phase E (sub-unit 1): validation-campaign store — pre-registered protocols + per-step evidence; the
+// verdict is a pure function over (criteria × evidence). Rides the human gate for authorization/promotion.
+builder.Services.AddSingleton<IValidationCampaignStore>(sp =>
+    new SqliteValidationCampaignStore(connectionString, sp.GetRequiredService<ILogger<SqliteValidationCampaignStore>>()));
+
 // === Coding Workspace Services ===
 builder.Services.AddSingleton<ICodingWorkspaceStore>(sp =>
     new CodingWorkspaceStore(
@@ -509,6 +514,8 @@ var innovatedStore = app.Services.GetRequiredService<IInnovatedKnowledgeStore>()
 await innovatedStore.InitializeAsync();
 var proposalStore = app.Services.GetRequiredService<IProposalStore>();
 await proposalStore.InitializeAsync();
+var validationCampaignStore = app.Services.GetRequiredService<IValidationCampaignStore>();
+await validationCampaignStore.InitializeAsync();
 // The startup sweep must run AFTER the proposal store is initialized so its carve-out can recognise
 // packets legitimately parked pending a human decision (and not reap them as orphans).
 var nodeWatchdog = app.Services.GetRequiredService<NodeWatchdog>();

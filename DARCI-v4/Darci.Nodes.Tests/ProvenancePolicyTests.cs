@@ -20,13 +20,34 @@ public class ProvenancePolicyTests
     [Theory]
     [InlineData(Provenance.Innovated)]
     [InlineData(Provenance.UnderTest)]
-    [InlineData(Provenance.ProvisionallyValidated)]
     [InlineData(Provenance.Unverified)]
-    public void Clamp_CappedProvenance_NeverExceedsCap_AndStaysLow(Provenance p)
+    public void Clamp_BottomStages_NeverExceedInnovatedCap_AndStayLow(Provenance p)
     {
         var clamped = ProvenancePolicy.Clamp(p, Confidence.Of(0.95));
         Assert.True(clamped.Score <= ProvenancePolicy.InnovatedCap);
-        Assert.True(clamped.IsLow);   // a hypothesis can never read as a confident fact
+        Assert.True(clamped.IsLow);   // a fresh/under-test hypothesis can never read as a confident fact
+    }
+
+    [Fact]
+    public void Clamp_ProvisionallyValidated_MidTierCap_ByDomain()
+    {
+        // §4a: a human-authorized campaign that passed lifts the cap to a mid tier — 0.6 general, 0.45 sensitive.
+        var general = ProvenancePolicy.Clamp(Provenance.ProvisionallyValidated, Confidence.Of(0.95), KnowledgeDomain.General);
+        Assert.Equal(ProvenancePolicy.ProvisionalCapGeneral, general.Score, 5);
+        Assert.False(general.IsLow);   // actionable, but still not "fact"
+        Assert.False(ProvenancePolicy.IsTrustedAsFact(Provenance.ProvisionallyValidated));
+
+        var sensitive = ProvenancePolicy.Clamp(Provenance.ProvisionallyValidated, Confidence.Of(0.95), KnowledgeDomain.Sensitive);
+        Assert.Equal(ProvenancePolicy.ProvisionalCapSensitive, sensitive.Score, 5);
+        Assert.True(sensitive.Score < general.Score);   // sensitive earns a strictly lower ceiling
+    }
+
+    [Fact]
+    public void Clamp_HumanApproved_IsUncapped()
+    {
+        // The trusted tier (human, both domains) is not capped — the one above-cap path.
+        var clamped = ProvenancePolicy.Clamp(Provenance.HumanApproved, Confidence.Of(0.9));
+        Assert.Equal(0.9, clamped.Score, 5);
     }
 
     [Fact]
