@@ -33,4 +33,11 @@ public static class PacketSlots
     public const string InnovationGaps = "innovationGaps";                // JSON string[] — the unmet gaps that triggered escalation
     public const string InnovationKnownFacts = "innovationKnownFacts";    // JSON string[] — KG/DR substrate to recombine
     public const string InnovationProposal = "innovationProposal";        // structured InnovationProposal as JSON
+
+    // Validation campaign — a child STEP packet (Phase E). The coordinator sets Campaign* on dispatch; the
+    // executing node writes StepMeasurements (+ optional StepOutcome) so the mechanical verdict can read them.
+    public const string CampaignId = "campaignId";
+    public const string CampaignStepId = "campaignStepId";
+    public const string StepMeasurements = "stepMeasurements";            // JSON { metric: number } produced by the node
+    public const string StepOutcome = "stepOutcome";                      // optional "Passed"|"Failed"|"Blocked" override
 }

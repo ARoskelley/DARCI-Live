@@ -24,17 +24,20 @@ public sealed class HumanGateService : IHumanGate
     private readonly IProposalStore _proposals;
     private readonly IInnovatedKnowledgeStore _innovated;
     private readonly INodePacketStore _packets;
+    private readonly ICampaignCoordinator? _campaigns;   // Phase E — delegate the two campaign touches
     private readonly ILogger<HumanGateService> _logger;
 
     public HumanGateService(
         IProposalStore proposals,
         IInnovatedKnowledgeStore innovated,
         INodePacketStore packets,
-        ILogger<HumanGateService> logger)
+        ILogger<HumanGateService> logger,
+        ICampaignCoordinator? campaigns = null)
     {
         _proposals = proposals;
         _innovated = innovated;
         _packets = packets;
+        _campaigns = campaigns;
         _logger = logger;
     }
 
@@ -54,8 +57,22 @@ public sealed class HumanGateService : IHumanGate
 
         var who = decidedBy ?? "human";
 
-        if (proposal.Kind == HumanProposalKind.PromoteInnovated)
-            await ApplyPromotionDecisionAsync(proposal, approve, note, who, ct);
+        switch (proposal.Kind)
+        {
+            case HumanProposalKind.PromoteInnovated:
+                await ApplyPromotionDecisionAsync(proposal, approve, note, who, ct);
+                break;
+            case HumanProposalKind.AuthorizeCampaign when _campaigns is not null:
+                await _campaigns.HandleAuthorizationDecisionAsync(proposal, approve, who, ct);
+                break;
+            case HumanProposalKind.PromoteFromCampaign when _campaigns is not null:
+                await _campaigns.HandlePromotionDecisionAsync(proposal, approve, who, ct);
+                break;
+            case HumanProposalKind.AuthorizeCampaign:
+            case HumanProposalKind.PromoteFromCampaign:
+                _logger.LogWarning("No campaign coordinator wired; recorded decision on {Kind} {Id} only.", proposal.Kind, proposal.Id);
+                break;
+        }
 
         await ResumeParkedPacketAsync(proposal, approve, ct);
 

@@ -3,10 +3,14 @@
 namespace Darci.Nodes;
 
 /// <summary>What a human is being asked to decide. Extensible; Phase C ships promotion of an innovated
-/// hypothesis (the one path that may lift trust above the cap). Campaign authorization etc. are later.</summary>
+/// hypothesis (the one path that may lift trust above the cap). Phase E adds the two campaign touches.</summary>
 public enum HumanProposalKind
 {
     PromoteInnovated = 0,   // raise an innovated entry's provenance above the cap (governing invariant §0a)
+
+    // Phase E — validation campaigns (§14b). Both are human-authored trust/authorization events.
+    AuthorizeCampaign = 1,  // 1st touch: approve the DESIGN (the pre-registered protocol), not a verdict
+    PromoteFromCampaign = 2,// 2nd touch: confirm promotion after a campaign passed (may be pre-authorized for general)
 }
 
 public enum HumanProposalStatus { Pending = 0, Approved = 1, Rejected = 2 }

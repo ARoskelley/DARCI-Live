@@ -373,6 +373,13 @@ builder.Services.AddSingleton<IHumanGate, HumanGateService>();
 builder.Services.AddSingleton<IValidationCampaignStore>(sp =>
     new SqliteValidationCampaignStore(connectionString, sp.GetRequiredService<ILogger<SqliteValidationCampaignStore>>()));
 
+// Phase E (sub-unit 2): the campaign lifecycle — protocol critic (falsify the DESIGN) + the coordinator
+// that drafts, authorizes, runs steps as child packets, computes the mechanical verdict, and files the
+// promotion touch. The human gate resolves ICampaignCoordinator optionally, so it is registered here.
+builder.Services.AddSingleton<IProtocolCritic, OllamaProtocolCritic>();
+builder.Services.AddSingleton(new CampaignEligibilityOptions());
+builder.Services.AddSingleton<ICampaignCoordinator, CampaignCoordinator>();
+
 // === Coding Workspace Services ===
 builder.Services.AddSingleton<ICodingWorkspaceStore>(sp =>
     new CodingWorkspaceStore(
