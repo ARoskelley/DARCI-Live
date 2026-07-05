@@ -297,7 +297,13 @@ Stop after each phase and evaluate; Phase A alone is worth shipping regardless o
 
 ---
 
-## 14. DESIGN-ONLY — campaign machinery (do NOT build until ProposalStore/UI node exist)
+## 14. Campaign machinery — BUILT in Phase E (was design-only until the ProposalStore/human gate existed)
+
+> **STATUS — Phase E complete.** §14a–c and the §4a staged caps are implemented, tested, and pushed.
+> - **Sub-unit 1:** `ValidationCampaign` + `SqliteValidationCampaignStore`; pure `CampaignProtocol.Evaluate` verdict; per-stage/per-domain caps in `ProvenancePolicy.Clamp`/`CapFor` (Innovated/UnderTest/Unverified 0.35; ProvisionallyValidated 0.6 general / 0.45 sensitive; HumanApproved uncapped); simple `DomainClassifier` (flagged for a stronger classifier).
+> - **Sub-unit 2:** `CampaignCoordinator` (draft → protocol-critic falsification → `AuthorizeCampaign` proposal + parked parent → `HumanAuthorizeCampaign` → child step packets → mechanical verdict → `PromoteFromCampaign` 2nd touch). Sensitive never auto-promotes; failed criteria demote; a missing environment parks on a gap. `HumanGate` delegates to `ICampaignCoordinator`.
+> - **Sub-unit 3:** `SandboxPoCGate` — weight-capped self-generated PoC evidence; provenance/confidence untouched.
+> - **Sub-unit 4:** `ToolingProposal` / `ToolingProposalEmitter` (data-only, demand-driven, rate-limited, critic-reviewed); `ResumeBlockedCampaignAsync` re-drives a campaign once the human builds the missing node at compile time.
 
 All of this is an instance of the §0a shape: **accumulate → package → propose → human event → state change.** It depends on the Phase-C human gate and is captured here so Phase A doesn't paint us into a corner.
 
