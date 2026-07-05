@@ -11,6 +11,10 @@ public enum HumanProposalKind
     // Phase E — validation campaigns (§14b). Both are human-authored trust/authorization events.
     AuthorizeCampaign = 1,  // 1st touch: approve the DESIGN (the pre-registered protocol), not a verdict
     PromoteFromCampaign = 2,// 2nd touch: confirm promotion after a campaign passed (may be pre-authorized for general)
+
+    // Phase E — tooling (§14c). DATA ONLY: proposes new node/tooling the system needs. Extending the
+    // capability surface is an upward crossing (same invariant as trust) — a human builds it at compile time.
+    ProposeTooling = 3,
 }
 
 public enum HumanProposalStatus { Pending = 0, Approved = 1, Rejected = 2 }

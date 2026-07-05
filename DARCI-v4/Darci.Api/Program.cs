@@ -384,6 +384,13 @@ builder.Services.AddSingleton(new CampaignEligibilityOptions());
 builder.Services.AddSingleton(new SandboxPoCOptions());
 builder.Services.AddSingleton<ISandboxPoCGate, SandboxPoCGate>();
 
+// Phase E (sub-unit 4): data-only tooling proposals — demand-driven, rate-limited, critic-reviewed. Never
+// self-modifies, never registers a node at runtime (compile-time only); the capability boundary is the
+// trust boundary (§0a). A blocked campaign step emits one; a human builds the node, then the campaign resumes.
+builder.Services.AddSingleton<IToolingCritic, OllamaToolingCritic>();
+builder.Services.AddSingleton(new ToolingProposalOptions());
+builder.Services.AddSingleton<IToolingProposalEmitter, ToolingProposalEmitter>();
+
 builder.Services.AddSingleton<ICampaignCoordinator, CampaignCoordinator>();
 
 // === Coding Workspace Services ===

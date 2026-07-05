@@ -54,6 +54,7 @@ public sealed class CampaignCoordinator : ICampaignCoordinator
     private readonly IProtocolCritic _protocolCritic;
     private readonly IReadOnlyList<INode> _nodes;   // to know whether a step's environment EXISTS
     private readonly ISandboxPoCGate? _poc;         // sub-unit 3 — objective PoC before the human sees it
+    private readonly IToolingProposalEmitter? _tooling;  // sub-unit 4 — data-only tooling demand
     private readonly ILogger<CampaignCoordinator> _logger;
 
     public CampaignCoordinator(
@@ -66,7 +67,8 @@ public sealed class CampaignCoordinator : ICampaignCoordinator
         IProtocolCritic protocolCritic,
         IEnumerable<INode> nodes,
         ILogger<CampaignCoordinator> logger,
-        ISandboxPoCGate? poc = null)
+        ISandboxPoCGate? poc = null,
+        IToolingProposalEmitter? tooling = null)
     {
         _campaigns = campaigns;
         _innovated = innovated;
@@ -77,6 +79,7 @@ public sealed class CampaignCoordinator : ICampaignCoordinator
         _protocolCritic = protocolCritic;
         _nodes = nodes.ToList();
         _poc = poc;
+        _tooling = tooling;
         _logger = logger;
     }
 
@@ -191,7 +194,14 @@ public sealed class CampaignCoordinator : ICampaignCoordinator
         };
         await _campaigns.UpdateAsync(campaign, ct);
 
-        // 2) Run each pre-registered step as a child packet. A missing environment parks the campaign.
+        // 2) Run the steps and finalize (verdict → promotion touch), or park on a missing environment.
+        await RunAndFinalizeAsync(campaign, entry, decidedBy, ct);
+    }
+
+    /// <summary>Run every pre-registered step as a child packet, then apply the mechanical verdict. Shared by
+    /// initial authorization and by <see cref="ResumeBlockedCampaignAsync"/> (once tooling has landed).</summary>
+    private async Task RunAndFinalizeAsync(ValidationCampaign campaign, InnovatedKnowledgeRecord entry, string who, CancellationToken ct)
+    {
         var blocked = await RunStepsAsync(campaign, entry, ct);
         if (blocked)
         {
@@ -199,7 +209,6 @@ public sealed class CampaignCoordinator : ICampaignCoordinator
             return;
         }
 
-        // 3) Mechanical verdict over the pre-registered criteria × collected evidence.
         var verdict = await _campaigns.ComputeVerdictAsync(campaign.Id, ct);
         _logger.LogInformation("Campaign {Id} verdict: {Verdict}.", campaign.Id, verdict);
 
@@ -207,7 +216,7 @@ public sealed class CampaignCoordinator : ICampaignCoordinator
         {
             if (campaign.PromotionPreauthorized)   // general + pre-authorized → the 2nd touch was given at design time
             {
-                await PromoteAsync(campaign, decidedBy, "auto (pre-authorized at design time)", ct);
+                await PromoteAsync(campaign, who, "auto (pre-authorized at design time)", ct);
                 await _campaigns.UpdateAsync(campaign with { Status = CampaignStatus.Completed }, ct);
             }
             else
@@ -226,6 +235,24 @@ public sealed class CampaignCoordinator : ICampaignCoordinator
             // Pending/Inconclusive with no hard block — leave it blocked for follow-up rather than concluding.
             await _campaigns.UpdateAsync(campaign with { Status = CampaignStatus.Blocked }, ct);
         }
+    }
+
+    public async Task<bool> ResumeBlockedCampaignAsync(string campaignId, CancellationToken ct = default)
+    {
+        var campaign = await _campaigns.GetAsync(campaignId, ct);
+        if (campaign is null || campaign.Status != CampaignStatus.Blocked) return false;
+
+        var entry = await _innovated.GetAsync(campaign.EntryId, ct);
+        if (entry is null) return false;
+
+        var who = campaign.Authorization?.ApprovedBy ?? "system";
+        campaign = campaign with { Status = CampaignStatus.Running };
+        await _campaigns.UpdateAsync(campaign, ct);
+
+        await RunAndFinalizeAsync(campaign, entry, who, ct);
+
+        var after = await _campaigns.GetAsync(campaignId, ct);
+        return after is not null && after.Status != CampaignStatus.Blocked;   // advanced past Blocked?
     }
 
     public async Task HandlePromotionDecisionAsync(HumanProposal proposal, bool approve, string decidedBy, CancellationToken ct = default)
@@ -289,7 +316,7 @@ public sealed class CampaignCoordinator : ICampaignCoordinator
                 $"no environment for capability {step.Capability} / node {step.Environment}"), ct);
 
         // The honest "needs external input" (§6) — a gap the human/goal system surfaces.
-        await _gaps.AddAsync(new GapRecord
+        var gap = new GapRecord
         {
             CorrelationId = campaign.CorrelationId,
             OriginNode = NodeId.Innovation,
@@ -297,7 +324,24 @@ public sealed class CampaignCoordinator : ICampaignCoordinator
             Intent = entry.Intent,
             Missing = $"a node providing capability {step.Capability} (environment {step.Environment})",
             Status = GapStatus.Open,
-        }, ct);
+        };
+        await _gaps.AddAsync(gap, ct);
+
+        // Sub-unit 4: emit a DATA-ONLY tooling proposal citing this blocker as demand. Never registers a
+        // node — a human builds it at compile time, then ResumeBlockedCampaignAsync re-drives the campaign.
+        if (_tooling is not null)
+        {
+            await _tooling.EmitAsync(new ToolingProposal(
+                Purpose: $"Run validation step '{step.Id}' ({step.Kind}) for campaign {campaign.Id}.",
+                CapabilitySought: step.Capability,
+                ProposedEnvironment: step.Environment,
+                ContractSketch: $"An INode advertising Capability.{step.Capability} that accepts a packet " +
+                                $"(slots: {PacketSlots.CampaignId}, {PacketSlots.CampaignStepId}, {PacketSlots.Question}) " +
+                                $"and writes {PacketSlots.StepMeasurements} for metric '{step.Criteria.Metric}'.",
+                BlockedCampaignIds: new[] { campaign.Id },
+                BlockedStepIds: new[] { step.Id },
+                OpenGapIds: new[] { gap.Id }), ct);
+        }
 
         _logger.LogInformation("Campaign {Id} blocked: step {Step} needs a missing environment ({Cap}/{Env}).",
             campaign.Id, step.Id, step.Capability, step.Environment);

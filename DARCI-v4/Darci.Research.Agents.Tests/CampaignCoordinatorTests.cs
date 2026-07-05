@@ -80,9 +80,19 @@ public sealed class CampaignCoordinatorTests : IDisposable
 
     // ── helpers ──
 
-    private CampaignCoordinator Coordinator(INodeRouter router, IEnumerable<INode> nodes, IProtocolCritic? critic = null, ISandboxPoCGate? poc = null) =>
+    private sealed class FakeToolingCritic : IToolingCritic
+    {
+        public Task<ToolingCritique> ReviewAsync(ToolingProposal proposal, CancellationToken ct = default)
+            => Task.FromResult(new ToolingCritique(System.Array.Empty<string>(), NeedsNewCapability: true, "needs new capability"));
+    }
+
+    private CampaignCoordinator Coordinator(INodeRouter router, IEnumerable<INode> nodes, IProtocolCritic? critic = null,
+        ISandboxPoCGate? poc = null, IToolingProposalEmitter? tooling = null) =>
         new(_campaigns, _innovated, _proposals, router, _packets, _gaps, critic ?? new FakeProtocolCritic(), nodes,
-            NullLogger<CampaignCoordinator>.Instance, poc);
+            NullLogger<CampaignCoordinator>.Instance, poc, tooling);
+
+    private IToolingProposalEmitter RealEmitter() =>
+        new ToolingProposalEmitter(_proposals, new FakeToolingCritic(), new ToolingProposalOptions(), NullLogger<ToolingProposalEmitter>.Instance);
 
     private HumanGateService Gate(ICampaignCoordinator coordinator) =>
         new(_proposals, _innovated, _packets, NullLogger<HumanGateService>.Instance, coordinator);
@@ -298,6 +308,63 @@ public sealed class CampaignCoordinatorTests : IDisposable
         Assert.Equal(ProvenancePolicy.ProvisionalCapSensitive, after.Confidence.Score, 5);   // 0.45 sensitive cap
         var campaign = (await _campaigns.GetByEntryAsync(entry.Id))[0];
         Assert.Equal(CampaignStatus.Completed, campaign.Status);
+    }
+
+    private static ValidationStep[] SimOnlyProtocol() => new[]
+    {
+        new ValidationStep("sim", ValidationStepKind.Simulation, Capability.GenerateCad, NodeId.Cad,
+            new SuccessCriteria("stable", Comparator.GreaterOrEqual, 1), "physics sim"),
+    };
+
+    [Fact]
+    public async Task BlockedStep_EmitsDataOnlyToolingProposal_CitingDemand()
+    {
+        var entry = await SeedEntryAsync();
+        var parent = await WorkingParentAsync();
+        var coordinator = Coordinator(PassingRouter(), BothEnvironments(), tooling: RealEmitter());   // no Cad node
+
+        await coordinator.DraftAndRequestAuthorizationAsync(entry, SimOnlyProtocol(), Provenance.ProvisionallyValidated, KnowledgeDomain.General, parent, preauthorizePromotion: true);
+        await Gate(coordinator).DecideAsync((await PendingOfKindAsync(HumanProposalKind.AuthorizeCampaign)).Id, true, null, "tinman");
+
+        var campaign = (await _campaigns.GetByEntryAsync(entry.Id))[0];
+        Assert.Equal(CampaignStatus.Blocked, campaign.Status);
+
+        var tooling = await PendingOfKindAsync(HumanProposalKind.ProposeTooling);
+        Assert.Equal(Capability.GenerateCad.ToString(), tooling.SubjectId);
+        Assert.Null(tooling.ParkedPacketId);                       // data-only — nothing is blocked ON it
+        Assert.Contains(campaign.Id, tooling.JustificationJson);   // cites the blocked campaign as demand
+    }
+
+    [Fact]
+    public async Task ResumeBlockedCampaign_AfterToolingLands_RunsAndCompletes()
+    {
+        var entry = await SeedEntryAsync();
+        var parent = await WorkingParentAsync();
+
+        // 1) Authorize with a sim step whose environment (Cad) does not exist yet → blocked.
+        var beforeTooling = Coordinator(PassingRouter(), BothEnvironments(), tooling: RealEmitter());
+        await beforeTooling.DraftAndRequestAuthorizationAsync(entry, SimOnlyProtocol(), Provenance.ProvisionallyValidated, KnowledgeDomain.General, parent, preauthorizePromotion: true);
+        await Gate(beforeTooling).DecideAsync((await PendingOfKindAsync(HumanProposalKind.AuthorizeCampaign)).Id, true, null, "tinman");
+        var campaign = (await _campaigns.GetByEntryAsync(entry.Id))[0];
+        Assert.Equal(CampaignStatus.Blocked, campaign.Status);
+
+        // 2) The human builds the node (compile-time). A new coordinator now has the Cad environment and a
+        //    router that runs the sim step. Resuming re-drives the campaign to completion.
+        var simRouter = new FakeRouter(child => child
+            .Transition(NodeId.Cad, NodeState.Routed, "r")
+            .Transition(NodeId.Cad, NodeState.Accepted, "a")
+            .Transition(NodeId.Cad, NodeState.Working, "w", leaseFor: TimeSpan.FromMinutes(1))
+            .WithSlot(PacketSlots.StepMeasurements, JsonSerializer.Serialize(new Dictionary<string, double> { ["stable"] = 1 }))
+            .Transition(NodeId.Cad, NodeState.Succeeded, "sim stable", success: true));
+        var nodesWithCad = BothEnvironments().Append(new FakeNode(NodeId.Cad, Capability.GenerateCad)).ToArray();
+        var afterTooling = Coordinator(simRouter, nodesWithCad);
+
+        var advanced = await afterTooling.ResumeBlockedCampaignAsync(campaign.Id);
+
+        Assert.True(advanced);
+        Assert.Equal(CampaignStatus.Completed, (await _campaigns.GetAsync(campaign.Id))!.Status);
+        var after = await _innovated.GetAsync(entry.Id);
+        Assert.Equal(Provenance.ProvisionallyValidated, after!.Provenance);   // general + pre-authorized → promoted on resume
     }
 
     [Fact]

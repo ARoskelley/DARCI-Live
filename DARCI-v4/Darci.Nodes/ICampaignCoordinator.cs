@@ -36,4 +36,9 @@ public interface ICampaignCoordinator
     /// <summary>Apply a human decision on a <see cref="HumanProposalKind.PromoteFromCampaign"/> proposal
     /// (the 2nd touch): on approve, promote the entry to the campaign's target stage (domain-capped).</summary>
     Task HandlePromotionDecisionAsync(HumanProposal proposal, bool approve, string decidedBy, CancellationToken ct = default);
+
+    /// <summary>Re-drive a campaign that was parked (<see cref="CampaignStatus.Blocked"/>) because a step had
+    /// no environment. Once a human has built + deployed the missing node (compile-time; the tooling
+    /// landed), this re-runs the steps and finalizes. Returns true if the campaign advanced past Blocked.</summary>
+    Task<bool> ResumeBlockedCampaignAsync(string campaignId, CancellationToken ct = default);
 }
