@@ -80,9 +80,9 @@ public sealed class CampaignCoordinatorTests : IDisposable
 
     // ── helpers ──
 
-    private CampaignCoordinator Coordinator(INodeRouter router, IEnumerable<INode> nodes, IProtocolCritic? critic = null) =>
+    private CampaignCoordinator Coordinator(INodeRouter router, IEnumerable<INode> nodes, IProtocolCritic? critic = null, ISandboxPoCGate? poc = null) =>
         new(_campaigns, _innovated, _proposals, router, _packets, _gaps, critic ?? new FakeProtocolCritic(), nodes,
-            NullLogger<CampaignCoordinator>.Instance);
+            NullLogger<CampaignCoordinator>.Instance, poc);
 
     private HumanGateService Gate(ICampaignCoordinator coordinator) =>
         new(_proposals, _innovated, _packets, NullLogger<HumanGateService>.Instance, coordinator);
@@ -298,6 +298,23 @@ public sealed class CampaignCoordinatorTests : IDisposable
         Assert.Equal(ProvenancePolicy.ProvisionalCapSensitive, after.Confidence.Score, 5);   // 0.45 sensitive cap
         var campaign = (await _campaigns.GetByEntryAsync(entry.Id))[0];
         Assert.Equal(CampaignStatus.Completed, campaign.Status);
+    }
+
+    [Fact]
+    public async Task Draft_WithPoCGate_AttachesSandboxEvidence_BeforeHumanSeesProposal()
+    {
+        var entry = await SeedEntryAsync();
+        var parent = await WorkingParentAsync();
+        var nodes = BothEnvironments();
+        var poc = new SandboxPoCGate(PassingRouter(), _innovated, nodes, new SandboxPoCOptions(), NullLogger<SandboxPoCGate>.Instance);
+
+        await Coordinator(PassingRouter(), nodes, poc: poc)
+            .DraftAndRequestAuthorizationAsync(entry, TwoStep(), Provenance.ProvisionallyValidated, KnowledgeDomain.General, parent);
+
+        // Objective PoC evidence is on the ledger before authorization — provenance still Innovated.
+        var revs = await _innovated.GetRevisionsAsync(entry.Id);
+        Assert.Contains(revs, r => r.CorrelationRoot == SandboxPoCGate.SandboxRoot);
+        Assert.Equal(Provenance.Innovated, (await _innovated.GetAsync(entry.Id))!.Provenance);
     }
 
     [Fact]

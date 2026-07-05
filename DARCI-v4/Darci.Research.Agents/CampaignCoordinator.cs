@@ -53,6 +53,7 @@ public sealed class CampaignCoordinator : ICampaignCoordinator
     private readonly IGapStore _gaps;
     private readonly IProtocolCritic _protocolCritic;
     private readonly IReadOnlyList<INode> _nodes;   // to know whether a step's environment EXISTS
+    private readonly ISandboxPoCGate? _poc;         // sub-unit 3 — objective PoC before the human sees it
     private readonly ILogger<CampaignCoordinator> _logger;
 
     public CampaignCoordinator(
@@ -64,7 +65,8 @@ public sealed class CampaignCoordinator : ICampaignCoordinator
         IGapStore gaps,
         IProtocolCritic protocolCritic,
         IEnumerable<INode> nodes,
-        ILogger<CampaignCoordinator> logger)
+        ILogger<CampaignCoordinator> logger,
+        ISandboxPoCGate? poc = null)
     {
         _campaigns = campaigns;
         _innovated = innovated;
@@ -74,6 +76,7 @@ public sealed class CampaignCoordinator : ICampaignCoordinator
         _gaps = gaps;
         _protocolCritic = protocolCritic;
         _nodes = nodes.ToList();
+        _poc = poc;
         _logger = logger;
     }
 
@@ -104,6 +107,19 @@ public sealed class CampaignCoordinator : ICampaignCoordinator
         var critique = await _protocolCritic.FalsifyAsync(campaign, ct);
         await _campaigns.AddAsync(campaign, ct);
 
+        // Objective PoC (sub-unit 3): route the candidate to a sandbox build/dry-run and attach the result
+        // as weight-capped evidence BEFORE the human sees the proposal. Best-effort — never blocks drafting.
+        ProofOfConcept? poc = null;
+        if (_poc is not null)
+        {
+            try { poc = await _poc.AttachAsync(entry, ct); }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogDebug(ex, "Sandbox PoC failed during draft (non-fatal).");
+            }
+            revs = await _innovated.GetRevisionsAsync(entry.Id, ct);   // refresh so the case reflects the PoC
+        }
+
         // Park the parent packet (clears the lease) — the campaign is an external dependency (§9).
         var parked = parentPacket.State == NodeState.AwaitingDependency
             ? parentPacket
@@ -118,6 +134,7 @@ public sealed class CampaignCoordinator : ICampaignCoordinator
             preauthorizePromotion = preauth,
             protocol,
             protocolCritique = critique,
+            proofOfConcept = poc,
             ledgerSoFar = revs,
         }, JsonOpts);
 

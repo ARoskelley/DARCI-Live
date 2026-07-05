@@ -378,6 +378,12 @@ builder.Services.AddSingleton<IValidationCampaignStore>(sp =>
 // promotion touch. The human gate resolves ICampaignCoordinator optionally, so it is registered here.
 builder.Services.AddSingleton<IProtocolCritic, OllamaProtocolCritic>();
 builder.Services.AddSingleton(new CampaignEligibilityOptions());
+
+// Phase E (sub-unit 3): the objective/sandbox PoC gate — routes a candidate to the coding node for a
+// sandboxed dry-run and attaches WEIGHT-CAPPED self-generated evidence before the human sees a proposal.
+builder.Services.AddSingleton(new SandboxPoCOptions());
+builder.Services.AddSingleton<ISandboxPoCGate, SandboxPoCGate>();
+
 builder.Services.AddSingleton<ICampaignCoordinator, CampaignCoordinator>();
 
 // === Coding Workspace Services ===
