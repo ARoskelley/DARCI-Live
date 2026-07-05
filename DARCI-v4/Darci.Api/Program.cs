@@ -317,9 +317,16 @@ builder.Services.AddSingleton<IKnowledgeCompilerAgent, OllamaKnowledgeCompilerAg
 builder.Services.AddSingleton(new KnowledgePipelineOptions());
 builder.Services.AddSingleton<IKnowledgePipeline, KnowledgePipeline>();
 
-// Phase B: single-pass innovation node — synthesizer (generator) + a SEPARATE plausibility reviewer,
-// escalated to by KGMA when KG + deep research are exhausted. Persists capped Innovated hypotheses.
+// Innovation node — escalated to by KGMA when KG + deep research are exhausted. Persists capped Innovated
+// hypotheses (never promoted). Phase B generator + Phase D loop:
+//   Phase B: the synthesizer (generator) and the SEPARATE plausibility reviewer (IKnowledgeReviewAgent).
+//   Phase D: the diverse-candidate loop governor — N=3 diverse candidates → ONE comparative screen (critic)
+//            → falsify the top survivors (reviewer). Progress-driven with a HARD budget backstop; N is
+//            adaptive so it degrades gracefully on a single local-Ollama build.
 builder.Services.AddSingleton<IInnovationSynthesizer, OllamaInnovationSynthesizer>();
+builder.Services.AddSingleton<IInnovationCritic, OllamaInnovationCritic>();
+builder.Services.AddSingleton(new InnovationLoopOptions());
+builder.Services.AddSingleton<IInnovationLoop, InnovationLoopGovernor>();
 
 // === Node Packet Protocol (Phase 0) ===
 // Shared envelope + state machine + watchdog. Currently only the coding node emits packets, but the

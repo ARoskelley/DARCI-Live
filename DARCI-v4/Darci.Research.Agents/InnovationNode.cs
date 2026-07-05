@@ -8,39 +8,36 @@ using Microsoft.Extensions.Logging;
 namespace Darci.Research.Agents;
 
 /// <summary>
-/// The innovation / ideation node as an <see cref="INode"/> (Phase B — single pass). KGMA escalates to it
-/// (capability <see cref="Capability.Innovate"/>) when the KG + deep research are exhausted. It runs ONE
-/// synthesis pass over the known substrate (generator), a SEPARATE plausibility review (evaluator), and
-/// returns a structured <see cref="InnovationProposal"/> — including the honest <see cref="ProposalStatus.Unsolvable"/>
-/// case. Any produced hypothesis is persisted as an <b>Innovated</b> entry (confidence capped, always IsLow)
-/// and is NOT promoted: trust only rises via a human event (governing invariant §0a).
+/// The innovation / ideation node as an <see cref="INode"/>. KGMA escalates to it (capability
+/// <see cref="Capability.Innovate"/>) when the KG + deep research are exhausted. Phase D replaced the Phase B
+/// single pass with the bounded diverse-candidate <see cref="IInnovationLoop"/>: the loop runs multiple
+/// generate→screen→falsify cycles (generator ≠ critic ≠ reviewer inside it) and returns either the winning
+/// candidate or an honest <see cref="ProposalStatus.Unsolvable"/>. This node stays thin: it builds the
+/// request, runs the loop, and — for a winner — persists it as a capped <b>Innovated</b> entry (always IsLow,
+/// NOT promoted) and files a human promotion proposal. Trust only rises via a human event (invariant §0a).
 ///
 /// Input slots:  <see cref="PacketSlots.Question"/>, <see cref="PacketSlots.FailureContext"/>,
 ///               <see cref="PacketSlots.InnovationGaps"/>, <see cref="PacketSlots.InnovationKnownFacts"/>.
 /// Output slot:  <see cref="PacketSlots.InnovationProposal"/> (structured JSON).
 ///
-/// NOT in Phase B (design-only): the multi-candidate loop governor (Phase D), the human gate/ProposalStore
-/// (Phase C), validation campaigns / tooling proposals (Phase E), and the full sycophancy critic hardening.
+/// NOT here (design-only): validation campaigns / tooling proposals + above-cap promotion pathway (Phase E).
 /// </summary>
 public sealed class InnovationNode : INode
 {
     private static readonly JsonSerializerOptions JsonOpts = new() { WriteIndented = false };
 
-    private readonly IInnovationSynthesizer _synthesizer;
-    private readonly IKnowledgeReviewAgent _reviewer;   // separate agent — generator ≠ evaluator
+    private readonly IInnovationLoop _loop;              // bounded diverse-candidate governor (Phase D)
     private readonly IInnovatedKnowledgeStore _store;
     private readonly IProposalStore? _proposals;        // human gate (Phase C) — file, never auto-decide
     private readonly ILogger<InnovationNode> _logger;
 
     public InnovationNode(
-        IInnovationSynthesizer synthesizer,
-        IKnowledgeReviewAgent reviewer,
+        IInnovationLoop loop,
         IInnovatedKnowledgeStore store,
         ILogger<InnovationNode> logger,
         IProposalStore? proposals = null)
     {
-        _synthesizer = synthesizer;
-        _reviewer = reviewer;
+        _loop = loop;
         _store = store;
         _logger = logger;
         _proposals = proposals;
@@ -54,31 +51,21 @@ public sealed class InnovationNode : INode
     {
         packet = AdvanceToWorking(packet);
         var request = BuildRequest(packet);
-        _logger.LogInformation("InnovationNode single-pass synthesis for packet {Id}: {Q}",
+        _logger.LogInformation("InnovationNode loop for packet {Id}: {Q}",
             packet.Id, request.Question.Length > 100 ? request.Question[..100] : request.Question);
 
         try
         {
-            // 1) Generate a single candidate (or an honest "unsolvable").
-            var proposal = await _synthesizer.SynthesizeAsync(request, ct) with { CorrelationId = packet.CorrelationId };
+            // 1) Run the bounded diverse-candidate loop (generate → screen → falsify, progress-governed).
+            //    It returns the vetted winner (capped Innovated + Plausibility) or an honest Unsolvable.
+            var proposal = await _loop.RunAsync(request, ct) with { CorrelationId = packet.CorrelationId };
 
             if (proposal.Status != ProposalStatus.Unsolvable && !string.IsNullOrWhiteSpace(proposal.Hypothesis))
             {
-                // 2) SEPARATE plausibility reviewer (generator did not judge itself).
-                var review = await _reviewer.ReviewAsync(
-                    new KnowledgeRequest(request.Question, request.Intent, request.FailureContext, KnowledgeKind.HowTo),
-                    CandidateText(proposal), "innovation-candidate", ct);
-
-                // Blend conservatively, then re-clamp to Innovated → always IsLow. Never promotes.
-                var blended = ProvenancePolicy.Clamp(Provenance.Innovated,
-                    Confidence.Of(Math.Min(proposal.Confidence.Score, review.Confidence.IsAssessed ? review.Confidence.Score : proposal.Confidence.Score)));
-
-                proposal = proposal with { Plausibility = review, Status = ProposalStatus.VettedInternally, Confidence = blended };
-
-                // 3) Persist as an unconfirmed Innovated hypothesis (capped, logged). NOT promoted.
+                // 2) Persist as an unconfirmed Innovated hypothesis (capped, logged). NOT promoted.
                 var record = await PersistAsync(packet, request, proposal, ct);
 
-                // 4) Human gate (Phase C): file a promotion proposal so the hypothesis is surfaced for the
+                // 3) Human gate (Phase C): file a promotion proposal so the hypothesis is surfaced for the
                 //    human's attention — never sits silent, never auto-promotes. Filing does NOT park this
                 //    packet: the capped hypothesis is usable now; promotion is an asynchronous human choice.
                 await FileProposalAsync(record, proposal, ct);
@@ -153,13 +140,6 @@ public sealed class InnovationNode : INode
     }
 
     private static string Truncate(string s, int max) => s.Length <= max ? s : s[..max].TrimEnd() + "…";
-
-    private static string CandidateText(InnovationProposal p)
-    {
-        var reasoning = p.Reasoning.Count > 0 ? "\nReasoning: " + string.Join("; ", p.Reasoning.Select(r => r.Inference)) : "";
-        var assumptions = p.Assumptions.Count > 0 ? "\nAssumptions: " + string.Join("; ", p.Assumptions) : "";
-        return p.Hypothesis + reasoning + assumptions;
-    }
 
     private static InnovationRequest BuildRequest(NodePacket packet)
     {

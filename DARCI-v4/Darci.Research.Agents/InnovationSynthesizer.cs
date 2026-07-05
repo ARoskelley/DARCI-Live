@@ -10,13 +10,26 @@ using Microsoft.Extensions.Logging;
 namespace Darci.Research.Agents;
 
 /// <summary>
-/// The GENERATOR of the innovation node (single-pass, Phase B): recombines the KG/DR substrate into ONE
-/// candidate hypothesis, or honestly concludes it is unsolvable with known information. Deliberately does
-/// NOT judge its own output — the plausibility review is a separate agent (generator ≠ evaluator).
+/// The GENERATOR of the innovation node: recombines the KG/DR substrate into a candidate hypothesis, or
+/// honestly concludes it is unsolvable. Deliberately does NOT judge its own output — the critic/review is
+/// a separate agent (generator ≠ evaluator). Phase D adds diverse-candidate generation: each candidate is
+/// prompted to DIFFER from ones already produced (forced within-cycle diversity = anti-mode-fixation).
 /// </summary>
 public interface IInnovationSynthesizer
 {
+    /// <summary>Single candidate with no diversity constraints (Phase B compatibility).</summary>
     Task<InnovationProposal> SynthesizeAsync(InnovationRequest request, CancellationToken ct = default);
+
+    /// <summary>
+    /// One candidate told to use a DIFFERENT mechanism / KG region than <paramref name="avoidHypotheses"/>
+    /// (those already produced this cycle + archive), and NOT to repropose <paramref name="failedHypotheses"/>
+    /// (empirically retracted ideas).
+    /// </summary>
+    Task<InnovationProposal> GenerateCandidateAsync(
+        InnovationRequest request,
+        IReadOnlyList<string> avoidHypotheses,
+        IReadOnlyList<string> failedHypotheses,
+        CancellationToken ct = default);
 }
 
 public sealed class OllamaInnovationSynthesizer : IInnovationSynthesizer
@@ -34,14 +47,18 @@ public sealed class OllamaInnovationSynthesizer : IInnovationSynthesizer
         _logger = logger;
     }
 
-    public async Task<InnovationProposal> SynthesizeAsync(InnovationRequest request, CancellationToken ct = default)
+    public Task<InnovationProposal> SynthesizeAsync(InnovationRequest request, CancellationToken ct = default)
+        => GenerateCandidateAsync(request, Array.Empty<string>(), Array.Empty<string>(), ct);
+
+    public async Task<InnovationProposal> GenerateCandidateAsync(
+        InnovationRequest request, IReadOnlyList<string> avoidHypotheses, IReadOnlyList<string> failedHypotheses, CancellationToken ct = default)
     {
         var relatedContext = await GatherGraphContextAsync(request.Question, ct);
 
         string raw;
         try
         {
-            raw = await _toolbox.GenerateAsync(BuildPrompt(request, relatedContext), ct);
+            raw = await _toolbox.GenerateAsync(BuildPrompt(request, relatedContext, avoidHypotheses, failedHypotheses), ct);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -74,7 +91,8 @@ public sealed class OllamaInnovationSynthesizer : IInnovationSynthesizer
         }
     }
 
-    private static string BuildPrompt(InnovationRequest req, string relatedContext)
+    private static string BuildPrompt(InnovationRequest req, string relatedContext,
+        IReadOnlyList<string> avoid, IReadOnlyList<string> failed)
     {
         var facts = req.FactList.Count > 0
             ? string.Join("\n", req.FactList.Select(f => $"- {f}"))
@@ -83,10 +101,21 @@ public sealed class OllamaInnovationSynthesizer : IInnovationSynthesizer
             ? string.Join("\n", req.GapList.Select(g => $"- {g}"))
             : "(none)";
 
+        var diversity = avoid.Count > 0
+            ? "\nAlready tried this session — your candidate MUST use a DIFFERENT mechanism / different part\n" +
+              "of the knowledge than ALL of these (do not merely refine them):\n" +
+              string.Join("\n", avoid.Select(a => $"- {a}")) + "\n"
+            : "";
+        var negatives = failed.Count > 0
+            ? "\nDo NOT repropose these approaches — they were TRIED and FAILED empirically:\n" +
+              string.Join("\n", failed.Select(f => $"- {f}")) + "\n"
+            : "";
+
         return $$"""
 You are an innovation synthesizer. Known research and knowledge-graph facts about a problem are below,
 but they did NOT already answer it. Produce ONE candidate solution by finding an INTERSECTION/novel
 combination of the KNOWN material — or, honestly, conclude it cannot be solved with known information.
+{{diversity}}{{negatives}}
 
 Respond with ONLY this JSON (no prose, no markdown):
 {"solvable": true|false,

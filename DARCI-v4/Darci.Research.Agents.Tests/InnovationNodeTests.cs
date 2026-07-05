@@ -8,6 +8,8 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Darci.Research.Agents.Tests;
 
+/// <summary>The node is now thin: it runs the loop, then (for a winner) persists a capped Innovated entry
+/// and files a promotion proposal. Loop internals (diversity/screen/falsify) are covered by the governor tests.</summary>
 public sealed class InnovationNodeTests : IDisposable
 {
     private readonly string _dbPath;
@@ -26,54 +28,53 @@ public sealed class InnovationNodeTests : IDisposable
         try { if (File.Exists(_dbPath)) File.Delete(_dbPath); } catch { }
     }
 
-    private sealed class FakeSynthesizer : IInnovationSynthesizer
+    private sealed class FakeLoop : IInnovationLoop
     {
         private readonly InnovationProposal _p;
         public InnovationRequest? Last;
-        public FakeSynthesizer(InnovationProposal p) => _p = p;
-        public Task<InnovationProposal> SynthesizeAsync(InnovationRequest request, CancellationToken ct = default)
+        public int CallCount;
+        public FakeLoop(InnovationProposal p) => _p = p;
+        public Task<InnovationProposal> RunAsync(InnovationRequest request, CancellationToken ct = default)
         {
             Last = request;
+            CallCount++;
             return Task.FromResult(_p);
         }
     }
 
-    private InnovationNode Node(IInnovationSynthesizer synth, FakeReviewAgent reviewer) =>
-        new(synth, reviewer, _store, NullLogger<InnovationNode>.Instance);
+    private InnovationNode Node(IInnovationLoop loop) =>
+        new(loop, _store, NullLogger<InnovationNode>.Instance);
 
     private static NodePacket Routed(IReadOnlyDictionary<string, string>? slots = null) =>
         NodePacket.Create("design a myoelectric grip controller", capability: Capability.Innovate, slots: slots)
             .Transition(NodeId.Orchestrator, NodeState.Routed, "routed");
 
-    private static InnovationProposal SolvableCandidate() => new()
+    // What the loop hands back for a winner: vetted, capped Innovated, plausibility attached.
+    private static InnovationProposal Winner() => new()
     {
-        Status = ProposalStatus.Proposed,
+        Status = ProposalStatus.VettedInternally,
         Hypothesis = "combine EMG threshold detection with a PID grip loop",
         Reasoning = new[] { new ReasoningLink("EMG amplitude maps to intent", new[] { "f1" }) },
         Provenance = Provenance.Innovated,
-        Confidence = ProvenancePolicy.Clamp(Provenance.Innovated, Confidence.Of(0.3)),
+        Plausibility = new KnowledgeReview(true, Confidence.Of(0.8), Array.Empty<string>(), "plausible"),
+        Confidence = ProvenancePolicy.Clamp(Provenance.Innovated, Confidence.Of(0.32)),
     };
 
     [Fact]
-    public async Task SinglePass_Solvable_Reviews_Persists_AndReturnsProposal()
+    public async Task Winner_Persists_FilesProposal_AndReturnsCappedProposal()
     {
-        var synth = new FakeSynthesizer(SolvableCandidate());
-        var reviewer = new FakeReviewAgent(FakeReviewAgent.Accept(0.9)); // separate evaluator; high but must not lift trust
-        var node = Node(synth, reviewer);
-
+        var loop = new FakeLoop(Winner());
         var slots = new Dictionary<string, string>
         {
             [PacketSlots.Question] = "how to close the grip loop?",
             [PacketSlots.InnovationKnownFacts] = JsonSerializer.Serialize(new[] { "EMG sensors give amplitude", "PID controls actuators" }),
         };
-        var result = await node.HandleAsync(Routed(slots));
+        var result = await Node(loop).HandleAsync(Routed(slots));
 
         Assert.Equal(NodeState.Succeeded, result.State);
+        Assert.Equal(1, loop.CallCount);
 
-        // Generator ≠ evaluator: the reviewer ran separately.
-        Assert.Equal(1, reviewer.CallCount);
-
-        // Structured proposal in the slot, vetted, capped.
+        // Structured proposal in the slot, vetted, capped (never IsLow-crossing).
         var proposal = JsonSerializer.Deserialize<InnovationProposal>(result.Payload.Slot(PacketSlots.InnovationProposal)!);
         Assert.Equal(ProposalStatus.VettedInternally, proposal!.Status);
         Assert.NotNull(proposal.Plausibility);
@@ -84,32 +85,17 @@ public sealed class InnovationNodeTests : IDisposable
         Assert.Single(persisted);
         Assert.Equal("combine EMG threshold detection with a PID grip loop", persisted[0].Hypothesis);
         Assert.True(persisted[0].Confidence.Score <= ProvenancePolicy.InnovatedCap);
-        Assert.Equal(Provenance.Innovated, persisted[0].Provenance);   // never higher without a human event
+        Assert.Equal(Provenance.Innovated, persisted[0].Provenance);
     }
 
     [Fact]
-    public async Task HighReviewerConfidence_DoesNotLiftAboveCap()
-    {
-        var synth = new FakeSynthesizer(SolvableCandidate());
-        var reviewer = new FakeReviewAgent(FakeReviewAgent.Accept(0.99));
-        var result = await Node(synth, reviewer).HandleAsync(Routed());
-
-        var proposal = JsonSerializer.Deserialize<InnovationProposal>(result.Payload.Slot(PacketSlots.InnovationProposal)!);
-        Assert.True(proposal!.Confidence.Score <= ProvenancePolicy.InnovatedCap);
-        Assert.True(proposal.Confidence.IsLow);
-    }
-
-    [Fact]
-    public async Task Unsolvable_ReturnsRequiredInputs_AndDoesNotPersistOrReview()
+    public async Task Unsolvable_ReturnsRequiredInputs_AndDoesNotPersist()
     {
         var unsolvable = InnovationProposal.CannotSolve("no known combination works",
             new[] { "measured actuator torque curve" });
-        var synth = new FakeSynthesizer(unsolvable);
-        var reviewer = new FakeReviewAgent();
-        var result = await Node(synth, reviewer).HandleAsync(Routed());
+        var result = await Node(new FakeLoop(unsolvable)).HandleAsync(Routed());
 
         Assert.Equal(NodeState.Succeeded, result.State);
-        Assert.Equal(0, reviewer.CallCount);                           // nothing to review
 
         var proposal = JsonSerializer.Deserialize<InnovationProposal>(result.Payload.Slot(PacketSlots.InnovationProposal)!);
         Assert.Equal(ProposalStatus.Unsolvable, proposal!.Status);
@@ -121,8 +107,7 @@ public sealed class InnovationNodeTests : IDisposable
     [Fact]
     public async Task RequestIsBuiltFromSlots()
     {
-        var synth = new FakeSynthesizer(SolvableCandidate());
-        var node = Node(synth, new FakeReviewAgent(FakeReviewAgent.Accept()));
+        var loop = new FakeLoop(Winner());
         var slots = new Dictionary<string, string>
         {
             [PacketSlots.Question] = "Q",
@@ -130,11 +115,11 @@ public sealed class InnovationNodeTests : IDisposable
             [PacketSlots.InnovationGaps] = JsonSerializer.Serialize(new[] { "g1" }),
             [PacketSlots.InnovationKnownFacts] = JsonSerializer.Serialize(new[] { "fact-a", "fact-b" }),
         };
-        await node.HandleAsync(Routed(slots));
+        await Node(loop).HandleAsync(Routed(slots));
 
-        Assert.Equal("Q", synth.Last!.Question);
-        Assert.Equal("research returned nothing", synth.Last.FailureContext);
-        Assert.Equal(new[] { "g1" }, synth.Last.GapList);
-        Assert.Equal(new[] { "fact-a", "fact-b" }, synth.Last.FactList);
+        Assert.Equal("Q", loop.Last!.Question);
+        Assert.Equal("research returned nothing", loop.Last.FailureContext);
+        Assert.Equal(new[] { "g1" }, loop.Last.GapList);
+        Assert.Equal(new[] { "fact-a", "fact-b" }, loop.Last.FactList);
     }
 }
