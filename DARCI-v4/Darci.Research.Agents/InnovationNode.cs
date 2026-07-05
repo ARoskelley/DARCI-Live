@@ -29,18 +29,21 @@ public sealed class InnovationNode : INode
     private readonly IInnovationSynthesizer _synthesizer;
     private readonly IKnowledgeReviewAgent _reviewer;   // separate agent — generator ≠ evaluator
     private readonly IInnovatedKnowledgeStore _store;
+    private readonly IProposalStore? _proposals;        // human gate (Phase C) — file, never auto-decide
     private readonly ILogger<InnovationNode> _logger;
 
     public InnovationNode(
         IInnovationSynthesizer synthesizer,
         IKnowledgeReviewAgent reviewer,
         IInnovatedKnowledgeStore store,
-        ILogger<InnovationNode> logger)
+        ILogger<InnovationNode> logger,
+        IProposalStore? proposals = null)
     {
         _synthesizer = synthesizer;
         _reviewer = reviewer;
         _store = store;
         _logger = logger;
+        _proposals = proposals;
     }
 
     public NodeId Id => NodeId.Innovation;
@@ -73,7 +76,12 @@ public sealed class InnovationNode : INode
                 proposal = proposal with { Plausibility = review, Status = ProposalStatus.VettedInternally, Confidence = blended };
 
                 // 3) Persist as an unconfirmed Innovated hypothesis (capped, logged). NOT promoted.
-                await PersistAsync(packet, request, proposal, ct);
+                var record = await PersistAsync(packet, request, proposal, ct);
+
+                // 4) Human gate (Phase C): file a promotion proposal so the hypothesis is surfaced for the
+                //    human's attention — never sits silent, never auto-promotes. Filing does NOT park this
+                //    packet: the capped hypothesis is usable now; promotion is an asynchronous human choice.
+                await FileProposalAsync(record, proposal, ct);
             }
 
             packet = packet.WithSlot(PacketSlots.InnovationProposal, JsonSerializer.Serialize(proposal, JsonOpts));
@@ -93,7 +101,7 @@ public sealed class InnovationNode : INode
         }
     }
 
-    private async Task PersistAsync(NodePacket packet, InnovationRequest request, InnovationProposal proposal, CancellationToken ct)
+    private async Task<InnovatedKnowledgeRecord> PersistAsync(NodePacket packet, InnovationRequest request, InnovationProposal proposal, CancellationToken ct)
     {
         var record = new InnovatedKnowledgeRecord
         {
@@ -109,7 +117,42 @@ public sealed class InnovationNode : INode
         await _store.AddAsync(record, ct);
         _logger.LogInformation("Persisted innovated hypothesis {Id} (Innovated, capped {Score:0.##}).",
             record.Id, record.Confidence.Score);
+        return record;
     }
+
+    private async Task FileProposalAsync(InnovatedKnowledgeRecord record, InnovationProposal proposal, CancellationToken ct)
+    {
+        if (_proposals is null) return;
+        try
+        {
+            var proposalRecord = new HumanProposal
+            {
+                CorrelationId = record.CorrelationId,
+                Kind = HumanProposalKind.PromoteInnovated,
+                SubjectId = record.Id,
+                TargetProvenance = Provenance.HumanApproved,
+                Title = $"Promote innovated hypothesis: {Truncate(record.Hypothesis, 80)}",
+                Summary = record.Hypothesis,
+                JustificationJson = JsonSerializer.Serialize(new
+                {
+                    hypothesis = record.Hypothesis,
+                    topic = record.Topic,
+                    reasoning = proposal.Reasoning,
+                    assumptions = proposal.Assumptions,
+                    plausibility = proposal.Plausibility,
+                }, JsonOpts),
+                // No parked packet: the capped hypothesis returns and is usable now; promotion is async.
+            };
+            await _proposals.AddAsync(proposalRecord, ct);
+            _logger.LogInformation("Filed promotion proposal {PId} for innovated {Id}.", proposalRecord.Id, record.Id);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogDebug(ex, "Filing promotion proposal failed (non-fatal).");
+        }
+    }
+
+    private static string Truncate(string s, int max) => s.Length <= max ? s : s[..max].TrimEnd() + "…";
 
     private static string CandidateText(InnovationProposal p)
     {

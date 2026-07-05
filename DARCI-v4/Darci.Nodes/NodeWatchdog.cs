@@ -16,11 +16,13 @@ namespace Darci.Nodes;
 public sealed class NodeWatchdog
 {
     private readonly INodePacketStore _store;
+    private readonly IProposalStore? _proposals;
     private readonly ILogger<NodeWatchdog> _logger;
 
-    public NodeWatchdog(INodePacketStore store, ILogger<NodeWatchdog> logger)
+    public NodeWatchdog(INodePacketStore store, ILogger<NodeWatchdog> logger, IProposalStore? proposals = null)
     {
         _store = store;
+        _proposals = proposals;
         _logger = logger;
     }
 
@@ -55,8 +57,18 @@ public sealed class NodeWatchdog
         var now = DateTime.UtcNow;
         var active = await _store.GetActivePacketsAsync(ct);
         var reaped = 0;
+        var parked = 0;
         foreach (var packet in active)
         {
+            // Carve-out: a packet parked awaiting a human decision (AwaitingDependency) with a live pending
+            // proposal is NOT an orphan — it is legitimately waiting and must survive the restart.
+            if (packet.State == NodeState.AwaitingDependency && _proposals is not null
+                && await _proposals.HasPendingForParkedPacketAsync(packet.Id, ct))
+            {
+                parked++;
+                continue;
+            }
+
             if (await AbortAsync(packet,
                     "Process restarted while packet was active; no live owner — reaped on startup.",
                     now, ct))
@@ -65,6 +77,8 @@ public sealed class NodeWatchdog
 
         if (reaped > 0)
             _logger.LogWarning("Watchdog reaped {Count} orphaned packet(s) on startup.", reaped);
+        if (parked > 0)
+            _logger.LogInformation("Watchdog preserved {Count} packet(s) parked pending human review.", parked);
 
         return reaped;
     }

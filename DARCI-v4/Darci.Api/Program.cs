@@ -355,6 +355,12 @@ builder.Services.AddSingleton<IInnovatedKnowledgeStore>(sp =>
 builder.Services.AddSingleton(new OutcomeFeedbackOptions());
 builder.Services.AddSingleton<IOutcomeFeedbackSink, InnovatedKnowledgeOutcomeSink>();
 
+// Phase C: the human gate — durable ProposalStore + decision service. Approval is the one path that
+// writes a human-authored ledger event (the only way to lift innovated knowledge above the cap).
+builder.Services.AddSingleton<IProposalStore>(sp =>
+    new SqliteProposalStore(connectionString, sp.GetRequiredService<ILogger<SqliteProposalStore>>()));
+builder.Services.AddSingleton<IHumanGate, HumanGateService>();
+
 // === Coding Workspace Services ===
 builder.Services.AddSingleton<ICodingWorkspaceStore>(sp =>
     new CodingWorkspaceStore(
@@ -494,6 +500,10 @@ var gapStore = app.Services.GetRequiredService<IGapStore>();
 await gapStore.InitializeAsync();
 var innovatedStore = app.Services.GetRequiredService<IInnovatedKnowledgeStore>();
 await innovatedStore.InitializeAsync();
+var proposalStore = app.Services.GetRequiredService<IProposalStore>();
+await proposalStore.InitializeAsync();
+// The startup sweep must run AFTER the proposal store is initialized so its carve-out can recognise
+// packets legitimately parked pending a human decision (and not reap them as orphans).
 var nodeWatchdog = app.Services.GetRequiredService<NodeWatchdog>();
 await nodeWatchdog.SweepStartupOrphansAsync();
 
@@ -1332,6 +1342,28 @@ app.MapGet("/nodes/correlations/{correlationId}", async Task<IResult> (
     return Results.Ok(packets);
 });
 
+// === Human gate (Phase C) — the interface a UI/FRIDAY channel calls ===
+// List proposals awaiting a human decision.
+app.MapGet("/human/proposals", async Task<IResult> (
+    IHumanGate gate,
+    int? limit,
+    CancellationToken ct) =>
+{
+    var pending = await gate.ListPendingAsync(limit ?? 100, ct);
+    return Results.Ok(pending);
+});
+
+// Submit a human decision. Approval of a promotion is the ONE path that raises trust above the cap.
+app.MapPost("/human/proposals/{id}/decision", async Task<IResult> (
+    IHumanGate gate,
+    string id,
+    HumanDecisionRequest request,
+    CancellationToken ct) =>
+{
+    var result = await gate.DecideAsync(id, request.Approve, request.Note, request.DecidedBy, ct);
+    return result.Applied ? Results.Ok(result) : Results.BadRequest(result);
+});
+
 // Create a git checkpoint for a workspace.
 app.MapPost("/coding/workspaces/{id}/checkpoint", async Task<IResult> (
     IGitCheckpointService checkpoints,
@@ -1530,6 +1562,7 @@ app.Run();
 
 // === Request/Response Models ===
 
+public record HumanDecisionRequest(bool Approve, string? Note = null, string? DecidedBy = null);
 public record MessageRequest(string Message, string? UserId = null, bool Urgent = false);
 public record GoalRequest(string Title, string? Description, string? UserId, GoalType? Type, GoalPriority? Priority);
 public record RegisterFileRequest(string Filename, string ContentType, string FilePath, long SizeBytes);

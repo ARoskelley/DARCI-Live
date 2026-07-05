@@ -111,6 +111,34 @@ public sealed record NodePacket
         };
     }
 
+    /// <summary>
+    /// Park the packet awaiting an external human decision (§9): transition to
+    /// <see cref="NodeState.AwaitingDependency"/> and CLEAR the lease, so it neither orphans nor holds a
+    /// lease open while the human is away. It resumes via a normal transition once the decision lands.
+    /// </summary>
+    public NodePacket ParkAwaitingDependency(NodeId node, string decision, Confidence? confidence = null, DateTime? nowUtc = null)
+    {
+        if (!NodeStateMachine.CanTransition(State, NodeState.AwaitingDependency))
+            throw new InvalidNodeTransitionException(State, NodeState.AwaitingDependency);
+
+        var now = nowUtc ?? DateTime.UtcNow;
+        var entry = new NodeLogEntry
+        {
+            Node = node,
+            At = now,
+            StateAfter = NodeState.AwaitingDependency,
+            Decision = decision,
+            Confidence = confidence ?? Confidence.Unassessed,
+        };
+        return this with
+        {
+            State = NodeState.AwaitingDependency,
+            Log = new List<NodeLogEntry>(Log) { entry },
+            UpdatedAt = now,
+            LeaseExpiresAt = null,   // no lease held while parked
+        };
+    }
+
     /// <summary>Append a slot value (progressive disclosure) without changing state. No log entry.</summary>
     public NodePacket WithSlot(string key, string value, DateTime? nowUtc = null) =>
         this with { Payload = Payload.WithSlot(key, value), UpdatedAt = nowUtc ?? DateTime.UtcNow };
