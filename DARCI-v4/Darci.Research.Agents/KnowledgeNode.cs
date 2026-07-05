@@ -25,13 +25,20 @@ public sealed class KnowledgeNode : INode
 
     private readonly IKnowledgePipeline _pipeline;
     private readonly IGapHandler? _gapHandler;
+    // Lazy to break the DI cycle: the router depends on this node, and this node routes to Innovation.
+    private readonly Lazy<INodeRouter>? _innovationRouter;
     private readonly ILogger<KnowledgeNode> _logger;
 
-    public KnowledgeNode(IKnowledgePipeline pipeline, ILogger<KnowledgeNode> logger, IGapHandler? gapHandler = null)
+    public KnowledgeNode(
+        IKnowledgePipeline pipeline,
+        ILogger<KnowledgeNode> logger,
+        IGapHandler? gapHandler = null,
+        Lazy<INodeRouter>? innovationRouter = null)
     {
         _pipeline = pipeline;
         _logger = logger;
         _gapHandler = gapHandler;
+        _innovationRouter = innovationRouter;
     }
 
     public NodeId Id => NodeId.Knowledge;
@@ -51,12 +58,25 @@ public sealed class KnowledgeNode : INode
         {
             var response = await _pipeline.RunAsync(request, ct);
 
-            // Make gaps actionable. Only at the top level (depth 0); a nested immediate-fill packet is a
-            // leaf and must not trigger further gap handling (recursion guard).
-            if (response.Gaps.Count > 0 && _gapHandler is not null && Depth(packet) == 0)
+            var blocking = string.Equals(packet.Payload.Slot(PacketSlots.Blocking), "true", StringComparison.OrdinalIgnoreCase);
+            var topLevel = Depth(packet) == 0;
+
+            // ESCALATE TO INNOVATION (§10): the KG + deep research are exhausted (not answered) on a
+            // blocking, critical-path request. Innovation synthesizes a candidate hypothesis (or honestly
+            // concludes it needs external input). Runs above the pipeline, KGMA-orchestrated.
+            var innovationRan = false;
+            if (topLevel && !response.Answered && response.Gaps.Count > 0 && blocking && _innovationRouter is not null)
             {
-                var blocking = string.Equals(packet.Payload.Slot(PacketSlots.Blocking), "true", StringComparison.OrdinalIgnoreCase);
-                var ctx = new GapContext(request.Question, request.Intent, response.Gaps, response.Confidence, blocking, NodeId.Knowledge);
+                (packet, response) = await EscalateToInnovationAsync(packet, request, response, ct);
+                innovationRan = true;
+            }
+
+            // Make gaps actionable. After an innovation escalation, gaps are DEFERRED (learning), not
+            // immediate-filled again (research already failed). Top level only (recursion guard).
+            if (response.Gaps.Count > 0 && _gapHandler is not null && topLevel)
+            {
+                var gapBlocking = blocking && !innovationRan;
+                var ctx = new GapContext(request.Question, request.Intent, response.Gaps, response.Confidence, gapBlocking, NodeId.Knowledge);
                 var outcome = await _gapHandler.HandleAsync(packet, ctx, ct);
                 packet = outcome.Packet;
 
@@ -107,6 +127,61 @@ public sealed class KnowledgeNode : INode
         if (string.IsNullOrWhiteSpace(json)) return null;
         try { return JsonSerializer.Deserialize<KnowledgeResponse>(json); }
         catch { return null; }
+    }
+
+    /// <summary>
+    /// Routes a child <see cref="Capability.Innovate"/> packet (KGMA-orchestrated, shared correlation) and
+    /// folds the resulting proposal into the response: an <see cref="ProposalStatus.Unsolvable"/> conclusion
+    /// adds its required external inputs as gaps; a synthesized hypothesis is added as a clearly-marked,
+    /// unverified low-confidence candidate finding. The answer stays unanswered — it's a hypothesis.
+    /// </summary>
+    private async Task<(NodePacket Packet, KnowledgeResponse Response)> EscalateToInnovationAsync(
+        NodePacket packet, KnowledgeRequest request, KnowledgeResponse response, CancellationToken ct)
+    {
+        var knownFacts = response.Findings.ToList();
+        if (!string.IsNullOrWhiteSpace(response.DirectAnswer)) knownFacts.Add(response.DirectAnswer);
+
+        var slots = new Dictionary<string, string>
+        {
+            [PacketSlots.Question] = request.Question,
+            [PacketSlots.InnovationGaps] = JsonSerializer.Serialize(response.Gaps, JsonOpts),
+            [PacketSlots.InnovationKnownFacts] = JsonSerializer.Serialize(knownFacts, JsonOpts),
+        };
+        if (!string.IsNullOrWhiteSpace(request.FailureContext))
+            slots[PacketSlots.FailureContext] = request.FailureContext!;
+
+        var child = NodePacket.Create(request.Intent, capability: Capability.Innovate,
+            correlationId: packet.CorrelationId, slots: slots);
+
+        packet = packet.Transition(NodeId.Knowledge, NodeState.Working,
+            "Escalated to innovation node (KG + deep research exhausted).", confidence: response.Confidence);
+
+        InnovationProposal? proposal = null;
+        try
+        {
+            var result = await _innovationRouter!.Value.DispatchAsync(child, ct);
+            var json = result.Payload.Slot(PacketSlots.InnovationProposal);
+            if (!string.IsNullOrWhiteSpace(json)) proposal = JsonSerializer.Deserialize<InnovationProposal>(json);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogDebug(ex, "Innovation escalation failed (non-fatal).");
+        }
+
+        if (proposal is null) return (packet, response);
+
+        if (proposal.Status == ProposalStatus.Unsolvable)
+        {
+            var gaps = response.Gaps
+                .Concat(proposal.RequiredExternalInputs.Select(x => $"needs external input: {x}"))
+                .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            return (packet, response with { Gaps = gaps });
+        }
+
+        var findings = response.Findings
+            .Append($"[innovated hypothesis — unverified, low confidence]: {proposal.Hypothesis}")
+            .ToList();
+        return (packet, response with { Findings = findings });
     }
 
     private static int Depth(NodePacket packet)

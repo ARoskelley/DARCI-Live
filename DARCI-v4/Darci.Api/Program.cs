@@ -317,6 +317,10 @@ builder.Services.AddSingleton<IKnowledgeCompilerAgent, OllamaKnowledgeCompilerAg
 builder.Services.AddSingleton(new KnowledgePipelineOptions());
 builder.Services.AddSingleton<IKnowledgePipeline, KnowledgePipeline>();
 
+// Phase B: single-pass innovation node — synthesizer (generator) + a SEPARATE plausibility reviewer,
+// escalated to by KGMA when KG + deep research are exhausted. Persists capped Innovated hypotheses.
+builder.Services.AddSingleton<IInnovationSynthesizer, OllamaInnovationSynthesizer>();
+
 // === Node Packet Protocol (Phase 0) ===
 // Shared envelope + state machine + watchdog. Currently only the coding node emits packets, but the
 // store/watchdog are app-wide so later nodes (engineering, knowledge, living loop) plug straight in.
@@ -332,6 +336,7 @@ builder.Services.AddHostedService<NodeWatchdogService>();
 builder.Services.AddSingleton(sp => new Lazy<ICodingAgentLoop>(sp.GetRequiredService<ICodingAgentLoop>));
 builder.Services.AddSingleton<INode, CodingNode>();
 builder.Services.AddSingleton<INode, KnowledgeNode>();
+builder.Services.AddSingleton<INode, InnovationNode>();
 builder.Services.AddSingleton<INodeRouter, NodeRouter>();
 
 // Gap-driven action: persist gaps, decide immediate-fill vs deferred auto-goal. The handler routes via

@@ -16,6 +16,7 @@ public enum NodeId
     Engineering = 3,
     Knowledge = 4,   // the KG / deep-research node
     Cad = 5,
+    Innovation = 6,  // the ideation node — synthesizes hypotheses when known knowledge is exhausted
 }
 
 /// <summary>
@@ -31,6 +32,7 @@ public enum Capability
     GenerateCad = 3,
     AnswerKnowledge = 4,
     FillKnowledgeGap = 5,
+    Innovate = 6,   // synthesize a candidate hypothesis from existing knowledge when it is exhausted
 }
 
 /// <summary>

@@ -175,4 +175,87 @@ public class KnowledgeNodeTests
 
         Assert.False(handler.Invoked);   // leaf fill must not recurse into gap handling
     }
+
+    // ── Innovation escalation (Phase B): only after KG + research exhausted, on a blocking request ──
+
+    private sealed class FakeInnovationRouter : INodeRouter
+    {
+        private readonly InnovationProposal _proposal;
+        public Capability? DispatchedCapability;
+        public bool Called;
+        public FakeInnovationRouter(InnovationProposal proposal) => _proposal = proposal;
+
+        public Task<NodePacket> DispatchAsync(NodePacket packet, CancellationToken ct = default)
+        {
+            Called = true;
+            DispatchedCapability = packet.RequestedCapability;
+            var done = packet
+                .Transition(NodeId.Orchestrator, NodeState.Routed, "routed")
+                .Transition(NodeId.Innovation, NodeState.Accepted, "a")
+                .Transition(NodeId.Innovation, NodeState.Working, "w")
+                .WithSlot(PacketSlots.InnovationProposal, JsonSerializer.Serialize(_proposal))
+                .Transition(NodeId.Innovation, NodeState.Succeeded, "done", success: true);
+            return Task.FromResult(done);
+        }
+    }
+
+    private static KnowledgeNode NodeWithInnovation(KnowledgeResponse response, FakeInnovationRouter router) =>
+        new(new FakePipeline(response), NullLogger<KnowledgeNode>.Instance,
+            gapHandler: new FakeGapHandler(), innovationRouter: new Lazy<INodeRouter>(() => router));
+
+    [Fact]
+    public async Task Unanswered_Blocking_EscalatesToInnovation()
+    {
+        var proposal = new InnovationProposal
+        {
+            Status = ProposalStatus.VettedInternally,
+            Hypothesis = "combine A and B via bridge C",
+            Confidence = ProvenancePolicy.Clamp(Provenance.Innovated, Confidence.Of(0.3)),
+        };
+        var router = new FakeInnovationRouter(proposal);
+        var node = NodeWithInnovation(KnowledgeResponse.Unanswered("no known table"), router);
+
+        var result = await node.HandleAsync(Routed(new Dictionary<string, string> { [PacketSlots.Blocking] = "true" }));
+
+        Assert.True(router.Called);
+        Assert.Equal(Capability.Innovate, router.DispatchedCapability);   // routed to the innovation capability
+        var merged = JsonSerializer.Deserialize<KnowledgeResponse>(result.Payload.Slot(PacketSlots.KnowledgeResponse)!);
+        Assert.Contains(merged!.Findings, f => f.Contains("innovated hypothesis") && f.Contains("bridge C"));
+    }
+
+    [Fact]
+    public async Task Answered_DoesNotEscalate()
+    {
+        var router = new FakeInnovationRouter(new InnovationProposal());
+        var answered = new KnowledgeResponse { Answered = true, DirectAnswer = "known answer", Confidence = Confidence.Of(0.7) };
+        var node = NodeWithInnovation(answered, router);
+
+        await node.HandleAsync(Routed(new Dictionary<string, string> { [PacketSlots.Blocking] = "true" }));
+
+        Assert.False(router.Called);   // KG/research answered — nothing to innovate
+    }
+
+    [Fact]
+    public async Task Unanswered_NonBlocking_DoesNotEscalate()
+    {
+        var router = new FakeInnovationRouter(new InnovationProposal());
+        var node = NodeWithInnovation(KnowledgeResponse.Unanswered("gap"), router);
+
+        await node.HandleAsync(Routed());   // no Blocking slot
+
+        Assert.False(router.Called);   // innovation reserved for the critical path
+    }
+
+    [Fact]
+    public async Task Unsolvable_AddsRequiredExternalInputsAsGaps()
+    {
+        var unsolvable = InnovationProposal.CannotSolve("nope", new[] { "measured latency X" });
+        var router = new FakeInnovationRouter(unsolvable);
+        var node = NodeWithInnovation(KnowledgeResponse.Unanswered("no known table"), router);
+
+        var result = await node.HandleAsync(Routed(new Dictionary<string, string> { [PacketSlots.Blocking] = "true" }));
+
+        var merged = JsonSerializer.Deserialize<KnowledgeResponse>(result.Payload.Slot(PacketSlots.KnowledgeResponse)!);
+        Assert.Contains(merged!.Gaps, g => g.Contains("needs external input") && g.Contains("measured latency X"));
+    }
 }

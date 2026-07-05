@@ -28,4 +28,9 @@ public static class PacketSlots
     public const string KnowledgeFindings = "knowledgeFindings";          // human/agent-readable rendering (legacy/compat)
     public const string KnowledgeConfidence = "knowledgeConfidence";
     public const string KnowledgeResponse = "knowledgeResponse";          // structured KnowledgeResponse as JSON (decision 4)
+
+    // Innovation node — request (JSON arrays) and response
+    public const string InnovationGaps = "innovationGaps";                // JSON string[] — the unmet gaps that triggered escalation
+    public const string InnovationKnownFacts = "innovationKnownFacts";    // JSON string[] — KG/DR substrate to recombine
+    public const string InnovationProposal = "innovationProposal";        // structured InnovationProposal as JSON
 }
