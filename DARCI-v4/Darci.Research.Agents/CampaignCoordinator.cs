@@ -55,6 +55,7 @@ public sealed class CampaignCoordinator : ICampaignCoordinator
     private readonly IReadOnlyList<INode> _nodes;   // to know whether a step's environment EXISTS
     private readonly ISandboxPoCGate? _poc;         // sub-unit 3 — objective PoC before the human sees it
     private readonly IToolingProposalEmitter? _tooling;  // sub-unit 4 — data-only tooling demand
+    private readonly IWorkScheduler? _scheduler;    // priority-ordered surfacing (seam for a future scheduler)
     private readonly ILogger<CampaignCoordinator> _logger;
 
     public CampaignCoordinator(
@@ -68,7 +69,8 @@ public sealed class CampaignCoordinator : ICampaignCoordinator
         IEnumerable<INode> nodes,
         ILogger<CampaignCoordinator> logger,
         ISandboxPoCGate? poc = null,
-        IToolingProposalEmitter? tooling = null)
+        IToolingProposalEmitter? tooling = null,
+        IWorkScheduler? scheduler = null)
     {
         _campaigns = campaigns;
         _innovated = innovated;
@@ -80,15 +82,21 @@ public sealed class CampaignCoordinator : ICampaignCoordinator
         _nodes = nodes.ToList();
         _poc = poc;
         _tooling = tooling;
+        _scheduler = scheduler;
         _logger = logger;
     }
 
     public async Task<ValidationCampaign> DraftAndRequestAuthorizationAsync(
         InnovatedKnowledgeRecord entry, IReadOnlyList<ValidationStep> protocol, Provenance targetStage,
-        KnowledgeDomain domain, NodePacket parentPacket, bool preauthorizePromotion = false, CancellationToken ct = default)
+        KnowledgeDomain domain, NodePacket? parentPacket = null, bool preauthorizePromotion = false,
+        CampaignPriority priority = CampaignPriority.HumanInitiated, CancellationToken ct = default)
     {
         // Sensitive domains NEVER pre-authorize the promotion touch — both human touches are mandatory.
         var preauth = preauthorizePromotion && domain == KnowledgeDomain.General;
+
+        // Auto-drafted campaigns have no in-flight packet — mint one so parking/watchdog carve-out behave
+        // identically. It STILL parks for human authorization; auto-draft only automates the draft step.
+        parentPacket ??= await MintParentPacketAsync(entry, ct);
 
         var revs = await _innovated.GetRevisionsAsync(entry.Id, ct);
         var snapshotSeq = revs.Count > 0 ? revs[^1].Seq : 0;
@@ -104,6 +112,7 @@ public sealed class CampaignCoordinator : ICampaignCoordinator
             Status = CampaignStatus.AwaitingAuthorization,
             CorrelationId = string.IsNullOrEmpty(parentPacket.CorrelationId) ? parentPacket.Id : parentPacket.CorrelationId,
             PromotionPreauthorized = preauth,
+            Priority = priority,
         };
 
         // The critic falsifies the DESIGN before a human sees it — attached so the human approves the plan.
@@ -156,9 +165,34 @@ public sealed class CampaignCoordinator : ICampaignCoordinator
         };
         await _proposals.AddAsync(proposal, ct);
 
-        _logger.LogInformation("Drafted campaign {Id} for entry {Entry} (target {Stage}, {Domain}); authorization filed.",
-            campaign.Id, entry.Id, targetStage, domain);
+        // Surface the pending authorization through the work scheduler at the campaign's priority, so a
+        // human-facing surface (and, later, a resource-allocation scheduler) picks up human-initiated
+        // campaigns before auto-drafted ones.
+        _scheduler?.Enqueue(new WorkItem(
+            Id: proposal.Id,
+            Kind: WorkKind.SurfaceAuthorization,
+            Priority: priority,
+            Description: $"Authorize campaign for: {Truncate(entry.Hypothesis, 60)}",
+            CampaignId: campaign.Id,
+            CorrelationId: campaign.CorrelationId,
+            Capability: Capability.Innovate));
+
+        _logger.LogInformation("Drafted campaign {Id} for entry {Entry} (target {Stage}, {Domain}, {Priority}); authorization filed.",
+            campaign.Id, entry.Id, targetStage, domain, priority);
         return campaign;
+    }
+
+    private async Task<NodePacket> MintParentPacketAsync(InnovatedKnowledgeRecord entry, CancellationToken ct)
+    {
+        var pkt = NodePacket.Create(
+                $"Auto-drafted validation campaign for: {entry.Hypothesis}",
+                capability: Capability.Innovate,
+                correlationId: string.IsNullOrEmpty(entry.CorrelationId) ? null : entry.CorrelationId)
+            .Transition(NodeId.Innovation, NodeState.Routed, "auto-drafted campaign")
+            .Transition(NodeId.Innovation, NodeState.Accepted, "accepted")
+            .Transition(NodeId.Innovation, NodeState.Working, "drafting", leaseFor: TimeSpan.FromMinutes(5));
+        await _packets.CreatePacketAsync(pkt, ct);
+        return pkt;
     }
 
     public async Task HandleAuthorizationDecisionAsync(HumanProposal proposal, bool approve, string decidedBy, CancellationToken ct = default)

@@ -16,16 +16,21 @@ public interface ICampaignCoordinator
     /// <summary>
     /// Draft a campaign for <paramref name="entry"/> with the given PRE-REGISTERED protocol, run the
     /// protocol critic (falsify the design), file an <see cref="HumanProposalKind.AuthorizeCampaign"/>
-    /// request, and park <paramref name="parentPacket"/> awaiting the decision. Nothing on the entry
-    /// changes yet — this only PROPOSES. Sensitive domains never pre-authorize the promotion touch.
+    /// request, and park a parent packet awaiting the decision. Nothing on the entry changes yet — this
+    /// only PROPOSES (so an auto-drafted campaign still parks for human authorization exactly like a
+    /// human-initiated one). Sensitive domains never pre-authorize the promotion touch.
     /// </summary>
+    /// <param name="parentPacket">The in-flight packet to park (human-initiated). Pass null for an
+    /// auto-drafted campaign with no live packet — the coordinator mints one to park.</param>
+    /// <param name="priority">Human-initiated outranks auto-drafted in the work scheduler.</param>
     Task<ValidationCampaign> DraftAndRequestAuthorizationAsync(
         InnovatedKnowledgeRecord entry,
         IReadOnlyList<ValidationStep> protocol,
         Provenance targetStage,
         KnowledgeDomain domain,
-        NodePacket parentPacket,
+        NodePacket? parentPacket = null,
         bool preauthorizePromotion = false,
+        CampaignPriority priority = CampaignPriority.HumanInitiated,
         CancellationToken ct = default);
 
     /// <summary>Apply a human decision on an <see cref="HumanProposalKind.AuthorizeCampaign"/> proposal:

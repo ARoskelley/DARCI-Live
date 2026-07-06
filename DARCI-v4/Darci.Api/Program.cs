@@ -391,7 +391,18 @@ builder.Services.AddSingleton<IToolingCritic, OllamaToolingCritic>();
 builder.Services.AddSingleton(new ToolingProposalOptions());
 builder.Services.AddSingleton<IToolingProposalEmitter, ToolingProposalEmitter>();
 
+// Priority-ordered work scheduler (seam for a future resource-allocation scheduler). Human-initiated work
+// outranks auto-drafted. Today a simple in-memory priority queue; the interface is what callers depend on.
+builder.Services.AddSingleton<IWorkScheduler, PriorityWorkQueue>();
+
 builder.Services.AddSingleton<ICampaignCoordinator, CampaignCoordinator>();
+
+// Auto-draft eligibility sweep — a standalone hosted service (like the node watchdog), NOT called from the
+// innovation node. It only auto-DRAFTS campaigns (low priority); every one still parks for human
+// authorization. Disabled by default; opt in via CampaignSweepOptions.Enabled.
+builder.Services.AddSingleton(new CampaignSweepOptions());
+builder.Services.AddSingleton<CampaignEligibilitySweep>();
+builder.Services.AddHostedService<CampaignEligibilitySweepService>();
 
 // === Coding Workspace Services ===
 builder.Services.AddSingleton<ICodingWorkspaceStore>(sp =>

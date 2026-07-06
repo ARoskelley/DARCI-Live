@@ -347,6 +347,16 @@ ValidationCampaign {
 
 ---
 
+## 16. Auto-draft eligibility sweep + the scheduler seam
+
+**BUILT — auto-draft sweep.** A standalone hosted service (`CampaignEligibilitySweepService`, modelled on `NodeWatchdogService`, **not** invoked from the innovation node so it can't recreate the node→coordinator→nodes DI cycle) periodically ticks `CampaignEligibilitySweep.RunOnceAsync`. That runs the pure `CampaignEligibilityEvaluator` over `Innovated` entries and, for eligible ones with **no live campaign** (de-dupe on `CampaignStatus.IsActive`), calls `CampaignCoordinator.DraftAndRequestAuthorizationAsync` at `CampaignPriority.AutoDrafted`. It automates **only the draft**: every auto-drafted campaign still parks for human authorization → protocol critic → human authorizes → steps → verdict → promotion. It never authorizes, runs, or promotes. Off by default (`CampaignSweepOptions.Enabled`); interval/throttle configurable.
+
+**BUILT — priority model.** `CampaignPriority { AutoDrafted, HumanInitiated }` rides on `ValidationCampaign` and on each enqueued `WorkItem`. Human-initiated always outranks auto-drafted. Surfacing goes through `IWorkScheduler` (today `PriorityWorkQueue`: highest priority first, FIFO within a tier).
+
+**DESIGN-ONLY — future direction (do NOT build yet).** `IWorkScheduler` is the seam. Today it only *orders* pending work. Tinman's framing: *"for now a queue of tasks, but eventually more like priority for resource allocation — where/when it assigns a task to a node and whether a current task should be overwritten."* The future implementation of the SAME interface becomes a **resource-allocation scheduler**: it decides **which node** runs a `WorkItem` (the `Capability` field already travels with it), **when** (under compute scarcity on Tinman's single-GPU build), and **whether to preempt/overwrite** a running lower-priority task for a higher-priority one. Because callers only depend on `IWorkScheduler.Enqueue`/`DequeueHighest`, that scheduler drops in without touching the coordinator or the sweep. This is the compute-budget/allocation lever for the single-GPU constraint — the analogue at the *capability/resource* layer of what `InnovationBudget` (§7) is at the loop layer.
+
+---
+
 ## 13. Prior-art sources
 
 - AlphaEvolve — [arXiv 2506.13131](https://arxiv.org/abs/2506.13131), [DeepMind PDF](https://storage.googleapis.com/deepmind-media/DeepMind.com/Blog/alphaevolve-a-gemini-powered-coding-agent-for-designing-advanced-algorithms/AlphaEvolve.pdf); FunSearch (generator+evaluator+program DB).

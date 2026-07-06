@@ -34,6 +34,25 @@ public enum CampaignStatus
     Abandoned = 8,             // terminal — budget exhausted / superseded
 }
 
+/// <summary>Scheduling priority of a campaign's work. Human-initiated (or explicitly-requested) campaigns
+/// always outrank auto-drafted ones. Higher numeric value = higher priority (so <see cref="IWorkScheduler"/>
+/// serves HumanInitiated before AutoDrafted). A future resource-allocation scheduler may widen this to a
+/// richer signal, but callers only depend on the ordering.</summary>
+public enum CampaignPriority
+{
+    AutoDrafted = 0,     // produced by the eligibility sweep — lowest priority
+    HumanInitiated = 1,  // requested by a human / explicit code path — highest priority
+}
+
+/// <summary>Lifecycle helpers.</summary>
+public static class CampaignLifecycle
+{
+    /// <summary>True while a campaign is still "live" (not a terminal outcome) — used to de-dupe so the
+    /// sweep never auto-drafts a second campaign for an entry that already has one in flight.</summary>
+    public static bool IsActive(this CampaignStatus s) => s is not (
+        CampaignStatus.Completed or CampaignStatus.Rejected or CampaignStatus.Abandoned);
+}
+
 /// <summary>The verdict computed mechanically over the pre-registered criteria × step evidence.</summary>
 public enum CampaignVerdict
 {
@@ -135,6 +154,9 @@ public sealed record ValidationCampaign
     /// <summary>Whether the second (promotion) human touch was pre-authorized at design time. Never true for
     /// <see cref="KnowledgeDomain.Sensitive"/>.</summary>
     public bool PromotionPreauthorized { get; init; }
+
+    /// <summary>Scheduling priority. Human-initiated campaigns outrank auto-drafted ones.</summary>
+    public CampaignPriority Priority { get; init; } = CampaignPriority.HumanInitiated;
 
     public DateTime CreatedAt { get; init; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; init; } = DateTime.UtcNow;

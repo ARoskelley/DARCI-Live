@@ -43,6 +43,7 @@ public sealed class SqliteValidationCampaignStore : IValidationCampaignStore
                 status INTEGER NOT NULL,
                 correlation_id TEXT NOT NULL,
                 promotion_preauthorized INTEGER NOT NULL DEFAULT 0,
+                priority INTEGER NOT NULL DEFAULT 1,
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
             );
@@ -73,10 +74,10 @@ public sealed class SqliteValidationCampaignStore : IValidationCampaignStore
         cmd.CommandText = """
             INSERT OR REPLACE INTO validation_campaigns
                 (id, entry_id, hypothesis_revision_seq, hypothesis_snapshot, target_stage, domain,
-                 protocol_json, authorization_json, status, correlation_id, promotion_preauthorized, created_at, updated_at)
+                 protocol_json, authorization_json, status, correlation_id, promotion_preauthorized, priority, created_at, updated_at)
             VALUES
                 ($id, $entry, $seq, $snap, $stage, $domain,
-                 $proto, $auth, $status, $corr, $preauth, $created, $updated)
+                 $proto, $auth, $status, $corr, $preauth, $priority, $created, $updated)
             """;
         BindCampaign(cmd, campaign);
         await cmd.ExecuteNonQueryAsync(ct);
@@ -194,6 +195,7 @@ public sealed class SqliteValidationCampaignStore : IValidationCampaignStore
         cmd.Parameters.AddWithValue("$status", (int)c.Status);
         cmd.Parameters.AddWithValue("$corr", c.CorrelationId);
         cmd.Parameters.AddWithValue("$preauth", c.PromotionPreauthorized ? 1 : 0);
+        cmd.Parameters.AddWithValue("$priority", (int)c.Priority);
         cmd.Parameters.AddWithValue("$created", ToIso(c.CreatedAt));
         cmd.Parameters.AddWithValue("$updated", ToIso(c.UpdatedAt));
     }
@@ -222,6 +224,7 @@ public sealed class SqliteValidationCampaignStore : IValidationCampaignStore
             Status = (CampaignStatus)r.GetInt32(r.GetOrdinal("status")),
             CorrelationId = r.GetString(r.GetOrdinal("correlation_id")),
             PromotionPreauthorized = r.GetInt32(r.GetOrdinal("promotion_preauthorized")) != 0,
+            Priority = (CampaignPriority)r.GetInt32(r.GetOrdinal("priority")),
             CreatedAt = FromIso(r.GetString(r.GetOrdinal("created_at"))),
             UpdatedAt = FromIso(r.GetString(r.GetOrdinal("updated_at"))),
         };

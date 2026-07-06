@@ -87,9 +87,9 @@ public sealed class CampaignCoordinatorTests : IDisposable
     }
 
     private CampaignCoordinator Coordinator(INodeRouter router, IEnumerable<INode> nodes, IProtocolCritic? critic = null,
-        ISandboxPoCGate? poc = null, IToolingProposalEmitter? tooling = null) =>
+        ISandboxPoCGate? poc = null, IToolingProposalEmitter? tooling = null, IWorkScheduler? scheduler = null) =>
         new(_campaigns, _innovated, _proposals, router, _packets, _gaps, critic ?? new FakeProtocolCritic(), nodes,
-            NullLogger<CampaignCoordinator>.Instance, poc, tooling);
+            NullLogger<CampaignCoordinator>.Instance, poc, tooling, scheduler);
 
     private IToolingProposalEmitter RealEmitter() =>
         new ToolingProposalEmitter(_proposals, new FakeToolingCritic(), new ToolingProposalOptions(), NullLogger<ToolingProposalEmitter>.Instance);
@@ -150,6 +150,38 @@ public sealed class CampaignCoordinatorTests : IDisposable
         => (await _proposals.GetPendingAsync()).Single(p => p.Kind == kind);
 
     // ── tests ──
+
+    [Fact]
+    public async Task Draft_EnqueuesSurfacingWork_AtCampaignPriority()
+    {
+        var entry = await SeedEntryAsync();
+        var parent = await WorkingParentAsync();
+        var scheduler = new PriorityWorkQueue();
+        var coordinator = Coordinator(PassingRouter(), BothEnvironments(), scheduler: scheduler);
+
+        await coordinator.DraftAndRequestAuthorizationAsync(entry, TwoStep(), Provenance.ProvisionallyValidated,
+            KnowledgeDomain.General, parent, priority: CampaignPriority.AutoDrafted);
+
+        var work = Assert.Single(scheduler.Snapshot());
+        Assert.Equal(WorkKind.SurfaceAuthorization, work.Kind);
+        Assert.Equal(CampaignPriority.AutoDrafted, work.Priority);
+    }
+
+    [Fact]
+    public async Task Draft_WithNullParent_MintsAndParksItsOwnPacket()
+    {
+        var entry = await SeedEntryAsync();
+        var coordinator = Coordinator(PassingRouter(), BothEnvironments());
+
+        // No caller packet (the auto-draft path) — the coordinator mints one and parks it for authorization.
+        await coordinator.DraftAndRequestAuthorizationAsync(entry, TwoStep(), Provenance.ProvisionallyValidated,
+            KnowledgeDomain.General, parentPacket: null, priority: CampaignPriority.AutoDrafted);
+
+        var proposal = await PendingOfKindAsync(HumanProposalKind.AuthorizeCampaign);
+        Assert.NotNull(proposal.ParkedPacketId);
+        var parked = await _packets.GetPacketAsync(proposal.ParkedPacketId!);
+        Assert.Equal(NodeState.AwaitingDependency, parked!.State);
+    }
 
     [Fact]
     public async Task Draft_FilesAuthorization_ParksParent_CreatesCampaign()
