@@ -102,8 +102,17 @@ public sealed class InnovationNode : INode
             Confidence = proposal.Confidence,       // store re-clamps anyway
         };
         await _store.AddAsync(record, ct);
-        _logger.LogInformation("Persisted innovated hypothesis {Id} (Innovated, capped {Score:0.##}).",
-            record.Id, record.Confidence.Score);
+
+        // SERVE POINT (correlation-link fix): the hypothesis is now surfaced into this packet's chain, and
+        // any downstream node that acts on it reports its OutcomeFeedback under this correlation ROOT. Record
+        // the consumption link so that outcome actually reaches this entry's ledger. Without this the outcome
+        // loop is inert (the sink matches ONLY on consumption links). Counting is by distinct root, so an
+        // independent later consumer under a different root records its own link and counts separately.
+        if (!string.IsNullOrWhiteSpace(packet.CorrelationId))
+            await _store.RecordConsumptionAsync(record.Id, packet.CorrelationId, ct: ct);
+
+        _logger.LogInformation("Persisted innovated hypothesis {Id} (Innovated, capped {Score:0.##}); consumption link → {Root}.",
+            record.Id, record.Confidence.Score, packet.CorrelationId);
         return record;
     }
 

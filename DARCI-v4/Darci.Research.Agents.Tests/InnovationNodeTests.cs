@@ -89,6 +89,28 @@ public sealed class InnovationNodeTests : IDisposable
     }
 
     [Fact]
+    public async Task Winner_RecordsConsumptionLink_SoDownstreamAndIndependentOutcomesReachEntry()
+    {
+        var packet = Routed(new Dictionary<string, string> { [PacketSlots.Question] = "q" });
+        var correlation = packet.CorrelationId;
+        await Node(new FakeLoop(Winner())).HandleAsync(packet);
+
+        var entry = Assert.Single(await _store.GetByProvenanceAsync(Provenance.Innovated));
+
+        // The serve point recorded entry → this packet's correlation root, so the downstream node's outcome
+        // (fired under that same root) reaches the entry's ledger — the loop is no longer inert.
+        var sink = new InnovatedKnowledgeOutcomeSink(_store, new OutcomeFeedbackOptions(),
+            NullLogger<InnovatedKnowledgeOutcomeSink>.Instance);
+        await sink.ApplyAsync(new OutcomeFeedback(correlation, Success: true));
+        Assert.Equal((1, 0), await _store.CountDistinctOutcomesAsync(entry.Id));
+
+        // An INDEPENDENT consumer under a NEW correlation (a second serve) counts separately by distinct root.
+        await _store.RecordConsumptionAsync(entry.Id, "independent-consumer-root");
+        await sink.ApplyAsync(new OutcomeFeedback("independent-consumer-root", Success: true));
+        Assert.Equal((2, 0), await _store.CountDistinctOutcomesAsync(entry.Id));
+    }
+
+    [Fact]
     public async Task Unsolvable_ReturnsRequiredInputs_AndDoesNotPersist()
     {
         var unsolvable = InnovationProposal.CannotSolve("no known combination works",

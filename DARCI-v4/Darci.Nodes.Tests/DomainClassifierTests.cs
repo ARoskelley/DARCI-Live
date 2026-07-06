@@ -29,8 +29,13 @@ public class DomainClassifierTests
         => Assert.Equal(KnowledgeDomain.General, DomainClassifier.Classify(null, text));
 
     [Fact]
-    public void EmptyInput_DefaultsGeneral()
-        => Assert.Equal(KnowledgeDomain.General, DomainClassifier.Classify(null));
+    public void UnclassifiableInput_FailsClosedToSensitive()
+    {
+        // No usable signal at all ⇒ we cannot rule out a high-stakes hypothesis, so take the stricter path.
+        Assert.Equal(KnowledgeDomain.Sensitive, DomainClassifier.Classify(null));
+        Assert.Equal(KnowledgeDomain.Sensitive, DomainClassifier.Classify(null, "", "   ", null));
+        Assert.Equal(KnowledgeDomain.Sensitive, DomainClassifier.Classify(explicitTag: null, "\t"));
+    }
 
     [Fact]
     public void UnknownTag_FallsThroughToKeywordScan()

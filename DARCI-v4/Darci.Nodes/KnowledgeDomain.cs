@@ -50,7 +50,7 @@ public static class DomainClassifier
 
         var hay = string.Join(" ", texts.Where(t => !string.IsNullOrWhiteSpace(t)))
             .ToLowerInvariant();
-        if (hay.Length == 0) return KnowledgeDomain.General;
+        if (hay.Length == 0) return KnowledgeDomain.Sensitive;   // fail CLOSED: unclassifiable ⇒ stricter gating
 
         return SensitiveKeywords.Any(k => hay.Contains(k, System.StringComparison.Ordinal))
             ? KnowledgeDomain.Sensitive

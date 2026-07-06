@@ -292,6 +292,31 @@ public sealed class CampaignCoordinatorTests : IDisposable
     }
 
     [Fact]
+    public async Task Authorize_StepMissingMetric_IsInconclusive_EntryNotDemoted()
+    {
+        var entry = await SeedEntryAsync();
+        var parent = await WorkingParentAsync();
+        // The node reports success but produces NO measurement for the step's pre-registered metric — the
+        // protocol couldn't test this way. This must be Inconclusive (no demotion), not Failed.
+        var missingMetricRouter = new FakeRouter(child => child
+            .Transition(NodeId.Coding, NodeState.Routed, "r")
+            .Transition(NodeId.Coding, NodeState.Accepted, "a")
+            .Transition(NodeId.Coding, NodeState.Working, "w", leaseFor: TimeSpan.FromMinutes(1))
+            .WithSlot(PacketSlots.StepMeasurements, JsonSerializer.Serialize(new Dictionary<string, double> { ["unrelated"] = 1 }))
+            .Transition(NodeId.Coding, NodeState.Succeeded, "done", success: true));
+        var coordinator = Coordinator(missingMetricRouter, BothEnvironments());
+
+        await coordinator.DraftAndRequestAuthorizationAsync(entry, new[] { SandboxStep() }, Provenance.ProvisionallyValidated, KnowledgeDomain.General, parent, preauthorizePromotion: true);
+        await Gate(coordinator).DecideAsync((await PendingOfKindAsync(HumanProposalKind.AuthorizeCampaign)).Id, true, null, "tinman");
+
+        // Entry is NOT demoted — it stays at UnderTest (an untestable protocol can't penalize a hypothesis).
+        Assert.Equal(Provenance.UnderTest, (await _innovated.GetAsync(entry.Id))!.Provenance);
+        var campaign = (await _campaigns.GetByEntryAsync(entry.Id))[0];
+        Assert.Equal(CampaignStatus.Blocked, campaign.Status);   // inconclusive → parked, not rejected
+        Assert.Empty(await _proposals.GetPendingAsync());        // no promotion (and no auto-promote either)
+    }
+
+    [Fact]
     public async Task Authorize_MissingEnvironment_BlocksCampaign_FilesGap()
     {
         var entry = await SeedEntryAsync();

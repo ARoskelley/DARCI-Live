@@ -71,7 +71,13 @@ public enum Comparator { GreaterOrEqual = 0, LessOrEqual = 1, Equal = 2 }
 /// </summary>
 public sealed record SuccessCriteria(string Metric, Comparator Comparator, double Threshold, string? Description = null)
 {
-    /// <summary>Pure predicate: is this criterion met by the step's measurements?</summary>
+    /// <summary>Whether the step actually produced a measurement for this criterion's metric. Absence means
+    /// the metric was NOT measured (the protocol couldn't test this way) — distinct from a measured miss.</summary>
+    public bool HasMetric(IReadOnlyDictionary<string, double> measurements)
+        => measurements is not null && measurements.ContainsKey(Metric);
+
+    /// <summary>Pure predicate: is this criterion met by the step's measurements? Absent metric ⇒ not met
+    /// (callers that must distinguish "absent" from "measured below bar" use <see cref="HasMetric"/> first).</summary>
     public bool IsMetBy(IReadOnlyDictionary<string, double> measurements)
     {
         if (measurements is null || !measurements.TryGetValue(Metric, out var v)) return false;
@@ -179,6 +185,7 @@ public static class CampaignProtocol
 
         var anyBlocked = false;
         var anyPending = false;
+        var anyUnmeasured = false;
 
         foreach (var step in protocol)
         {
@@ -189,11 +196,16 @@ public static class CampaignProtocol
             }
             if (ev.Outcome == ValidationStepOutcome.Blocked) { anyBlocked = true; continue; }
             if (ev.Outcome == ValidationStepOutcome.Failed) return CampaignVerdict.Failed;
-            // Passed outcome must ALSO meet the pre-registered criteria — the outcome flag alone is not enough.
+
+            // Passed outcome must ALSO meet the pre-registered criteria — but distinguish two cases:
+            //   metric ABSENT   → the protocol couldn't measure this ⇒ INCONCLUSIVE (never a failure/demotion);
+            //   metric PRESENT but below bar → a genuine measured miss ⇒ Failed.
+            if (!step.Criteria.HasMetric(ev.Measurements)) { anyUnmeasured = true; continue; }
             if (!step.Criteria.IsMetBy(ev.Measurements)) return CampaignVerdict.Failed;
         }
 
-        if (anyBlocked) return CampaignVerdict.Inconclusive;   // an environment is missing — cannot conclude
+        // A missing environment or an unmeasured metric both mean "cannot conclude" — not a failure.
+        if (anyBlocked || anyUnmeasured) return CampaignVerdict.Inconclusive;
         if (anyPending) return CampaignVerdict.Pending;
         return CampaignVerdict.Passed;
     }

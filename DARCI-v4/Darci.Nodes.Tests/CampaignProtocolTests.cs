@@ -34,6 +34,26 @@ public class CampaignProtocolTests
     }
 
     [Fact]
+    public void PassedOutcome_ButMetricAbsent_IsInconclusive_NotFailed()
+    {
+        // The node "passed" but produced no measurement for the pre-registered metric — the protocol
+        // couldn't test this way. That must NOT read as a failure (which would demote a good hypothesis).
+        var protocol = new[] { Step("s1", "pass_rate", Comparator.GreaterOrEqual, 0.9) };
+        var evidence = new[] { Ev("s1", ValidationStepOutcome.Passed, ("unrelated_metric", 1.0)) };
+
+        Assert.Equal(CampaignVerdict.Inconclusive, CampaignProtocol.Evaluate(protocol, evidence));
+    }
+
+    [Fact]
+    public void MeasuredBelowBar_Fails_ButAbsentMetric_DoesNot()
+    {
+        var protocol = new[] { Step("s1", "pass_rate", Comparator.GreaterOrEqual, 0.9) };
+        // present-but-below → Failed; absent → Inconclusive.
+        Assert.Equal(CampaignVerdict.Failed, CampaignProtocol.Evaluate(protocol, new[] { Ev("s1", ValidationStepOutcome.Passed, ("pass_rate", 0.5)) }));
+        Assert.Equal(CampaignVerdict.Inconclusive, CampaignProtocol.Evaluate(protocol, new[] { Ev("s1", ValidationStepOutcome.Passed) }));
+    }
+
+    [Fact]
     public void AnyStepFailed_Fails()
     {
         var protocol = new[] { Step("s1", "m", Comparator.GreaterOrEqual, 1), Step("s2", "m", Comparator.GreaterOrEqual, 1) };
@@ -103,4 +123,13 @@ public class CampaignProtocolTests
     [Fact]
     public void SuccessCriteria_MissingMetric_IsNotMet()
         => Assert.False(new SuccessCriteria("m", Comparator.GreaterOrEqual, 1).IsMetBy(new Dictionary<string, double>()));
+
+    [Fact]
+    public void SuccessCriteria_HasMetric_DetectsPresenceVsAbsence()
+    {
+        var c = new SuccessCriteria("m", Comparator.GreaterOrEqual, 1);
+        Assert.True(c.HasMetric(new Dictionary<string, double> { ["m"] = 0.5 }));   // present (even if below bar)
+        Assert.False(c.HasMetric(new Dictionary<string, double> { ["other"] = 9 }));
+        Assert.False(c.HasMetric(new Dictionary<string, double>()));
+    }
 }
