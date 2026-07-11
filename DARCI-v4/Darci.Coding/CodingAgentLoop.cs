@@ -456,9 +456,13 @@ public sealed class CodingAgentLoop : ICodingAgentLoop
         try
         {
             var success = string.Equals(finalStatus, "completed", StringComparison.OrdinalIgnoreCase);
+            var outcomeCorrelation = _nodes.CurrentCorrelationId(taskId);
+            // TEMP-E2E-OBSERVE: expose the outcome-emission correlation root (revert — uncommitted).
+            _logger.LogInformation("E2E-OUTCOME-EMIT task={TaskId} success={Success} correlationRoot={Root}",
+                taskId, success, outcomeCorrelation);
             await _outcomeSink.ApplyAsync(
                 new OutcomeFeedback(
-                    CorrelationId: _nodes.CurrentCorrelationId(taskId),
+                    CorrelationId: outcomeCorrelation,
                     Success: success,
                     Evidence: $"coding run terminal status '{finalStatus}'",
                     TerminalStatus: finalStatus),

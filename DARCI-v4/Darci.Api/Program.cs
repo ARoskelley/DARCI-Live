@@ -269,7 +269,8 @@ builder.Services.AddSingleton<Darci.Core.Darci>(sp =>
         sp.GetRequiredService<BomGenerator>(),
         sp.GetRequiredService<IGoalManager>(),
         sp.GetService<INodeRouter>()));
-builder.Services.AddHostedService(sp => sp.GetRequiredService<Darci.Core.Darci>());
+// TEMP-E2E-PAUSE: autonomous loop paused for the E2E observation run (revert this line — uncommitted).
+// builder.Services.AddHostedService(sp => sp.GetRequiredService<Darci.Core.Darci>());
 
 // Controllers
 builder.Services.AddControllers();
