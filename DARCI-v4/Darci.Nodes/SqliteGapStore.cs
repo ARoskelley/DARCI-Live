@@ -43,7 +43,13 @@ public sealed class SqliteGapStore : IGapStore
             CREATE INDEX IF NOT EXISTS ix_node_gaps_correlation ON node_gaps(correlation_id);
             """;
         await cmd.ExecuteNonQueryAsync(ct);
-        _logger.LogInformation("Node gap store initialized.");
+        // SU5 — additive migration to canonical string node keys (see SqliteEnumKeyMigration). Non-destructive:
+        // the origin_node ordinal column stays and reads are unchanged until SU6.
+        await SqliteEnumKeyMigration.EnsureColumnAsync(conn, "node_gaps", "origin_node_key", "TEXT NULL", ct);
+        var backfilled = await SqliteEnumKeyMigration.BackfillNodeKeysAsync(conn, "node_gaps", "origin_node", "origin_node_key", ct);
+
+        _logger.LogInformation("Node gap store initialized{Backfill}.",
+            backfilled > 0 ? $" (backfilled {backfilled} string key(s))" : "");
     }
 
     public async Task AddAsync(GapRecord gap, CancellationToken ct = default)
@@ -53,10 +59,10 @@ public sealed class SqliteGapStore : IGapStore
         await using var cmd = conn.CreateCommand();
         cmd.CommandText = """
             INSERT OR REPLACE INTO node_gaps
-                (id, correlation_id, origin_packet_id, origin_node, question, intent, missing,
+                (id, correlation_id, origin_packet_id, origin_node, origin_node_key, question, intent, missing,
                  confidence_score, confidence_note, status, goal_id, created_at, updated_at)
             VALUES
-                ($id, $corr, $pkt, $node, $q, $intent, $missing,
+                ($id, $corr, $pkt, $node, $node_key, $q, $intent, $missing,
                  $cscore, $cnote, $status, $goal, $created, $updated)
             """;
         Bind(cmd, gap);
@@ -103,6 +109,7 @@ public sealed class SqliteGapStore : IGapStore
         cmd.Parameters.AddWithValue("$corr", g.CorrelationId);
         cmd.Parameters.AddWithValue("$pkt", g.OriginPacketId);
         cmd.Parameters.AddWithValue("$node", (int)g.OriginNode);
+        cmd.Parameters.AddWithValue("$node_key", CapabilityKey.From(g.OriginNode));   // dual-write (SU5)
         cmd.Parameters.AddWithValue("$q", g.Question);
         cmd.Parameters.AddWithValue("$intent", g.Intent);
         cmd.Parameters.AddWithValue("$missing", g.Missing);

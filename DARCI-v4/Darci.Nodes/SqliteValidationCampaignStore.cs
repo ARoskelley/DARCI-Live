@@ -2,6 +2,7 @@
 
 using System.Globalization;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
 
@@ -14,7 +15,17 @@ namespace Darci.Nodes;
 /// </summary>
 public sealed class SqliteValidationCampaignStore : IValidationCampaignStore
 {
-    private static readonly JsonSerializerOptions JsonOpts = new() { WriteIndented = false };
+    /// <summary>
+    /// SU5: <see cref="ValidationStep"/> embeds <see cref="Capability"/>/<see cref="NodeId"/>, which were
+    /// serialized as bare enum ORDINALS — a form that cannot express an external node's capability. The
+    /// converter writes them as canonical strings from now on and still READS the numeric form, so campaigns
+    /// persisted before this change keep loading. Non-destructive, like the column migration.
+    /// </summary>
+    private static readonly JsonSerializerOptions JsonOpts = new()
+    {
+        WriteIndented = false,
+        Converters = { new JsonStringEnumConverter() },
+    };
 
     private readonly string _connectionString;
     private readonly ILogger<SqliteValidationCampaignStore> _logger;
@@ -220,7 +231,7 @@ public sealed class SqliteValidationCampaignStore : IValidationCampaignStore
             TargetStage = (Provenance)r.GetInt32(r.GetOrdinal("target_stage")),
             Domain = (KnowledgeDomain)r.GetInt32(r.GetOrdinal("domain")),
             Protocol = DeserializeProtocol(r.GetString(r.GetOrdinal("protocol_json"))),
-            Authorization = r.IsDBNull(authOrd) ? null : JsonSerializer.Deserialize<CampaignAuthorization>(r.GetString(authOrd)),
+            Authorization = r.IsDBNull(authOrd) ? null : JsonSerializer.Deserialize<CampaignAuthorization>(r.GetString(authOrd), JsonOpts),
             Status = (CampaignStatus)r.GetInt32(r.GetOrdinal("status")),
             CorrelationId = r.GetString(r.GetOrdinal("correlation_id")),
             PromotionPreauthorized = r.GetInt32(r.GetOrdinal("promotion_preauthorized")) != 0,
@@ -232,12 +243,17 @@ public sealed class SqliteValidationCampaignStore : IValidationCampaignStore
 
     private static IReadOnlyList<ValidationStep> DeserializeProtocol(string json)
     {
-        try { return JsonSerializer.Deserialize<List<ValidationStep>>(json) ?? new(); } catch { return new List<ValidationStep>(); }
+        // MUST use the same options as the writer: JsonOpts writes enums as strings, and default options
+        // cannot read those back. Asymmetric options here silently yield an EMPTY protocol, which would make
+        // every campaign verdict read as Pending.
+        try { return JsonSerializer.Deserialize<List<ValidationStep>>(json, JsonOpts) ?? new(); }
+        catch { return new List<ValidationStep>(); }
     }
 
     private static IReadOnlyDictionary<string, double> DeserializeMeasurements(string json)
     {
-        try { return JsonSerializer.Deserialize<Dictionary<string, double>>(json) ?? new(); } catch { return new Dictionary<string, double>(); }
+        try { return JsonSerializer.Deserialize<Dictionary<string, double>>(json, JsonOpts) ?? new(); }
+        catch { return new Dictionary<string, double>(); }
     }
 
     private static string ToIso(DateTime v) => v.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture);

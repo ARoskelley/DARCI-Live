@@ -73,7 +73,26 @@ public sealed class SqliteNodePacketStore : INodePacketStore
             """;
         await cmd.ExecuteNonQueryAsync(ct);
 
-        _logger.LogInformation("Node packet store initialized.");
+        // SU5 — additive migration to canonical STRING keys. The ordinal columns stay (nothing is dropped and
+        // no read path changes yet); these carry the values an external node's capability could never fit in
+        // an enum ordinal, and become the source of truth when the domain types switch in SU6.
+        await SqliteEnumKeyMigration.EnsureColumnAsync(conn, "node_packets", "address_key", "TEXT NULL", ct);
+        await SqliteEnumKeyMigration.EnsureColumnAsync(conn, "node_packets", "capability_key", "TEXT NULL", ct);
+        await SqliteEnumKeyMigration.EnsureColumnAsync(conn, "node_log", "node_key", "TEXT NULL", ct);
+
+        var backfilled =
+            await SqliteEnumKeyMigration.BackfillNodeKeysAsync(conn, "node_packets", "address", "address_key", ct) +
+            await SqliteEnumKeyMigration.BackfillCapabilityKeysAsync(conn, "node_packets", "requested_capability", "capability_key", ct) +
+            await SqliteEnumKeyMigration.BackfillNodeKeysAsync(conn, "node_log", "node", "node_key", ct);
+
+        await using (var index = conn.CreateCommand())
+        {
+            index.CommandText = "CREATE INDEX IF NOT EXISTS ix_node_packets_capability_key ON node_packets(capability_key);";
+            await index.ExecuteNonQueryAsync(ct);
+        }
+
+        _logger.LogInformation("Node packet store initialized{Backfill}.",
+            backfilled > 0 ? $" (backfilled {backfilled} string key(s))" : "");
     }
 
     public async Task CreatePacketAsync(NodePacket packet, CancellationToken ct = default)
@@ -120,15 +139,17 @@ public sealed class SqliteNodePacketStore : INodePacketStore
         cmd.Transaction = tx;
         cmd.CommandText = """
             INSERT INTO node_packets
-                (id, correlation_id, address, requested_capability, state, intent, success_criteria,
+                (id, correlation_id, address, requested_capability, address_key, capability_key, state, intent, success_criteria,
                  payload_slots_json, log_count, created_at, updated_at, lease_expires_at)
             VALUES
-                ($id, $corr, $addr, $cap, $state, $intent, $success_criteria,
+                ($id, $corr, $addr, $cap, $addr_key, $cap_key, $state, $intent, $success_criteria,
                  $slots, $log_count, $created_at, $updated_at, $lease)
             ON CONFLICT(id) DO UPDATE SET
                 correlation_id = excluded.correlation_id,
                 address = excluded.address,
                 requested_capability = excluded.requested_capability,
+                address_key = excluded.address_key,
+                capability_key = excluded.capability_key,
                 state = excluded.state,
                 intent = excluded.intent,
                 success_criteria = excluded.success_criteria,
@@ -141,6 +162,9 @@ public sealed class SqliteNodePacketStore : INodePacketStore
         cmd.Parameters.AddWithValue("$corr", p.CorrelationId);
         cmd.Parameters.AddWithValue("$addr", p.Address is null ? DBNull.Value : (int)p.Address.Value);
         cmd.Parameters.AddWithValue("$cap", p.RequestedCapability is null ? DBNull.Value : (int)p.RequestedCapability.Value);
+        // Dual-write the canonical string keys (SU5). Reads still use the ordinals until SU6.
+        cmd.Parameters.AddWithValue("$addr_key", p.Address is null ? DBNull.Value : CapabilityKey.From(p.Address.Value));
+        cmd.Parameters.AddWithValue("$cap_key", p.RequestedCapability is null ? DBNull.Value : CapabilityKey.From(p.RequestedCapability.Value));
         cmd.Parameters.AddWithValue("$state", (int)p.State);
         cmd.Parameters.AddWithValue("$intent", p.Payload.Intent);
         cmd.Parameters.AddWithValue("$success_criteria", (object?)p.Payload.SuccessCriteria ?? DBNull.Value);
@@ -158,14 +182,15 @@ public sealed class SqliteNodePacketStore : INodePacketStore
         cmd.Transaction = tx;
         cmd.CommandText = """
             INSERT OR IGNORE INTO node_log
-                (packet_id, seq, node, at, state_after, decision, confidence_score, confidence_note,
+                (packet_id, seq, node, node_key, at, state_after, decision, confidence_score, confidence_note,
                  success, error, artifacts_json)
             VALUES
-                ($pid, $seq, $node, $at, $state_after, $decision, $cscore, $cnote, $success, $error, $artifacts)
+                ($pid, $seq, $node, $node_key, $at, $state_after, $decision, $cscore, $cnote, $success, $error, $artifacts)
             """;
         cmd.Parameters.AddWithValue("$pid", packetId);
         cmd.Parameters.AddWithValue("$seq", seq);
         cmd.Parameters.AddWithValue("$node", (int)e.Node);
+        cmd.Parameters.AddWithValue("$node_key", CapabilityKey.From(e.Node));
         cmd.Parameters.AddWithValue("$at", ToIso(e.At));
         cmd.Parameters.AddWithValue("$state_after", (int)e.StateAfter);
         cmd.Parameters.AddWithValue("$decision", e.Decision);
