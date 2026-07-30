@@ -1,0 +1,24 @@
+{
+  "contract_version": "0.1.1",
+  "node_id": "darci.innovation",
+  "display_name": "Innovation (hypothesis synthesis)",
+  "node_version": "1.0.0",
+  "kind": "capability",
+  "capabilities": [
+    {
+      "name": "innovation.synthesize",
+      "description": "Synthesize a candidate hypothesis from exhausted known material, or honestly conclude it needs external input. Output is always capped-trust (Innovated) and is never promoted without a human event.",
+      "typical_latency_ms": 180000,
+      "deadline_ms": 900000
+    }
+  ],
+  "requires": {
+    "model_classes": ["chat.deep", "chat.balanced", "embed.text"],
+    "memory_scopes": ["read:knowledge", "read:innovated", "write:innovated", "write:proposals", "write:gaps"],
+    "permissions": [],
+    "emits_untrusted": false
+  },
+  "health": "/health",
+  "author": "ARoskelley",
+  "repository": "https://github.com/ARoskelley/DARCI-Live"
+}

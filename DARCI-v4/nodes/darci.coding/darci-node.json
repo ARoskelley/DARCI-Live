@@ -1,0 +1,33 @@
+{
+  "contract_version": "0.1.1",
+  "node_id": "darci.coding",
+  "display_name": "Coding Environment",
+  "node_version": "1.0.0",
+  "kind": "environment",
+  "capabilities": [
+    {
+      "name": "coding.write",
+      "description": "Implement or modify code in a workspace until a verification command passes.",
+      "typical_latency_ms": 400000,
+      "deadline_ms": 3600000
+    },
+    {
+      "name": "coding.test",
+      "description": "Run a workspace's verification/test command and report the result.",
+      "typical_latency_ms": 30000,
+      "deadline_ms": 600000
+    }
+  ],
+  "requires": {
+    "model_classes": ["code.generate", "chat.balanced", "embed.text"],
+    "memory_scopes": ["read:workspace", "write:workspace", "read:knowledge"],
+    "permissions": ["execute:sandbox-command", "write:workspace-files"],
+    "emits_untrusted": false
+  },
+  "health": "/health",
+  "workspace_root": "./Workspaces",
+  "max_runtime_s": 3600,
+  "network": "allowlist",
+  "author": "ARoskelley",
+  "repository": "https://github.com/ARoskelley/DARCI-Live"
+}
