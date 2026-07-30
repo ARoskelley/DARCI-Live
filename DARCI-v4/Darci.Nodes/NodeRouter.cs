@@ -1,26 +1,51 @@
 #nullable enable
 
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Darci.Nodes;
 
 /// <summary>
-/// Default in-process router (decision 1: in-process transport). Resolves the target node by explicit
-/// address first, then by requested capability, persists the packet at every hop, and delegates to the
-/// node. Persistence happens before and after the node runs so a crash mid-handoff still leaves a
-/// recoverable, watchdog-reapable record.
+/// The routing seam. Resolves a packet's target node, persists the packet at every hop, and hands it to the
+/// node through the ONE dispatch point (<see cref="NodeDispatcher"/>). Persistence happens before and after
+/// the node runs so a crash mid-handoff still leaves a recoverable, watchdog-reapable record.
+///
+/// <para><b>Phase 1 (SU3):</b> resolution moved from a compiled-in <see cref="Capability"/> enum scan to the
+/// string-keyed <see cref="INodeRegistry"/>, and invocation moved to <see cref="NodeDispatcher"/>. The public
+/// surface (<see cref="INodeRouter.DispatchAsync"/>) is deliberately UNCHANGED, so every existing call site
+/// and test keeps working — that is the behavior-preservation contract of this sub-unit.</para>
 /// </summary>
 public sealed class NodeRouter : INodeRouter
 {
-    private readonly IReadOnlyList<INode> _nodes;
+    private readonly INodeRegistry _registry;
+    private readonly NodeDispatcher _dispatcher;
     private readonly INodePacketStore _store;
     private readonly ILogger<NodeRouter> _logger;
 
-    public NodeRouter(IEnumerable<INode> nodes, INodePacketStore store, ILogger<NodeRouter> logger)
+    /// <summary>Primary constructor: routing driven by the manifest-backed registry.</summary>
+    public NodeRouter(
+        INodeRegistry registry,
+        NodeDispatcher dispatcher,
+        INodePacketStore store,
+        ILogger<NodeRouter> logger)
     {
-        _nodes = nodes.ToList();
+        _registry = registry;
+        _dispatcher = dispatcher;
         _store = store;
         _logger = logger;
+    }
+
+    /// <summary>
+    /// COMPATIBILITY constructor (transitional, retired in SU6): takes packet-native <see cref="INode"/>s,
+    /// wraps each in a <see cref="LegacyPacketNodeAdapter"/> with a synthesized manifest, and registers them.
+    ///
+    /// <para>Capability overlap is TOLERATED here (first-wins by registration order) because that is what the
+    /// pre-carve router did — an existing configuration registers two nodes both declaring
+    /// <see cref="Capability.WriteCode"/>. Manifest-driven registration is strict instead. See the SU3 fork note.</para>
+    /// </summary>
+    public NodeRouter(IEnumerable<INode> nodes, INodePacketStore store, ILogger<NodeRouter> logger)
+        : this(BuildLegacyRegistry(nodes), new NodeDispatcher(NullLogger<NodeDispatcher>.Instance), store, logger)
+    {
     }
 
     public async Task<NodePacket> DispatchAsync(NodePacket packet, CancellationToken ct = default)
@@ -37,8 +62,8 @@ public sealed class NodeRouter : INodeRouter
             await _store.SavePacketAsync(packet, ct);
         }
 
-        var node = Resolve(packet);
-        if (node is null)
+        var (registration, capability) = Resolve(packet);
+        if (registration is null)
         {
             var failed = packet.State.IsTerminal()
                 ? packet
@@ -52,39 +77,63 @@ public sealed class NodeRouter : INodeRouter
             return failed;
         }
 
-        _logger.LogInformation("NodeRouter dispatching packet {Id} to {Node}.", packet.Id, node.Id);
+        _logger.LogInformation("NodeRouter dispatching packet {Id} to {Node}.", packet.Id, registration.NodeId);
 
         try
         {
-            var result = await node.HandleAsync(packet, ct);
+            var result = await _dispatcher.DispatchAsync(registration, packet, capability, ct);
             await _store.SavePacketAsync(result, ct);
             return result;
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            _logger.LogError(ex, "NodeRouter: node {Node} threw handling packet {Id}.", node.Id, packet.Id);
+            var legacyNodeId = CapabilityKey.ToLegacyNode(registration.NodeId) ?? NodeId.Orchestrator;
+            _logger.LogError(ex, "NodeRouter: node {Node} threw handling packet {Id}.", legacyNodeId, packet.Id);
             var aborted = packet.State.IsTerminal()
                 ? packet
-                : packet.Transition(node.Id, NodeState.Failed,
-                    $"Node {node.Id} threw while handling the packet.",
+                : packet.Transition(legacyNodeId, NodeState.Failed,
+                    $"Node {legacyNodeId} threw while handling the packet.",
                     success: false, error: $"{ex.GetType().Name}: {ex.Message}");
             await _store.SavePacketAsync(aborted, ct);
             return aborted;
         }
     }
 
-    /// <summary>Explicit address wins; otherwise the first node advertising the requested capability.</summary>
-    private INode? Resolve(NodePacket packet)
+    /// <summary>Explicit address wins; otherwise the node registered for the requested capability.</summary>
+    private (NodeRegistration? Registration, string Capability) Resolve(NodePacket packet)
     {
+        var requestedCapability = packet.RequestedCapability is { } cap ? CapabilityKey.From(cap) : "";
+
         if (packet.Address is { } addr)
         {
-            var byAddress = _nodes.FirstOrDefault(n => n.Id == addr);
-            if (byAddress is not null) return byAddress;
+            var byAddress = _registry.ResolveNode(CapabilityKey.From(addr));
+            if (byAddress is not null)
+            {
+                // Prefer the requested capability when this node actually serves it, so telemetry and the
+                // per-invocation deadline reflect the real verb rather than a guess.
+                var capability = byAddress.Manifest.Capabilities.Any(c => c.Name == requestedCapability)
+                    ? requestedCapability
+                    : byAddress.Manifest.Capabilities.Count == 1
+                        ? byAddress.Manifest.Capabilities[0].Name
+                        : requestedCapability;
+                return (byAddress, capability);
+            }
         }
 
-        if (packet.RequestedCapability is { } cap)
-            return _nodes.FirstOrDefault(n => n.Capabilities.Contains(cap));
+        if (requestedCapability.Length > 0)
+        {
+            var byCapability = _registry.Resolve(requestedCapability);
+            if (byCapability is not null) return (byCapability, requestedCapability);
+        }
 
-        return null;
+        return (null, requestedCapability);
+    }
+
+    private static INodeRegistry BuildLegacyRegistry(IEnumerable<INode> nodes)
+    {
+        var registry = new NodeRegistry(NullLogger<NodeRegistry>.Instance);
+        foreach (var node in nodes)
+            registry.Register(LegacyPacketNodeAdapter.ForLegacyNode(node), tolerateCapabilityOverlap: true);
+        return registry;
     }
 }

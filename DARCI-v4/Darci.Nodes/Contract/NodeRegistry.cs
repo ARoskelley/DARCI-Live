@@ -30,8 +30,17 @@ public sealed class NodeRegistrationException : Exception
 /// </summary>
 public interface INodeRegistry
 {
-    /// <summary>Register a node. Throws <see cref="NodeRegistrationException"/> on any validation failure.</summary>
-    NodeRegistration Register(INodeAdapter adapter);
+    /// <summary>
+    /// Register a node. Throws <see cref="NodeRegistrationException"/> on any validation failure.
+    /// </summary>
+    /// <param name="tolerateCapabilityOverlap">
+    /// TRANSITIONAL (SU3, removed in SU6). Manifest-driven registration is STRICT: a capability may have
+    /// exactly one owner, and a second claimant is a fatal error. But the pre-carve router allowed overlapping
+    /// <see cref="Capability"/> declarations and resolved them first-wins by registration order, and at least
+    /// one existing configuration relies on that. When true, a duplicate claim is WARNED and skipped
+    /// (first-wins) instead of throwing, preserving legacy behavior exactly. See the fork note in SU3.
+    /// </param>
+    NodeRegistration Register(INodeAdapter adapter, bool tolerateCapabilityOverlap = false);
 
     /// <summary>The node serving <paramref name="capability"/>, or null if nothing does.</summary>
     NodeRegistration? Resolve(string capability);
@@ -59,7 +68,7 @@ public sealed class NodeRegistry : INodeRegistry
 
     public NodeRegistry(ILogger<NodeRegistry> logger) => _logger = logger;
 
-    public NodeRegistration Register(INodeAdapter adapter)
+    public NodeRegistration Register(INodeAdapter adapter, bool tolerateCapabilityOverlap = false)
     {
         var manifest = adapter.Manifest;
 
@@ -75,16 +84,31 @@ public sealed class NodeRegistry : INodeRegistry
                 throw new NodeRegistrationException($"Node id '{manifest.NodeId}' is already registered.");
 
             // A capability may be served by exactly one node — otherwise routing is ambiguous.
+            var skipped = new List<string>();
             foreach (var c in manifest.Capabilities)
-                if (_byCapability.TryGetValue(c.Name, out var owner))
+            {
+                if (!_byCapability.TryGetValue(c.Name, out var owner)) continue;
+
+                if (!tolerateCapabilityOverlap)
                     throw new NodeRegistrationException(
                         $"Capability '{c.Name}' is already served by node '{owner.NodeId}'; " +
                         $"node '{manifest.NodeId}' cannot also claim it.");
 
+                // Legacy first-wins: keep the incumbent owner, warn, and do not route this claim.
+                skipped.Add(c.Name);
+                _logger.LogWarning(
+                    "Node '{NodeId}' also declares capability '{Capability}', already served by '{Owner}'. " +
+                    "Keeping the incumbent (legacy first-wins). Overlapping capabilities are ambiguous routing " +
+                    "and should be resolved.",
+                    manifest.NodeId, c.Name, owner.NodeId);
+            }
+
             var registration = new NodeRegistration(manifest, adapter, manifest.ComputeSha256(), DateTime.UtcNow);
             _registrations.Add(registration);
             _byNodeId[manifest.NodeId] = registration;
-            foreach (var c in manifest.Capabilities) _byCapability[c.Name] = registration;
+            foreach (var c in manifest.Capabilities)
+                if (!skipped.Contains(c.Name))
+                    _byCapability[c.Name] = registration;
 
             _logger.LogInformation(
                 "Registered node {NodeId} v{Version} ({Kind}, {InProc}) serving [{Caps}] — manifest sha256 {Sha}.",

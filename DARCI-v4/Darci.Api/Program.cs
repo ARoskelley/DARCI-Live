@@ -344,6 +344,56 @@ builder.Services.AddSingleton(sp => new Lazy<ICodingAgentLoop>(sp.GetRequiredSer
 builder.Services.AddSingleton<INode, CodingNode>();
 builder.Services.AddSingleton<INode, KnowledgeNode>();
 builder.Services.AddSingleton<INode, InnovationNode>();
+
+// === Phase 1 core carve: string-keyed node registry + ONE dispatch point ===
+// Routing resolves a STRING capability verb from a manifest (not the compiled-in Capability enum), so an
+// external node can declare a capability this core was never built with. Every node-capability invocation
+// flows through NodeDispatcher, which emits the per-invocation telemetry record. (Model calls are NOT in
+// scope here — those belong to the Phase 2 model broker.)
+var nodesDirectory = Path.GetFullPath(
+    Environment.GetEnvironmentVariable("DARCI_NODES_PATH")
+    ?? Path.Combine(builder.Environment.ContentRootPath, "..", "nodes"));
+
+builder.Services.AddSingleton<INodeTelemetrySink, LoggingNodeTelemetrySink>();
+builder.Services.AddSingleton<NodeDispatcher>();
+builder.Services.AddSingleton<NodeManifestLoader>();
+builder.Services.AddSingleton<INodeRegistrationStore>(sp =>
+    new SqliteNodeRegistrationStore(connectionString, sp.GetRequiredService<ILogger<SqliteNodeRegistrationStore>>()));
+
+builder.Services.AddSingleton<INodeRegistry>(sp =>
+{
+    var log = sp.GetRequiredService<ILogger<Program>>();
+    var registry = new NodeRegistry(sp.GetRequiredService<ILogger<NodeRegistry>>());
+
+    // Manifests are the source of truth for the capability surface. A manifest reviewed and merged into the
+    // repo IS the human-authored capability grant (Phase E §14c); there is no runtime self-registration.
+    var manifests = sp.GetRequiredService<NodeManifestLoader>().LoadAll(nodesDirectory)
+        .ToDictionary(m => m.Manifest.NodeId, StringComparer.Ordinal);
+
+    foreach (var node in sp.GetServices<INode>())
+    {
+        var nodeKey = CapabilityKey.From(node.Id);
+        if (manifests.TryGetValue(nodeKey, out var loaded))
+        {
+            registry.Register(new LegacyPacketNodeAdapter(node, loaded.Manifest));
+        }
+        else
+        {
+            // No manifest on disk: fall back to a synthesized one so the node still routes, but say so —
+            // a built-in node without a reviewed manifest is a gap to close, not a normal state.
+            log.LogWarning("Node {NodeId} has no darci-node.json under {Dir}; using a synthesized manifest.",
+                nodeKey, nodesDirectory);
+            registry.Register(LegacyPacketNodeAdapter.ForLegacyNode(node), tolerateCapabilityOverlap: true);
+        }
+    }
+
+    foreach (var orphan in manifests.Keys.Where(k => registry.ResolveNode(k) is null))
+        log.LogWarning("Manifest for {NodeId} declares capabilities but no in-process node implements it; not routable.",
+            orphan);
+
+    return registry;
+});
+
 builder.Services.AddSingleton<INodeRouter, NodeRouter>();
 
 // Gap-driven action: persist gaps, decide immediate-fill vs deferred auto-goal. The handler routes via
@@ -547,6 +597,27 @@ var proposalStore = app.Services.GetRequiredService<IProposalStore>();
 await proposalStore.InitializeAsync();
 var validationCampaignStore = app.Services.GetRequiredService<IValidationCampaignStore>();
 await validationCampaignStore.InitializeAsync();
+
+// Phase 1: resolve the node registry (this is where manifest validation failures surface — loudly, at
+// startup) and record the registered capability surface for audit (Phase E §14c). A changed manifest hash
+// is flagged, so widening what DARCI can do leaves a durable trace.
+var nodeRegistrationStore = app.Services.GetRequiredService<INodeRegistrationStore>();
+await nodeRegistrationStore.InitializeAsync();
+var nodeRegistry = app.Services.GetRequiredService<INodeRegistry>();
+foreach (var registration in nodeRegistry.Registrations)
+{
+    await nodeRegistrationStore.RecordAsync(new NodeRegistrationRecord
+    {
+        NodeId = registration.NodeId,
+        NodeVersion = registration.Manifest.NodeVersion,
+        ContractVersion = registration.Manifest.ContractVersion,
+        ManifestSha256 = registration.ManifestSha256,
+        Capabilities = registration.Manifest.Capabilities.Select(c => c.Name).ToList(),
+        RegisteredAt = registration.RegisteredAt,
+    });
+}
+app.Logger.LogInformation("Node registry ready: {Count} node(s) serving [{Capabilities}].",
+    nodeRegistry.Registrations.Count, string.Join(", ", nodeRegistry.RoutableCapabilities));
 // The startup sweep must run AFTER the proposal store is initialized so its carve-out can recognise
 // packets legitimately parked pending a human decision (and not reap them as orphans).
 var nodeWatchdog = app.Services.GetRequiredService<NodeWatchdog>();
