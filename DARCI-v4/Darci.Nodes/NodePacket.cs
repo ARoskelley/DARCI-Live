@@ -20,6 +20,28 @@ public sealed record NodePacket
     /// <summary>Alternative to <see cref="Address"/>: request a capability, let the router resolve.</summary>
     public Capability? RequestedCapability { get; init; }
 
+    /// <summary>
+    /// The requested capability as a canonical STRING verb (e.g. <c>"coding.write"</c>, or an external node's
+    /// <c>"acme.simulate_thermal"</c>). This is the routing key the registry actually uses, and the only form
+    /// that can express a capability the core was not compiled with — <see cref="RequestedCapability"/> is
+    /// limited to the built-in enum. Set automatically when a packet is created with an enum capability, so
+    /// both forms agree; set it directly (via <see cref="Create"/>'s <c>capabilityKey</c>) for external verbs.
+    /// </summary>
+    public string? RequestedCapabilityKey { get; init; }
+
+    /// <summary>The target node as a canonical string id (e.g. <c>"darci.coding"</c>). Same rationale as
+    /// <see cref="RequestedCapabilityKey"/>: <see cref="Address"/> cannot name an external node.</summary>
+    public string? AddressKey { get; init; }
+
+    /// <summary>The capability verb to route on: the string key when present, else the legacy enum's canonical
+    /// string, else null.</summary>
+    public string? EffectiveCapabilityKey =>
+        RequestedCapabilityKey ?? (RequestedCapability is { } c ? CapabilityKey.From(c) : null);
+
+    /// <summary>The node id to route to: the string key when present, else the legacy enum's canonical string.</summary>
+    public string? EffectiveAddressKey =>
+        AddressKey ?? (Address is { } a ? CapabilityKey.From(a) : null);
+
     public NodeState State { get; init; } = NodeState.Created;
     public PacketPayload Payload { get; init; } = new();
     public IReadOnlyList<NodeLogEntry> Log { get; init; } = Array.Empty<NodeLogEntry>();
@@ -37,14 +59,22 @@ public sealed record NodePacket
     /// <summary>The most recent log entry, or null if none recorded yet.</summary>
     public NodeLogEntry? LastEntry => Log.Count > 0 ? Log[^1] : null;
 
-    /// <summary>Mint a fresh packet for an intent. Starts in <see cref="NodeState.Created"/>.</summary>
+    /// <summary>
+    /// Mint a fresh packet for an intent. Starts in <see cref="NodeState.Created"/>.
+    /// <para>Pass <paramref name="capabilityKey"/> (and/or <paramref name="addressKey"/>) to request a
+    /// capability by STRING verb — the only way to target a capability the core was not compiled with, such as
+    /// an external collaborator's node. When only the enum form is given, the string keys are derived so both
+    /// forms always agree.</para>
+    /// </summary>
     public static NodePacket Create(
         string intent,
         string? successCriteria = null,
         NodeId? address = null,
         Capability? capability = null,
         string? correlationId = null,
-        IReadOnlyDictionary<string, string>? slots = null)
+        IReadOnlyDictionary<string, string>? slots = null,
+        string? capabilityKey = null,
+        string? addressKey = null)
     {
         var id = Guid.NewGuid().ToString("N");
         return new NodePacket
@@ -53,6 +83,8 @@ public sealed record NodePacket
             CorrelationId = correlationId ?? id,
             Address = address,
             RequestedCapability = capability,
+            RequestedCapabilityKey = capabilityKey ?? (capability is { } c ? CapabilityKey.From(c) : null),
+            AddressKey = addressKey ?? (address is { } a ? CapabilityKey.From(a) : null),
             State = NodeState.Created,
             Payload = new PacketPayload
             {

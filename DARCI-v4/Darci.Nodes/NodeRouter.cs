@@ -36,12 +36,10 @@ public sealed class NodeRouter : INodeRouter
     }
 
     /// <summary>
-    /// COMPATIBILITY constructor (transitional, retired in SU6): takes packet-native <see cref="INode"/>s,
-    /// wraps each in a <see cref="LegacyPacketNodeAdapter"/> with a synthesized manifest, and registers them.
-    ///
-    /// <para>Capability overlap is TOLERATED here (first-wins by registration order) because that is what the
-    /// pre-carve router did — an existing configuration registers two nodes both declaring
-    /// <see cref="Capability.WriteCode"/>. Manifest-driven registration is strict instead. See the SU3 fork note.</para>
+    /// CONVENIENCE constructor for packet-native <see cref="INode"/>s: wraps each in a
+    /// <see cref="LegacyPacketNodeAdapter"/> with a synthesized manifest and registers it. Capability
+    /// ownership is strict here too — two nodes claiming the same verb is a registration error, not a
+    /// silently-resolved race.
     /// </summary>
     public NodeRouter(IEnumerable<INode> nodes, INodePacketStore store, ILogger<NodeRouter> logger)
         : this(BuildLegacyRegistry(nodes), new NodeDispatcher(NullLogger<NodeDispatcher>.Instance), store, logger)
@@ -99,14 +97,18 @@ public sealed class NodeRouter : INodeRouter
         }
     }
 
-    /// <summary>Explicit address wins; otherwise the node registered for the requested capability.</summary>
+    /// <summary>
+    /// Explicit address wins; otherwise the node registered for the requested capability. Both are resolved
+    /// from the packet's canonical STRING keys, so an external capability with no <see cref="Capability"/>
+    /// member routes exactly like a built-in one.
+    /// </summary>
     private (NodeRegistration? Registration, string Capability) Resolve(NodePacket packet)
     {
-        var requestedCapability = packet.RequestedCapability is { } cap ? CapabilityKey.From(cap) : "";
+        var requestedCapability = packet.EffectiveCapabilityKey ?? "";
 
-        if (packet.Address is { } addr)
+        if (packet.EffectiveAddressKey is { } addressKey)
         {
-            var byAddress = _registry.ResolveNode(CapabilityKey.From(addr));
+            var byAddress = _registry.ResolveNode(addressKey);
             if (byAddress is not null)
             {
                 // Prefer the requested capability when this node actually serves it, so telemetry and the
@@ -133,7 +135,7 @@ public sealed class NodeRouter : INodeRouter
     {
         var registry = new NodeRegistry(NullLogger<NodeRegistry>.Instance);
         foreach (var node in nodes)
-            registry.Register(LegacyPacketNodeAdapter.ForLegacyNode(node), tolerateCapabilityOverlap: true);
+            registry.Register(LegacyPacketNodeAdapter.ForLegacyNode(node));
         return registry;
     }
 }

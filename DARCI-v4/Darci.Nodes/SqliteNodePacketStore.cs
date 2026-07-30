@@ -162,9 +162,10 @@ public sealed class SqliteNodePacketStore : INodePacketStore
         cmd.Parameters.AddWithValue("$corr", p.CorrelationId);
         cmd.Parameters.AddWithValue("$addr", p.Address is null ? DBNull.Value : (int)p.Address.Value);
         cmd.Parameters.AddWithValue("$cap", p.RequestedCapability is null ? DBNull.Value : (int)p.RequestedCapability.Value);
-        // Dual-write the canonical string keys (SU5). Reads still use the ordinals until SU6.
-        cmd.Parameters.AddWithValue("$addr_key", p.Address is null ? DBNull.Value : CapabilityKey.From(p.Address.Value));
-        cmd.Parameters.AddWithValue("$cap_key", p.RequestedCapability is null ? DBNull.Value : CapabilityKey.From(p.RequestedCapability.Value));
+        // The string keys are the authoritative routing form (they can express external capabilities); the
+        // ordinal columns remain for backward compatibility.
+        cmd.Parameters.AddWithValue("$addr_key", (object?)p.EffectiveAddressKey ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("$cap_key", (object?)p.EffectiveCapabilityKey ?? DBNull.Value);
         cmd.Parameters.AddWithValue("$state", (int)p.State);
         cmd.Parameters.AddWithValue("$intent", p.Payload.Intent);
         cmd.Parameters.AddWithValue("$success_criteria", (object?)p.Payload.SuccessCriteria ?? DBNull.Value);
@@ -344,6 +345,8 @@ public sealed class SqliteNodePacketStore : INodePacketStore
     {
         var addrOrd = reader.GetOrdinal("address");
         var capOrd = reader.GetOrdinal("requested_capability");
+        var addrKeyOrd = reader.GetOrdinal("address_key");
+        var capKeyOrd = reader.GetOrdinal("capability_key");
         var scOrd = reader.GetOrdinal("success_criteria");
         var leaseOrd = reader.GetOrdinal("lease_expires_at");
 
@@ -355,6 +358,10 @@ public sealed class SqliteNodePacketStore : INodePacketStore
             CorrelationId = reader.GetString(reader.GetOrdinal("correlation_id")),
             Address = reader.IsDBNull(addrOrd) ? null : (NodeId)reader.GetInt32(addrOrd),
             RequestedCapability = reader.IsDBNull(capOrd) ? null : (Capability)reader.GetInt32(capOrd),
+            // Read the string keys too: an external capability exists ONLY in these columns (no ordinal can
+            // represent it), so dropping them on load would silently un-route such a packet after a restart.
+            AddressKey = reader.IsDBNull(addrKeyOrd) ? null : reader.GetString(addrKeyOrd),
+            RequestedCapabilityKey = reader.IsDBNull(capKeyOrd) ? null : reader.GetString(capKeyOrd),
             State = (NodeState)reader.GetInt32(reader.GetOrdinal("state")),
             Payload = new PacketPayload
             {

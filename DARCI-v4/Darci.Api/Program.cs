@@ -383,7 +383,7 @@ builder.Services.AddSingleton<INodeRegistry>(sp =>
             // a built-in node without a reviewed manifest is a gap to close, not a normal state.
             log.LogWarning("Node {NodeId} has no darci-node.json under {Dir}; using a synthesized manifest.",
                 nodeKey, nodesDirectory);
-            registry.Register(LegacyPacketNodeAdapter.ForLegacyNode(node), tolerateCapabilityOverlap: true);
+            registry.Register(LegacyPacketNodeAdapter.ForLegacyNode(node));
         }
     }
 

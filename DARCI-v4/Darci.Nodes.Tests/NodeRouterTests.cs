@@ -110,15 +110,20 @@ public sealed class NodeRouterTests : IDisposable
     [Fact]
     public async Task Dispatch_AddressTakesPrecedenceOverCapability()
     {
-        // Both could serve WriteCode by capability, but address pins it to Coding.
+        // The requested capability is served by 'other', but the explicit address pins it to Coding.
+        //
+        // This previously had BOTH nodes declaring Capability.WriteCode and relied on the router silently
+        // resolving that overlap first-wins by registration order. Capability ownership is now strict — one
+        // owner per verb — so each node declares its own distinct capability. The intent under test is
+        // unchanged (address beats capability) and is now expressed unambiguously.
         var coding = new FakeNode(NodeId.Coding, Capability.WriteCode);
-        var other = new FakeNode(NodeId.Engineering, Capability.WriteCode);
-        var router = Router(other, coding); // order: capability match would hit 'other' first
+        var other = new FakeNode(NodeId.Engineering, Capability.DesignGeometry);
+        var router = Router(other, coding);
 
-        var packet = NodePacket.Create("x", address: NodeId.Coding, capability: Capability.WriteCode);
+        var packet = NodePacket.Create("x", address: NodeId.Coding, capability: Capability.DesignGeometry);
         await router.DispatchAsync(packet);
 
-        Assert.True(coding.WasCalled);
-        Assert.False(other.WasCalled);
+        Assert.True(coding.WasCalled);    // address won
+        Assert.False(other.WasCalled);    // ...even though 'other' owns the requested capability
     }
 }
