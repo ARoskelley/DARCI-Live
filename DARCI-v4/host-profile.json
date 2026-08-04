@@ -1,0 +1,45 @@
+{
+  "profile_id": "tinman-3070ti-local",
+  "description": "All-local Ollama profile for a single 8GB-VRAM host. Every class resolves to an installed model and requires no external API key. Bindings intentionally reproduce the pre-broker DARCI_OLLAMA_* routing exactly, so introducing the model broker changes no behavior. See host-profile.claude.example.json for a hybrid profile.",
+  "providers": {
+    "ollama": {
+      "kind": "ollama",
+      "base_url": "http://localhost:11434",
+      "timeout_minutes": 12
+    }
+  },
+  "classes": {
+    "chat.fast": {
+      "provider": "ollama",
+      "model": "gemma2:9b",
+      "note": "ASPIRATIONAL: no genuinely small model is installed, so this is the same 9B as chat.balanced. Pull llama3.2:3b (~2GB) to make this tier real."
+    },
+    "chat.balanced": {
+      "provider": "ollama",
+      "model": "gemma2:9b"
+    },
+    "chat.deep": {
+      "provider": "ollama",
+      "model": "gemma2:9b",
+      "note": "ASPIRATIONAL: mapped to the balanced model on purpose. llama3.3 (42GB) is installed but impractical on an 8GB card - heavy CPU offload makes it minutes-per-call. Point this at a larger local model or the Claude profile when one is available."
+    },
+    "classify.intent": {
+      "provider": "ollama",
+      "model": "gemma2:9b",
+      "note": "The doc suggests a dedicated classifier (Lizzy/ONNX); none is wired in this repo yet."
+    },
+    "embed.text": {
+      "provider": "ollama",
+      "model": "nomic-embed-text"
+    },
+    "code.generate": {
+      "provider": "ollama",
+      "model": "qwen2.5-coder:7b"
+    },
+    "code.fast": {
+      "provider": "ollama",
+      "model": "qwen2.5-coder:7b",
+      "note": "Same model as code.generate today; kept as a distinct class so the fast/full distinction the code already makes is preserved."
+    }
+  }
+}
