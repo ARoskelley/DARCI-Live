@@ -36,14 +36,19 @@ public sealed class OllamaInnovationSynthesizer : IInnovationSynthesizer
 {
     private const double InitialHypothesisScore = 0.3;   // capped to Innovated (always IsLow) downstream
 
+    /// <summary>This node's memory access: its id plus the scopes its manifest declares. Read-only — the
+    /// innovation node reads the graph for context and never writes to it.</summary>
+    private static readonly MemoryAccess Access =
+        MemoryAccess.ForNode("darci.innovation", new[] { MemoryScopes.ReadKnowledge });
+
     private readonly IResearchToolbox _toolbox;
-    private readonly IKnowledgeGraph _graph;
+    private readonly IMemoryBroker _memory;
     private readonly ILogger<OllamaInnovationSynthesizer> _logger;
 
-    public OllamaInnovationSynthesizer(IResearchToolbox toolbox, IKnowledgeGraph graph, ILogger<OllamaInnovationSynthesizer> logger)
+    public OllamaInnovationSynthesizer(IResearchToolbox toolbox, IMemoryBroker memory, ILogger<OllamaInnovationSynthesizer> logger)
     {
         _toolbox = toolbox;
-        _graph = graph;
+        _memory = memory;
         _logger = logger;
     }
 
@@ -77,7 +82,7 @@ public sealed class OllamaInnovationSynthesizer : IInnovationSynthesizer
     {
         try
         {
-            var entities = await _graph.SearchEntitiesAsync(question, limit: 6, ct: ct);
+            var entities = await _memory.SearchEntitiesAsync(Access, question, limit: 6, ct: ct);
             if (entities.Count == 0) return "";
             var sb = new StringBuilder("Related concepts in the knowledge graph:\n");
             foreach (var e in entities)

@@ -11,20 +11,24 @@ public sealed class CodingContextBuilder : ICodingContextBuilder
     private const int MaxPreviewBytes = 200_000;
     private const int MaxPreviewChars = 4_000;
 
+    /// <summary>Runs under the coding node; reads the graph only (its manifest declares read:knowledge).</summary>
+    private static readonly MemoryAccess Access =
+        MemoryAccess.ForNode("darci.coding", new[] { MemoryScopes.ReadKnowledge });
+
     private readonly ICodingWorkspaceStore _store;
     private readonly IModelRouter _router;
-    private readonly IKnowledgeGraph _kg;
+    private readonly IMemoryBroker _memory;
     private readonly ILogger<CodingContextBuilder> _logger;
 
     public CodingContextBuilder(
         ICodingWorkspaceStore store,
         IModelRouter router,
-        IKnowledgeGraph kg,
+        IMemoryBroker memory,
         ILogger<CodingContextBuilder> logger)
     {
         _store = store;
         _router = router;
-        _kg = kg;
+        _memory = memory;
         _logger = logger;
     }
 
@@ -159,10 +163,10 @@ public sealed class CodingContextBuilder : ICodingContextBuilder
             try
             {
                 // Get all code-file entities that "define" this symbol (incoming direction).
-                var relations = await _kg.GetRelationsAsync(hit.EntityId, relationType: "defines", incoming: true, ct);
+                var relations = await _memory.GetRelationsAsync(Access, hit.EntityId, relationType: "defines", incoming: true, ct: ct);
                 foreach (var rel in relations)
                 {
-                    var fileEntity = await _kg.GetEntityAsync(rel.FromEntityId, ct);
+                    var fileEntity = await _memory.GetEntityAsync(Access, rel.FromEntityId, ct);
                     if (fileEntity is { EntityType: "code-file" })
                     {
                         boostedPaths.Add(fileEntity.Name);
@@ -201,7 +205,7 @@ public sealed class CodingContextBuilder : ICodingContextBuilder
             var seen = new Dictionary<string, (KgEntity Entity, float Score)>(StringComparer.OrdinalIgnoreCase);
             for (var i = 0; i < Math.Min(tokens.Length, 4); i++)
             {
-                var results = await _kg.SearchEntitiesAsync(tokens[i], domain: "code", limit: 5, ct: ct);
+                var results = await _memory.SearchEntitiesAsync(Access, tokens[i], domain: "code", limit: 5, ct: ct);
                 var tokenWeight = 1.0f - (i * 0.15f); // earlier tokens = slightly higher weight
                 foreach (var entity in results)
                 {

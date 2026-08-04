@@ -22,18 +22,22 @@ public sealed class KnowledgeAssessor : IKnowledgeAssessor
     /// LLM gap classifier fires to decide whether RunGapFill or SkipAgents.
     /// </summary>
 
-    private readonly IKnowledgeGraph _graph;
+    /// <summary>This node's memory access: its id plus the scopes its manifest declares.</summary>
+    private static readonly MemoryAccess Access =
+        MemoryAccess.ForNode("darci.knowledge", new[] { MemoryScopes.ReadKnowledge });
+
+    private readonly IMemoryBroker _memory;
     private readonly IConfidenceTracker _confidence;
     private readonly IResearchToolbox _toolbox;
     private readonly ILogger<KnowledgeAssessor> _logger;
 
     public KnowledgeAssessor(
-        IKnowledgeGraph graph,
+        IMemoryBroker memory,
         IConfidenceTracker confidence,
         IResearchToolbox toolbox,
         ILogger<KnowledgeAssessor> logger)
     {
-        _graph = graph;
+        _memory = memory;
         _confidence = confidence;
         _toolbox = toolbox;
         _logger = logger;
@@ -44,7 +48,7 @@ public sealed class KnowledgeAssessor : IKnowledgeAssessor
         CancellationToken ct = default)
     {
         // ── Step 1: Query knowledge graph ──
-        var entities = await _graph.SearchEntitiesAsync(topic, limit: 5, ct: ct);
+        var entities = await _memory.SearchEntitiesAsync(Access, topic, limit: 5, ct: ct);
 
         // ── Step 2: Query confidence tracker ──
         List<float>? embedding = null;

@@ -105,6 +105,14 @@ public interface IMemoryBroker
     Task<KgRelation> UpsertRelationAsync(
         MemoryAccess access, string fromEntityId, string toEntityId, string relationType,
         float weight = 1.0f, float confidence = 0.5f, string[]? evidenceIds = null, CancellationToken ct = default);
+
+    /// <summary>Extract entities/relations from free text and write them into the graph. A node-initiated
+    /// graph WRITE, so it is brokered like any other — leaving it direct would recreate the second path the
+    /// broker exists to close.</summary>
+    Task IngestMemoryAsync(
+        MemoryAccess access, string memoryContent, string[] tags,
+        Func<string, Task<List<float>>> getEmbedding, Func<string, Task<string>> llmExtract,
+        CancellationToken ct = default);
 }
 
 /// <summary>Scope-enforcing broker over the concrete <see cref="IKnowledgeGraph"/>.</summary>
@@ -190,6 +198,17 @@ public sealed class MemoryBroker : IMemoryBroker
         _logger.LogDebug("Memory write by {Caller}: relation {From} -{Type}-> {To}.",
             access.CallerId, fromEntityId, relationType, toEntityId);
         return _graph.UpsertRelationAsync(fromEntityId, toEntityId, relationType, weight, confidence, evidenceIds, ct);
+    }
+
+    public Task IngestMemoryAsync(
+        MemoryAccess access, string memoryContent, string[] tags,
+        Func<string, Task<List<float>>> getEmbedding, Func<string, Task<string>> llmExtract,
+        CancellationToken ct = default)
+    {
+        Require(access, MemoryScopes.WriteKnowledge);
+        _logger.LogDebug("Memory ingest by {Caller}: {Length} chars, tags [{Tags}].",
+            access.CallerId, memoryContent.Length, string.Join(", ", tags));
+        return _graph.IngestMemoryAsync(memoryContent, tags, getEmbedding, llmExtract, ct);
     }
 
     /// <summary>Enforce a scope. A denial is logged as a WARNING — §6.1: that log is how a misbehaving or

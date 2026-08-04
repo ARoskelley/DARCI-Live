@@ -46,6 +46,10 @@ public sealed class KnowledgeGraphCharacterizationTests : IDisposable
         try { if (File.Exists(_dbPath)) File.Delete(_dbPath); } catch { }
     }
 
+    /// <summary>The real graph, reached the way nodes now reach it — through the broker. The underlying
+    /// store and data are identical, which is what makes these assertions a genuine before/after proof.</summary>
+    private IMemoryBroker Memory => new MemoryBroker(_graph, NullLogger<MemoryBroker>.Instance);
+
     private async Task SeedGraphAsync()
     {
         await _graph.UpsertEntityAsync("EMG sensor", "Component", "biomed",
@@ -85,7 +89,7 @@ public sealed class KnowledgeGraphCharacterizationTests : IDisposable
     {
         await SeedGraphAsync();
         var toolbox = new PromptCapturingToolbox(SolvableJson);
-        var synthesizer = new OllamaInnovationSynthesizer(toolbox, _graph, NullLogger<OllamaInnovationSynthesizer>.Instance);
+        var synthesizer = new OllamaInnovationSynthesizer(toolbox, Memory, NullLogger<OllamaInnovationSynthesizer>.Instance);
 
         // The question must be a SUBSTRING of an entity name for the current graph search to match — see
         // Synthesizer_WithANaturalLanguageQuestion_FindsNothing below for why that matters.
@@ -117,7 +121,7 @@ public sealed class KnowledgeGraphCharacterizationTests : IDisposable
         // search (keyword extraction / semantic search) is a separate, deliberate change.
         await SeedGraphAsync();
         var toolbox = new PromptCapturingToolbox(SolvableJson);
-        var synthesizer = new OllamaInnovationSynthesizer(toolbox, _graph, NullLogger<OllamaInnovationSynthesizer>.Instance);
+        var synthesizer = new OllamaInnovationSynthesizer(toolbox, Memory, NullLogger<OllamaInnovationSynthesizer>.Instance);
 
         await synthesizer.SynthesizeAsync(
             new InnovationRequest("How do I close an EMG grip loop?", "build a grip controller"));
@@ -130,7 +134,7 @@ public sealed class KnowledgeGraphCharacterizationTests : IDisposable
     {
         // No seeding: the graph is empty. The context section must be absent, not an empty header.
         var toolbox = new PromptCapturingToolbox(SolvableJson);
-        var synthesizer = new OllamaInnovationSynthesizer(toolbox, _graph, NullLogger<OllamaInnovationSynthesizer>.Instance);
+        var synthesizer = new OllamaInnovationSynthesizer(toolbox, Memory, NullLogger<OllamaInnovationSynthesizer>.Instance);
 
         await synthesizer.SynthesizeAsync(new InnovationRequest("anything at all", "intent"));
 
@@ -143,7 +147,9 @@ public sealed class KnowledgeGraphCharacterizationTests : IDisposable
         // Graph lookup is best-effort: a broken graph degrades the prompt, it does not fail the synthesis.
         var toolbox = new PromptCapturingToolbox(SolvableJson);
         var synthesizer = new OllamaInnovationSynthesizer(
-            toolbox, new ThrowingGraph(), NullLogger<OllamaInnovationSynthesizer>.Instance);
+            toolbox,
+            new MemoryBroker(new ThrowingGraph(), NullLogger<MemoryBroker>.Instance),
+            NullLogger<OllamaInnovationSynthesizer>.Instance);
 
         var proposal = await synthesizer.SynthesizeAsync(new InnovationRequest("q", "i"));
 
@@ -158,7 +164,7 @@ public sealed class KnowledgeGraphCharacterizationTests : IDisposable
     {
         await SeedGraphAsync();
         var assessor = new KnowledgeAssessor(
-            _graph, new StubConfidenceTracker(0.1), new PromptCapturingToolbox("{}"),
+            Memory, new StubConfidenceTracker(0.1), new PromptCapturingToolbox("{}"),
             NullLogger<KnowledgeAssessor>.Instance);
 
         var assessment = await assessor.AssessAsync("EMG sensor");
@@ -173,7 +179,7 @@ public sealed class KnowledgeGraphCharacterizationTests : IDisposable
     {
         await SeedGraphAsync();
         var assessor = new KnowledgeAssessor(
-            _graph, new StubConfidenceTracker(0.05), new PromptCapturingToolbox("{}"),
+            Memory, new StubConfidenceTracker(0.05), new PromptCapturingToolbox("{}"),
             NullLogger<KnowledgeAssessor>.Instance);
 
         var assessment = await assessor.AssessAsync("EMG sensor");
@@ -187,7 +193,7 @@ public sealed class KnowledgeGraphCharacterizationTests : IDisposable
     {
         await SeedGraphAsync();
         var assessor = new KnowledgeAssessor(
-            _graph, new StubConfidenceTracker(0.95), new PromptCapturingToolbox("{}"),
+            Memory, new StubConfidenceTracker(0.95), new PromptCapturingToolbox("{}"),
             NullLogger<KnowledgeAssessor>.Instance);
 
         var assessment = await assessor.AssessAsync("EMG sensor");

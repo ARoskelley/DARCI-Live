@@ -322,7 +322,7 @@ builder.Services.AddSingleton<ConstraintExtractor>();
 builder.Services.AddSingleton<DeepResearchOrchestrator>(sp => new DeepResearchOrchestrator(
     sp.GetRequiredService<IResearchStore>(),
     sp.GetRequiredService<IResearchAgentFactory>(),
-    sp.GetRequiredService<IKnowledgeGraph>(),
+    sp.GetRequiredService<IMemoryBroker>(),
     sp.GetRequiredService<IConfidenceTracker>(),
     sp.GetRequiredService<IResearchToolbox>(),
     sp.GetRequiredService<KnowledgeAssessor>(),
@@ -524,7 +524,7 @@ builder.Services.AddSingleton<ICodingContextBuilder>(sp =>
     new CodingContextBuilder(
         sp.GetRequiredService<ICodingWorkspaceStore>(),
         sp.GetRequiredService<IModelRouter>(),
-        sp.GetRequiredService<IKnowledgeGraph>(),
+        sp.GetRequiredService<IMemoryBroker>(),
         sp.GetRequiredService<ILogger<CodingContextBuilder>>()));
 
 builder.Services.AddSingleton<IWorkspaceEmbeddingService, WorkspaceEmbeddingService>();

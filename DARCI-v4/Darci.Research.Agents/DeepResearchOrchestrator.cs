@@ -13,9 +13,14 @@ namespace Darci.Research.Agents;
 
 public sealed class DeepResearchOrchestrator : IDeepResearchOrchestrator
 {
+    /// <summary>Runs under the knowledge node. Needs WRITE as well as read: successful research is ingested
+    /// back into the graph, which its manifest declares.</summary>
+    private static readonly MemoryAccess Access = MemoryAccess.ForNode(
+        "darci.knowledge", new[] { MemoryScopes.ReadKnowledge, MemoryScopes.WriteKnowledge });
+
     private readonly IResearchStore _store;
     private readonly IResearchAgentFactory _agentFactory;
-    private readonly IKnowledgeGraph _graph;
+    private readonly IMemoryBroker _memory;
     private readonly IConfidenceTracker _confidence;
     private readonly IResearchToolbox _toolbox;
     private readonly KnowledgeAssessor _assessor;
@@ -24,7 +29,7 @@ public sealed class DeepResearchOrchestrator : IDeepResearchOrchestrator
     public DeepResearchOrchestrator(
         IResearchStore store,
         IResearchAgentFactory agentFactory,
-        IKnowledgeGraph graph,
+        IMemoryBroker memory,
         IConfidenceTracker confidence,
         IResearchToolbox toolbox,
         KnowledgeAssessor assessor,
@@ -32,7 +37,7 @@ public sealed class DeepResearchOrchestrator : IDeepResearchOrchestrator
     {
         _store = store;
         _agentFactory = agentFactory;
-        _graph = graph;
+        _memory = memory;
         _confidence = confidence;
         _toolbox = toolbox;
         _assessor = assessor;
@@ -68,7 +73,8 @@ public sealed class DeepResearchOrchestrator : IDeepResearchOrchestrator
 
             if (agentOutcome.IsSuccess && !string.IsNullOrWhiteSpace(agentOutcome.FinalAnswer))
             {
-                _ = _graph.IngestMemoryAsync(
+                _ = _memory.IngestMemoryAsync(
+                    Access,
                     agentOutcome.FinalAnswer,
                     new[] { "deep_research", domain },
                     getEmbedding: text => _toolbox.GetEmbeddingAsync(text, ct),
@@ -412,7 +418,7 @@ public sealed class DeepResearchOrchestrator : IDeepResearchOrchestrator
         try
         {
             var embedding = await _toolbox.GetEmbeddingAsync(subQuestion, ct);
-            var matches = await _graph.SemanticSearchAsync(embedding.ToArray(), limit: 1, ct);
+            var matches = await _memory.SemanticSearchAsync(Access, embedding.ToArray(), limit: 1, ct);
             if (matches.Count > 0 && matches[0].Score > 0.7f) return "graph";
         }
         catch (Exception ex)

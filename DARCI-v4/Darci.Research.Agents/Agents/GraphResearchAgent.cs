@@ -11,19 +11,23 @@ namespace Darci.Research.Agents.Agents;
 
 public sealed class GraphResearchAgent : IResearchAgent
 {
+    /// <summary>Runs under the knowledge node; reads the graph only.</summary>
+    private static readonly MemoryAccess Access =
+        MemoryAccess.ForNode("darci.knowledge", new[] { MemoryScopes.ReadKnowledge });
+
     private readonly IResearchStore _store;
-    private readonly IKnowledgeGraph _graph;
+    private readonly IMemoryBroker _memory;
     private readonly IResearchToolbox _toolbox;
     private readonly ILogger<GraphResearchAgent> _logger;
 
     public GraphResearchAgent(
         IResearchStore store,
-        IKnowledgeGraph graph,
+        IMemoryBroker memory,
         IResearchToolbox toolbox,
         ILogger<GraphResearchAgent> logger)
     {
         _store = store;
-        _graph = graph;
+        _memory = memory;
         _toolbox = toolbox;
         _logger = logger;
     }
@@ -39,7 +43,7 @@ public sealed class GraphResearchAgent : IResearchAgent
         {
             await _store.UpdateAgentJobAsync(jobId, "running", assignedAt: startedAt);
 
-            var entities = await _graph.SearchEntitiesAsync(subQuestion, limit: 3, ct: ct);
+            var entities = await _memory.SearchEntitiesAsync(Access, subQuestion, limit: 3, ct: ct);
             if (entities.Count == 0)
             {
                 const string error = "No graph knowledge for this sub-question";
@@ -64,7 +68,7 @@ public sealed class GraphResearchAgent : IResearchAgent
             var builder = new StringBuilder();
             foreach (var entity in entities)
             {
-                var neighbours = await _graph.GetNeighboursAsync(entity.Id, depth: 2, ct: ct);
+                var neighbours = await _memory.GetNeighboursAsync(Access, entity.Id, depth: 2, ct: ct);
                 var map = neighbours.Entities.ToDictionary(item => item.Id, StringComparer.OrdinalIgnoreCase);
                 foreach (var relation in neighbours.Relations)
                 {
