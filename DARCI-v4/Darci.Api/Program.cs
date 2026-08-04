@@ -465,6 +465,15 @@ builder.Services.AddSingleton<IProposalStore>(sp =>
     new SqliteProposalStore(connectionString, sp.GetRequiredService<ILogger<SqliteProposalStore>>()));
 builder.Services.AddSingleton<IHumanGate, HumanGateService>();
 
+// === Phase 2 (P2c.1): the MEMORY BROKER (doc §6.1) ===
+// Nodes reach the knowledge graph through this, with their manifest-declared scopes enforced per request and
+// denials logged. Registered now; node call sites move onto it in P2c.3.
+// NOT brokered, deliberately: the core's own lifecycle and trust state (InnovatedKnowledgeStore,
+// ProposalStore, ValidationCampaignStore, GapStore, NodePacketStore) and core-internal KG consumers
+// (MemoryStore, ConfidenceTracker, the /knowledge endpoints) — doc §3 makes the core the graph's owner, so
+// the broker mediates NODE access rather than walling the core off from itself.
+builder.Services.AddSingleton<IMemoryBroker, MemoryBroker>();
+
 // Phase E (sub-unit 1): validation-campaign store — pre-registered protocols + per-step evidence; the
 // verdict is a pure function over (criteria × evidence). Rides the human gate for authorization/promotion.
 builder.Services.AddSingleton<IValidationCampaignStore>(sp =>
