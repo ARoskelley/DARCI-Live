@@ -21,12 +21,19 @@ namespace Darci.Nodes;
 public sealed class NodeDispatcher
 {
     private readonly INodeTelemetrySink _telemetry;
+    private readonly string? _hostProfileId;
     private readonly ILogger<NodeDispatcher> _logger;
 
-    public NodeDispatcher(ILogger<NodeDispatcher> logger, INodeTelemetrySink? telemetry = null)
+    /// <param name="hostProfile">Optional: which model profile is active, recorded on every invocation so
+    /// telemetry stays comparable across hosts with different hardware.</param>
+    public NodeDispatcher(
+        ILogger<NodeDispatcher> logger,
+        INodeTelemetrySink? telemetry = null,
+        HostProfile? hostProfile = null)
     {
         _logger = logger;
         _telemetry = telemetry ?? NullNodeTelemetrySink.Instance;
+        _hostProfileId = hostProfile?.ProfileId;
     }
 
     /// <summary>
@@ -44,6 +51,10 @@ public sealed class NodeDispatcher
         var startedAt = DateTime.UtcNow;
         var sw = Stopwatch.StartNew();
 
+        // Open the ambient scope so any model call the node makes — however many frames down — is attributed
+        // to THIS invocation without threading a context object through every call site (fork F1a).
+        using var scope = ModelCallScope.Begin(invocation.TraceId, invocation.GoalId);
+
         NodeResult result;
         try
         {
@@ -58,10 +69,10 @@ public sealed class NodeDispatcher
             sw.Stop();
             // The adapter threw. Report it as an INTERNAL error result; the CALLER decides the record's fate,
             // preserving the router's existing exception handling exactly.
-            _telemetry.Record(new NodeTelemetryRecord(
+            _telemetry.Record(WithModelRollUp(new NodeTelemetryRecord(
                 invocation.TraceId, invocation.GoalId, registration.NodeId, capability,
                 startedAt, sw.ElapsedMilliseconds, NodeOutcome.Error, Confidence.Unassessed,
-                ErrorCode: NodeErrorCode.Internal.ToString()));
+                ErrorCode: NodeErrorCode.Internal.ToString())));
             throw;
         }
 
@@ -73,14 +84,42 @@ public sealed class NodeDispatcher
                 "Node {NodeId} did not echo trace_id ({Expected} → {Actual}); telemetry correlation for this " +
                 "invocation is unreliable.", registration.NodeId, invocation.TraceId, result.TraceId);
 
-        _telemetry.Record(new NodeTelemetryRecord(
+        _telemetry.Record(WithModelRollUp(new NodeTelemetryRecord(
             invocation.TraceId, invocation.GoalId, registration.NodeId, capability,
             startedAt, sw.ElapsedMilliseconds, result.Outcome, result.Confidence,
             ErrorCode: result.Error?.WireCode,
             BlockedOn: result.Dependency?.Kind,
-            TaintLevel: result.Taint.Level));
+            TaintLevel: result.Taint.Level)));
 
         return Fold(packet, registration, result);
+    }
+
+    /// <summary>
+    /// Attach the invocation's model roll-up: summed tokens, call count, and the DOMINANT class/model
+    /// (the one that consumed the most tokens — the honest single answer to "what ran this", given §6.3's
+    /// schema has room for only one). An invocation that called no model gets null model facts, which is a
+    /// different statement from "zero tokens".
+    /// </summary>
+    private NodeTelemetryRecord WithModelRollUp(NodeTelemetryRecord record)
+    {
+        var calls = ModelCallScope.CurrentCalls;
+        if (calls.Count == 0) return record;
+
+        var dominant = calls
+            .GroupBy(c => (c.ModelClass, c.ResolvedModel))
+            .OrderByDescending(g => g.Sum(c => c.TokensIn + c.TokensOut))
+            .ThenByDescending(g => g.Count())
+            .First().Key;
+
+        return record with
+        {
+            ModelClass = dominant.ModelClass,
+            ModelResolved = dominant.ResolvedModel,
+            TokensIn = calls.Sum(c => c.TokensIn),
+            TokensOut = calls.Sum(c => c.TokensOut),
+            ModelCallCount = calls.Count,
+            HostProfileId = _hostProfileId,
+        };
     }
 
     /// <summary>

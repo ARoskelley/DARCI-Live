@@ -22,6 +22,12 @@ public interface ITelemetryStore
 
     /// <summary>Every invocation under a goal (correlation root) — the causal chain of one piece of work.</summary>
     Task<IReadOnlyList<NodeTelemetryRecord>> GetByGoalAsync(string goalId, CancellationToken ct = default);
+
+    /// <summary>Persist one brokered model call (the per-call grain behind an invocation's roll-up).</summary>
+    Task RecordModelCallAsync(ModelCallRecord call, CancellationToken ct = default);
+
+    /// <summary>Every model call made during one invocation.</summary>
+    Task<IReadOnlyList<ModelCallRecord>> GetModelCallsAsync(string traceId, CancellationToken ct = default);
 }
 
 public sealed class SqliteTelemetryStore : ITelemetryStore
@@ -66,6 +72,27 @@ public sealed class SqliteTelemetryStore : ITelemetryStore
             CREATE INDEX IF NOT EXISTS ix_node_invocations_goal ON node_invocations(goal_id, started_at);
             CREATE INDEX IF NOT EXISTS ix_node_invocations_trace ON node_invocations(trace_id);
             CREATE INDEX IF NOT EXISTS ix_node_invocations_node ON node_invocations(node_id, started_at);
+
+            -- Per-call grain: §6.3 has room for one model per invocation, but a node makes many calls.
+            -- The invocation row carries the roll-up; this carries the detail, linked by trace_id.
+            CREATE TABLE IF NOT EXISTS model_calls (
+                seq INTEGER PRIMARY KEY AUTOINCREMENT,
+                trace_id TEXT NOT NULL,
+                goal_id TEXT NOT NULL,
+                model_class TEXT NOT NULL,
+                resolved_model TEXT NOT NULL,
+                provider_kind TEXT NOT NULL,
+                started_at TEXT NOT NULL,
+                duration_ms INTEGER NOT NULL,
+                tokens_in INTEGER NOT NULL,
+                tokens_out INTEGER NOT NULL,
+                succeeded INTEGER NOT NULL,
+                purpose TEXT NULL,
+                error TEXT NULL
+            );
+            CREATE INDEX IF NOT EXISTS ix_model_calls_trace ON model_calls(trace_id);
+            CREATE INDEX IF NOT EXISTS ix_model_calls_goal ON model_calls(goal_id, started_at);
+            CREATE INDEX IF NOT EXISTS ix_model_calls_model ON model_calls(resolved_model, started_at);
             """;
         await cmd.ExecuteNonQueryAsync(ct);
         _logger.LogInformation("Telemetry store initialized (separate database).");
@@ -122,6 +149,63 @@ public sealed class SqliteTelemetryStore : ITelemetryStore
         cmd.CommandText = "SELECT * FROM node_invocations WHERE goal_id = $goal ORDER BY seq";
         cmd.Parameters.AddWithValue("$goal", goalId);
         return await ReadAll(cmd, ct);
+    }
+
+    public async Task RecordModelCallAsync(ModelCallRecord c, CancellationToken ct = default)
+    {
+        await using var conn = new SqliteConnection(_connectionString);
+        await conn.OpenAsync(ct);
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = """
+            INSERT INTO model_calls
+                (trace_id, goal_id, model_class, resolved_model, provider_kind, started_at, duration_ms,
+                 tokens_in, tokens_out, succeeded, purpose, error)
+            VALUES ($trace, $goal, $class, $model, $provider, $started, $dur, $tin, $tout, $ok, $purpose, $err)
+            """;
+        cmd.Parameters.AddWithValue("$trace", c.TraceId);
+        cmd.Parameters.AddWithValue("$goal", c.GoalId);
+        cmd.Parameters.AddWithValue("$class", c.ModelClass);
+        cmd.Parameters.AddWithValue("$model", c.ResolvedModel);
+        cmd.Parameters.AddWithValue("$provider", c.ProviderKind);
+        cmd.Parameters.AddWithValue("$started", ToIso(c.StartedAt));
+        cmd.Parameters.AddWithValue("$dur", c.DurationMs);
+        cmd.Parameters.AddWithValue("$tin", c.TokensIn);
+        cmd.Parameters.AddWithValue("$tout", c.TokensOut);
+        cmd.Parameters.AddWithValue("$ok", c.Succeeded ? 1 : 0);
+        cmd.Parameters.AddWithValue("$purpose", (object?)c.Purpose ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("$err", (object?)c.Error ?? DBNull.Value);
+        await cmd.ExecuteNonQueryAsync(ct);
+    }
+
+    public async Task<IReadOnlyList<ModelCallRecord>> GetModelCallsAsync(string traceId, CancellationToken ct = default)
+    {
+        await using var conn = new SqliteConnection(_connectionString);
+        await conn.OpenAsync(ct);
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = "SELECT * FROM model_calls WHERE trace_id = $trace ORDER BY seq";
+        cmd.Parameters.AddWithValue("$trace", traceId);
+
+        var list = new List<ModelCallRecord>();
+        await using var reader = await cmd.ExecuteReaderAsync(ct);
+        while (await reader.ReadAsync(ct))
+        {
+            var purposeOrd = reader.GetOrdinal("purpose");
+            var errOrd = reader.GetOrdinal("error");
+            list.Add(new ModelCallRecord(
+                reader.GetString(reader.GetOrdinal("trace_id")),
+                reader.GetString(reader.GetOrdinal("goal_id")),
+                reader.GetString(reader.GetOrdinal("model_class")),
+                reader.GetString(reader.GetOrdinal("resolved_model")),
+                reader.GetString(reader.GetOrdinal("provider_kind")),
+                FromIso(reader.GetString(reader.GetOrdinal("started_at"))),
+                reader.GetInt64(reader.GetOrdinal("duration_ms")),
+                reader.GetInt32(reader.GetOrdinal("tokens_in")),
+                reader.GetInt32(reader.GetOrdinal("tokens_out")),
+                reader.GetInt32(reader.GetOrdinal("succeeded")) != 0,
+                reader.IsDBNull(purposeOrd) ? null : reader.GetString(purposeOrd),
+                reader.IsDBNull(errOrd) ? null : reader.GetString(errOrd)));
+        }
+        return list;
     }
 
     private static async Task<IReadOnlyList<NodeTelemetryRecord>> ReadAll(SqliteCommand cmd, CancellationToken ct)
@@ -242,6 +326,68 @@ public sealed class TelemetryStoreSink : INodeTelemetrySink, IAsyncDisposable
 
         if (Dropped > 0)
             _logger.LogWarning("Telemetry sink dropped {Count} record(s) due to a saturated queue.", Dropped);
+    }
+}
+
+/// <summary>
+/// Queues per-call model telemetry to the store, with the same never-block / never-crash guarantees as
+/// <see cref="TelemetryStoreSink"/>: model calls happen on the hot path, so this must never add latency.
+/// </summary>
+public sealed class ModelCallStoreSink : IModelCallSink, IAsyncDisposable
+{
+    private readonly Channel<ModelCallRecord> _queue;
+    private readonly ITelemetryStore _store;
+    private readonly ILogger<ModelCallStoreSink> _logger;
+    private readonly Task _drain;
+    private readonly CancellationTokenSource _stopping = new();
+
+    private long _dropped;
+    private int _disposed;
+
+    public ModelCallStoreSink(ITelemetryStore store, ILogger<ModelCallStoreSink> logger, int capacity = 4096)
+    {
+        _store = store;
+        _logger = logger;
+        _queue = Channel.CreateBounded<ModelCallRecord>(new BoundedChannelOptions(capacity)
+        {
+            FullMode = BoundedChannelFullMode.Wait,   // with TryWrite: never blocks, and saturation is countable
+            SingleReader = true,
+        });
+        _drain = Task.Run(DrainAsync);
+    }
+
+    public long Dropped => Interlocked.Read(ref _dropped);
+
+    public void Record(ModelCallRecord call)
+    {
+        if (!_queue.Writer.TryWrite(call)) Interlocked.Increment(ref _dropped);
+    }
+
+    private async Task DrainAsync()
+    {
+        try
+        {
+            await foreach (var call in _queue.Reader.ReadAllAsync(_stopping.Token))
+            {
+                try { await _store.RecordModelCallAsync(call, _stopping.Token); }
+                catch (OperationCanceledException) { break; }
+                catch (Exception ex) { _logger.LogDebug(ex, "Model-call telemetry write failed (non-fatal)."); }
+            }
+        }
+        catch (OperationCanceledException) { /* shutting down */ }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (Interlocked.Exchange(ref _disposed, 1) == 1) return;
+
+        _queue.Writer.TryComplete();
+        try { await _drain.WaitAsync(TimeSpan.FromSeconds(5)); } catch { }
+        _stopping.Cancel();
+        _stopping.Dispose();
+
+        if (Dropped > 0)
+            _logger.LogWarning("Model-call telemetry dropped {Count} record(s) due to a saturated queue.", Dropped);
     }
 }
 

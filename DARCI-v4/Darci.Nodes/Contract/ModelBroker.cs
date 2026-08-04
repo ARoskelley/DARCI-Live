@@ -26,12 +26,18 @@ public interface IModelProvider
 public sealed class ModelBroker : IModelBroker
 {
     private readonly IReadOnlyDictionary<string, IModelProvider> _providers;
+    private readonly IModelCallSink _callSink;
     private readonly ILogger<ModelBroker> _logger;
 
-    public ModelBroker(HostProfile profile, IEnumerable<IModelProvider> providers, ILogger<ModelBroker> logger)
+    public ModelBroker(
+        HostProfile profile,
+        IEnumerable<IModelProvider> providers,
+        ILogger<ModelBroker> logger,
+        IModelCallSink? callSink = null)
     {
         Profile = profile;
         _providers = providers.ToDictionary(p => p.Kind, StringComparer.OrdinalIgnoreCase);
+        _callSink = callSink ?? NullModelCallSink.Instance;
         _logger = logger;
 
         var errors = profile.Validate();
@@ -64,12 +70,16 @@ public sealed class ModelBroker : IModelBroker
         if (!TryResolve(request.ModelClass, out var binding, out var config, out var provider, out var error))
             return ModelCompletion.Failure(request.ModelClass, "", error!);
 
+        var startedAt = DateTime.UtcNow;
         var sw = Stopwatch.StartNew();
         try
         {
             var completion = await provider!.CompleteAsync(binding!, config!, request, ct);
             sw.Stop();
-            return completion with { DurationMs = sw.ElapsedMilliseconds, ModelClass = request.ModelClass };
+            var result = completion with { DurationMs = sw.ElapsedMilliseconds, ModelClass = request.ModelClass };
+            EmitCall(request.ModelClass, binding!.Model, result.ProviderKind, startedAt, sw.ElapsedMilliseconds,
+                result.TokensIn, result.TokensOut, true, request.Purpose, null);
+            return result;
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -80,8 +90,30 @@ public sealed class ModelBroker : IModelBroker
             sw.Stop();
             _logger.LogWarning(ex, "Model completion failed for class {Class} (model {Model}).",
                 request.ModelClass, binding!.Model);
+            EmitCall(request.ModelClass, binding.Model, "", startedAt, sw.ElapsedMilliseconds, 0, 0, false,
+                request.Purpose, ex.Message);
             return ModelCompletion.Failure(request.ModelClass, binding.Model, $"{ex.GetType().Name}: {ex.Message}", sw.ElapsedMilliseconds);
         }
+    }
+
+    /// <summary>
+    /// Attribute a model call to the invocation that caused it, and forward it to the per-call sink.
+    /// Outside an invocation scope (e.g. the autonomous loop, or fire-and-forget work) the call is recorded
+    /// as UNATTRIBUTED rather than being pinned to an unrelated invocation.
+    /// </summary>
+    private void EmitCall(
+        string modelClass, string resolvedModel, string providerKind, DateTime startedAt, long durationMs,
+        int tokensIn, int tokensOut, bool succeeded, string? purpose, string? error)
+    {
+        var scope = ModelCallScope.CurrentInvocation;
+        var call = new ModelCallRecord(
+            scope?.TraceId ?? "", scope?.GoalId ?? "",
+            modelClass, resolvedModel, providerKind, startedAt, durationMs,
+            tokensIn, tokensOut, succeeded, purpose, error);
+
+        ModelCallScope.Attribute(call);
+        try { _callSink.Record(call); }
+        catch (Exception ex) { _logger.LogDebug(ex, "Model-call telemetry sink threw (non-fatal)."); }
     }
 
     public async Task<ModelEmbedding> EmbedAsync(EmbeddingRequest request, CancellationToken ct = default)
@@ -89,12 +121,16 @@ public sealed class ModelBroker : IModelBroker
         if (!TryResolve(request.ModelClass, out var binding, out var config, out var provider, out var error))
             return ModelEmbedding.Failure(request.ModelClass, "", error!);
 
+        var startedAt = DateTime.UtcNow;
         var sw = Stopwatch.StartNew();
         try
         {
             var embedding = await provider!.EmbedAsync(binding!, config!, request, ct);
             sw.Stop();
-            return embedding with { DurationMs = sw.ElapsedMilliseconds, ModelClass = request.ModelClass };
+            var result = embedding with { DurationMs = sw.ElapsedMilliseconds, ModelClass = request.ModelClass };
+            EmitCall(request.ModelClass, binding!.Model, "", startedAt, sw.ElapsedMilliseconds,
+                result.TokensIn, 0, true, request.Purpose, null);
+            return result;
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -105,6 +141,8 @@ public sealed class ModelBroker : IModelBroker
             sw.Stop();
             _logger.LogDebug(ex, "Model embedding failed for class {Class} (model {Model}).",
                 request.ModelClass, binding!.Model);
+            EmitCall(request.ModelClass, binding.Model, "", startedAt, sw.ElapsedMilliseconds, 0, 0, false,
+                request.Purpose, ex.Message);
             return ModelEmbedding.Failure(request.ModelClass, binding.Model, $"{ex.GetType().Name}: {ex.Message}");
         }
     }

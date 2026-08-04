@@ -187,6 +187,10 @@ public sealed class TelemetryStoreTests : IDisposable
             => Task.FromResult<IReadOnlyList<NodeTelemetryRecord>>(Array.Empty<NodeTelemetryRecord>());
         public Task<IReadOnlyList<NodeTelemetryRecord>> GetByGoalAsync(string goalId, CancellationToken ct = default)
             => Task.FromResult<IReadOnlyList<NodeTelemetryRecord>>(Array.Empty<NodeTelemetryRecord>());
+        public Task RecordModelCallAsync(ModelCallRecord call, CancellationToken ct = default)
+            => throw new InvalidOperationException("disk on fire");
+        public Task<IReadOnlyList<ModelCallRecord>> GetModelCallsAsync(string traceId, CancellationToken ct = default)
+            => Task.FromResult<IReadOnlyList<ModelCallRecord>>(Array.Empty<ModelCallRecord>());
     }
 
     private sealed class BlockingStore : ITelemetryStore
@@ -200,5 +204,9 @@ public sealed class TelemetryStoreTests : IDisposable
             => Task.FromResult<IReadOnlyList<NodeTelemetryRecord>>(Array.Empty<NodeTelemetryRecord>());
         public Task<IReadOnlyList<NodeTelemetryRecord>> GetByGoalAsync(string goalId, CancellationToken ct = default)
             => Task.FromResult<IReadOnlyList<NodeTelemetryRecord>>(Array.Empty<NodeTelemetryRecord>());
+        public async Task RecordModelCallAsync(ModelCallRecord call, CancellationToken ct = default)
+            => await _gate.WaitAsync(ct);
+        public Task<IReadOnlyList<ModelCallRecord>> GetModelCallsAsync(string traceId, CancellationToken ct = default)
+            => Task.FromResult<IReadOnlyList<ModelCallRecord>>(Array.Empty<ModelCallRecord>());
     }
 }

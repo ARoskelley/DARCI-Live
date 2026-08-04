@@ -70,10 +70,13 @@ var (hostProfile, hostProfileFromFile) = HostProfileLoader.LoadOrDefault(Path.Ge
 builder.Services.AddSingleton(hostProfile);
 builder.Services.AddHttpClient<OllamaModelProvider>();
 builder.Services.AddSingleton<IModelProvider>(sp => sp.GetRequiredService<OllamaModelProvider>());
+builder.Services.AddSingleton<ModelCallStoreSink>();
+builder.Services.AddSingleton<IModelCallSink>(sp => sp.GetRequiredService<ModelCallStoreSink>());
 builder.Services.AddSingleton<IModelBroker>(sp => new ModelBroker(
     hostProfile,
     sp.GetServices<IModelProvider>(),
-    sp.GetRequiredService<ILogger<ModelBroker>>()));
+    sp.GetRequiredService<ILogger<ModelBroker>>(),
+    sp.GetRequiredService<IModelCallSink>()));
 
 // Both legacy model interfaces are now thin ADAPTERS over the broker (Phase 2 fork F4): keeping them means
 // ~57 existing call sites are untouched, while the hardcoded-model bypass inside OllamaClient is gone.
@@ -389,7 +392,10 @@ builder.Services.AddSingleton<INodeTelemetrySink>(sp => new CompositeNodeTelemet
     new LoggingNodeTelemetrySink(sp.GetRequiredService<ILogger<LoggingNodeTelemetrySink>>()),
     sp.GetRequiredService<TelemetryStoreSink>(),
 }));
-builder.Services.AddSingleton<NodeDispatcher>();
+builder.Services.AddSingleton(sp => new NodeDispatcher(
+    sp.GetRequiredService<ILogger<NodeDispatcher>>(),
+    sp.GetRequiredService<INodeTelemetrySink>(),
+    hostProfile));
 builder.Services.AddSingleton<NodeManifestLoader>();
 builder.Services.AddSingleton<INodeRegistrationStore>(sp =>
     new SqliteNodeRegistrationStore(connectionString, sp.GetRequiredService<ILogger<SqliteNodeRegistrationStore>>()));
