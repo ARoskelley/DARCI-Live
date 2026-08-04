@@ -372,7 +372,23 @@ var nodesDirectory = Path.GetFullPath(
     Environment.GetEnvironmentVariable("DARCI_NODES_PATH")
     ?? Path.Combine(builder.Environment.ContentRootPath, "..", "nodes"));
 
-builder.Services.AddSingleton<INodeTelemetrySink, LoggingNodeTelemetrySink>();
+// Telemetry lands in its OWN database (decision D6): different access pattern, different retention, and
+// telemetry volume has no business in the knowledge graph or the trust ledger. Records reach it through a
+// non-blocking queue, so a disk write can never slow down — or take down — the dispatch path.
+var telemetryDbPath = Environment.GetEnvironmentVariable("DARCI_TELEMETRY_DB_PATH")
+    ?? Path.Combine(Path.GetDirectoryName(dbPath)!, "telemetry.db");
+telemetryDbPath = Path.GetFullPath(telemetryDbPath);
+Directory.CreateDirectory(Path.GetDirectoryName(telemetryDbPath)!);
+var telemetryConnectionString = $"Data Source={telemetryDbPath}";
+
+builder.Services.AddSingleton<ITelemetryStore>(sp =>
+    new SqliteTelemetryStore(telemetryConnectionString, sp.GetRequiredService<ILogger<SqliteTelemetryStore>>()));
+builder.Services.AddSingleton<TelemetryStoreSink>();
+builder.Services.AddSingleton<INodeTelemetrySink>(sp => new CompositeNodeTelemetrySink(new INodeTelemetrySink[]
+{
+    new LoggingNodeTelemetrySink(sp.GetRequiredService<ILogger<LoggingNodeTelemetrySink>>()),
+    sp.GetRequiredService<TelemetryStoreSink>(),
+}));
 builder.Services.AddSingleton<NodeDispatcher>();
 builder.Services.AddSingleton<NodeManifestLoader>();
 builder.Services.AddSingleton<INodeRegistrationStore>(sp =>
@@ -628,6 +644,9 @@ await validationCampaignStore.InitializeAsync();
 // is flagged, so widening what DARCI can do leaves a durable trace.
 var nodeRegistrationStore = app.Services.GetRequiredService<INodeRegistrationStore>();
 await nodeRegistrationStore.InitializeAsync();
+var telemetryStore = app.Services.GetRequiredService<ITelemetryStore>();
+await telemetryStore.InitializeAsync();
+app.Logger.LogInformation("Telemetry database: {Path}", telemetryDbPath);
 var nodeRegistry = app.Services.GetRequiredService<INodeRegistry>();
 foreach (var registration in nodeRegistry.Registrations)
 {
