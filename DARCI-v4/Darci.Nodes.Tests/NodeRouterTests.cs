@@ -45,7 +45,7 @@ public sealed class NodeRouterTests : IDisposable
     }
 
     private NodeRouter Router(params INode[] nodes) =>
-        new(nodes, _store, NullLogger<NodeRouter>.Instance);
+        NodeRouter.ForNodes(nodes, _store, NullLogger<NodeRouter>.Instance);
 
     [Fact]
     public async Task Dispatch_ByExplicitAddress_HitsThatNode()

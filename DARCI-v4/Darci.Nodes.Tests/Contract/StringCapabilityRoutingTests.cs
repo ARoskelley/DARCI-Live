@@ -150,7 +150,7 @@ public sealed class StringCapabilityRoutingTests : IDisposable
         var two = new FakeEnumNode(NodeId.Engineering, Capability.WriteCode);
 
         Assert.Throws<NodeRegistrationException>(() =>
-            new NodeRouter(new INode[] { one, two }, _store, NullLogger<NodeRouter>.Instance));
+            NodeRouter.ForNodes(new INode[] { one, two }, _store, NullLogger<NodeRouter>.Instance));
     }
 
     private sealed class FakeEnumNode : INode

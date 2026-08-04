@@ -58,8 +58,26 @@ builder.Services.AddSwaggerGen(c =>
     c.SwaggerDoc("v1", new() { Title = "DARCI API", Version = "v4.0" });
 });
 
-// HTTP client for Ollama
-builder.Services.AddHttpClient<IOllamaClient, OllamaClient>();
+// === Phase 2: the MODEL BROKER (doc §6.2) ===
+// The single place inference happens and the single place a model CLASS becomes a concrete model. Callers
+// ask for a class (chat.balanced, code.generate, embed.text, …); host-profile.json decides what that means
+// on this machine. An unsatisfiable class fails HERE, at startup, with a named error — not mid-task with a
+// 404 on every generation (which is exactly how the gemma4:e4b typo behaved).
+var hostProfilePath = Environment.GetEnvironmentVariable("DARCI_HOST_PROFILE")
+    ?? Path.Combine(builder.Environment.ContentRootPath, "..", HostProfileLoader.FileName);
+var (hostProfile, hostProfileFromFile) = HostProfileLoader.LoadOrDefault(Path.GetFullPath(hostProfilePath));
+
+builder.Services.AddSingleton(hostProfile);
+builder.Services.AddHttpClient<OllamaModelProvider>();
+builder.Services.AddSingleton<IModelProvider>(sp => sp.GetRequiredService<OllamaModelProvider>());
+builder.Services.AddSingleton<IModelBroker>(sp => new ModelBroker(
+    hostProfile,
+    sp.GetServices<IModelProvider>(),
+    sp.GetRequiredService<ILogger<ModelBroker>>()));
+
+// Both legacy model interfaces are now thin ADAPTERS over the broker (Phase 2 fork F4): keeping them means
+// ~57 existing call sites are untouched, while the hardcoded-model bypass inside OllamaClient is gone.
+builder.Services.AddSingleton<IOllamaClient, OllamaClient>();
 
 // HTTP clients for external research APIs
 builder.Services.AddHttpClient("tavily");
@@ -394,7 +412,14 @@ builder.Services.AddSingleton<INodeRegistry>(sp =>
     return registry;
 });
 
-builder.Services.AddSingleton<INodeRouter, NodeRouter>();
+// Explicit factory, not AddSingleton<INodeRouter, NodeRouter>(): NodeRouter has a second (convenience)
+// constructor for packet-native nodes, and letting the container pick is how the host ends up failing at
+// start with "the following constructors are ambiguous".
+builder.Services.AddSingleton<INodeRouter>(sp => new NodeRouter(
+    sp.GetRequiredService<INodeRegistry>(),
+    sp.GetRequiredService<NodeDispatcher>(),
+    sp.GetRequiredService<INodePacketStore>(),
+    sp.GetRequiredService<ILogger<NodeRouter>>()));
 
 // Gap-driven action: persist gaps, decide immediate-fill vs deferred auto-goal. The handler routes via
 // a Lazy<INodeRouter> to break the cycle (KnowledgeNode → GapHandler → router → KnowledgeNode).
@@ -460,8 +485,8 @@ builder.Services.AddSingleton<ICodingWorkspaceStore>(sp =>
         connectionString,
         sp.GetRequiredService<ILogger<CodingWorkspaceStore>>()));
 
-// Model router — typed HttpClient, reads Ollama model names from env vars.
-builder.Services.AddHttpClient<ModelRouter>();
+// Model router — now a thin adapter over the model broker (maps ModelTaskType → model class).
+builder.Services.AddSingleton<ModelRouter>();
 builder.Services.AddSingleton<IModelRouter>(sp => sp.GetRequiredService<ModelRouter>());
 
 builder.Services.AddSingleton<ICodingContextBuilder>(sp =>
@@ -618,6 +643,14 @@ foreach (var registration in nodeRegistry.Registrations)
 }
 app.Logger.LogInformation("Node registry ready: {Count} node(s) serving [{Capabilities}].",
     nodeRegistry.Registrations.Count, string.Join(", ", nodeRegistry.RoutableCapabilities));
+
+// Which model profile is live, and what each class actually resolves to. Worth logging plainly: silent
+// model-name drift is the failure mode this whole broker exists to prevent.
+var activeProfile = app.Services.GetRequiredService<IModelBroker>().Profile;
+app.Logger.LogInformation("Model profile '{Profile}' active ({Source}): {Bindings}",
+    activeProfile.ProfileId,
+    hostProfileFromFile ? Path.GetFullPath(hostProfilePath) : "synthesized from DARCI_OLLAMA_* env vars",
+    string.Join(", ", ModelClasses.All.Select(c => $"{c}→{activeProfile.Resolve(c)!.Model}")));
 // The startup sweep must run AFTER the proposal store is initialized so its carve-out can recognise
 // packets legitimately parked pending a human decision (and not reap them as orphans).
 var nodeWatchdog = app.Services.GetRequiredService<NodeWatchdog>();

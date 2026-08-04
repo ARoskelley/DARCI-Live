@@ -92,7 +92,7 @@ internal sealed class CharacterizationHarness : IDisposable
         _nodes.Add(knowledgeNode);
         _nodes.Add(innovationNode);
 
-        Router = new NodeRouter(_nodes, Packets, NullLogger<NodeRouter>.Instance);
+        Router = NodeRouter.ForNodes(_nodes, Packets, NullLogger<NodeRouter>.Instance);
     }
 
     public IReadOnlyList<INode> Nodes => _nodes;

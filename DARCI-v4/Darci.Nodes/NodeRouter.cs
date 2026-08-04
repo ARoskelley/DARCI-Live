@@ -22,7 +22,15 @@ public sealed class NodeRouter : INodeRouter
     private readonly INodePacketStore _store;
     private readonly ILogger<NodeRouter> _logger;
 
-    /// <summary>Primary constructor: routing driven by the manifest-backed registry.</summary>
+    /// <summary>
+    /// THE ONLY public constructor — deliberately. This type previously had a second, convenience constructor,
+    /// and the DI container could not choose between them: <c>AddSingleton&lt;INodeRouter, NodeRouter&gt;()</c>
+    /// failed at host start with "the following constructors are ambiguous" while every unit test stayed green
+    /// (tests pick a constructor themselves). <c>[ActivatorUtilitiesConstructor]</c> does NOT fix that — the
+    /// built-in container's constructor selection ignores it. So the convenience path is a static factory
+    /// (<see cref="ForNodes"/>) instead, leaving exactly one constructor and no way to reintroduce the
+    /// ambiguity. See DiActivationTests.
+    /// </summary>
     public NodeRouter(
         INodeRegistry registry,
         NodeDispatcher dispatcher,
@@ -36,15 +44,13 @@ public sealed class NodeRouter : INodeRouter
     }
 
     /// <summary>
-    /// CONVENIENCE constructor for packet-native <see cref="INode"/>s: wraps each in a
+    /// CONVENIENCE factory for packet-native <see cref="INode"/>s: wraps each in a
     /// <see cref="LegacyPacketNodeAdapter"/> with a synthesized manifest and registers it. Capability
     /// ownership is strict here too — two nodes claiming the same verb is a registration error, not a
     /// silently-resolved race.
     /// </summary>
-    public NodeRouter(IEnumerable<INode> nodes, INodePacketStore store, ILogger<NodeRouter> logger)
-        : this(BuildLegacyRegistry(nodes), new NodeDispatcher(NullLogger<NodeDispatcher>.Instance), store, logger)
-    {
-    }
+    public static NodeRouter ForNodes(IEnumerable<INode> nodes, INodePacketStore store, ILogger<NodeRouter> logger)
+        => new(BuildLegacyRegistry(nodes), new NodeDispatcher(NullLogger<NodeDispatcher>.Instance), store, logger);
 
     public async Task<NodePacket> DispatchAsync(NodePacket packet, CancellationToken ct = default)
     {

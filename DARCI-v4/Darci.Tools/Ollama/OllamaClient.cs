@@ -1,7 +1,4 @@
-using System.Net.Http.Json;
-using System.Text;
-using System.Text.Json;
-using Microsoft.Extensions.Configuration;
+using Darci.Nodes;
 using Microsoft.Extensions.Logging;
 
 namespace Darci.Tools.Ollama;
@@ -16,146 +13,69 @@ public interface IOllamaClient
 }
 
 /// <summary>
-/// Ollama client for local LLM inference
+/// General-purpose LLM access for the toolkit and research agents.
+///
+/// <para><b>Phase 2 (P2a.3):</b> this used to hold its own <c>HttpClient</c> and a HARDCODED model name read
+/// from <c>DARCI_OLLAMA_MODEL</c> — the bypass that meant every innovation, critic, and knowledge call ran on
+/// one fixed model with no class concept and no token accounting. It is now a THIN ADAPTER over
+/// <see cref="IModelBroker"/>: generation asks for <see cref="ModelClasses.ChatBalanced"/> and embedding for
+/// <see cref="ModelClasses.EmbedText"/>, and the host profile decides what those mean.</para>
+///
+/// <para>The name and interface are kept (fork F4) so the many existing call sites — reached via
+/// <c>IResearchToolbox</c> and <c>Toolkit</c> — stay untouched. Sampling parameters (temperature 0.7,
+/// num_predict 1024) and the historical <c>"[Error generating response]"</c> sentinel are preserved exactly,
+/// because callers pattern-match on that string.</para>
 /// </summary>
 public class OllamaClient : IOllamaClient
 {
-    private readonly HttpClient _http;
+    /// <summary>The sentinel some callers check for. Preserved verbatim from the pre-broker implementation.</summary>
+    public const string GenerationErrorSentinel = "[Error generating response]";
+
+    private const double GeneralTemperature = 0.7;
+    private const int GeneralMaxTokens = 1024;
+
+    /// <summary>Historical per-request ceiling for this path (the broker's provider ceiling is longer).</summary>
+    private static readonly TimeSpan GeneralTimeout = TimeSpan.FromMinutes(5);
+
+    private readonly IModelBroker _broker;
     private readonly ILogger<OllamaClient> _logger;
-    private readonly string _model;
-    private readonly string _embeddingModel;
 
-    public OllamaClient(
-        HttpClient http,
-        ILogger<OllamaClient> logger,
-        IConfiguration configuration)
+    public OllamaClient(IModelBroker broker, ILogger<OllamaClient> logger)
     {
-        _http = http;
+        _broker = broker;
         _logger = logger;
-        _model = FirstNonEmpty(
-            Environment.GetEnvironmentVariable("DARCI_OLLAMA_MODEL"),
-            configuration["Darci:OllamaModel"],
-            "gemma4:e4b");
-        _embeddingModel = FirstNonEmpty(
-            Environment.GetEnvironmentVariable("DARCI_OLLAMA_EMBEDDING_MODEL"),
-            configuration["Darci:EmbeddingModel"],
-            "nomic-embed-text");
-
-        var baseUrl = NormalizeBaseUrl(
-            Environment.GetEnvironmentVariable("DARCI_OLLAMA_BASE_URL"),
-            Environment.GetEnvironmentVariable("OLLAMA_HOST"),
-            configuration["Darci:OllamaBaseUrl"],
-            "http://localhost:11434");
-
-        // Ollama runs locally
-        _http.BaseAddress = new Uri(baseUrl, UriKind.Absolute);
-        _http.Timeout = TimeSpan.FromMinutes(5); // LLM can be slow
 
         _logger.LogInformation(
-            "Using Ollama at {BaseUrl} with model {Model} and embedding model {EmbeddingModel}",
-            _http.BaseAddress,
-            _model,
-            _embeddingModel);
+            "OllamaClient on profile '{Profile}' — chat={Model}, embed={EmbedModel}",
+            broker.Profile.ProfileId,
+            broker.ResolveModelName(ModelClasses.ChatBalanced),
+            broker.ResolveModelName(ModelClasses.EmbedText));
     }
 
     public async Task<string> Generate(string prompt)
     {
-        try
+        var result = await _broker.CompleteAsync(new ModelRequest(ModelClasses.ChatBalanced, prompt)
         {
-            var request = new
-            {
-                model = _model,
-                prompt = prompt,
-                stream = false,
-                options = new
-                {
-                    temperature = 0.7,
-                    num_predict = 1024
-                }
-            };
+            Temperature = GeneralTemperature,
+            MaxTokens = GeneralMaxTokens,
+            Timeout = GeneralTimeout,
+            Purpose = "toolkit.generate",
+        });
 
-            var json = JsonSerializer.Serialize(request);
-            var content = new StringContent(json, Encoding.UTF8, "application/json");
+        if (result.Succeeded) return result.Text;
 
-            _logger.LogDebug("Generating with {Model}, prompt length: {Length}", _model, prompt.Length);
-
-            var response = await _http.PostAsync("/api/generate", content);
-            response.EnsureSuccessStatusCode();
-
-            var result = await response.Content.ReadFromJsonAsync<OllamaResponse>();
-            var text = result?.Response?.Trim() ?? "";
-
-            _logger.LogDebug("Generated {Length} chars", text.Length);
-
-            return text;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Ollama generation failed");
-            return "[Error generating response]";
-        }
+        _logger.LogError("Ollama generation failed for class {Class} (model {Model}): {Error}",
+            result.ModelClass, result.ResolvedModel, result.Error);
+        return GenerationErrorSentinel;
     }
 
     public async Task<List<float>> GetEmbedding(string text)
     {
-        try
-        {
-            var request = new
-            {
-                model = _embeddingModel,
-                input = text
-            };
+        var result = await _broker.EmbedAsync(new EmbeddingRequest(text) { Purpose = "toolkit.embed" });
 
-            var json = JsonSerializer.Serialize(request);
-            var content = new StringContent(json, Encoding.UTF8, "application/json");
+        if (result.Succeeded) return result.Vector.ToList();
 
-            var response = await _http.PostAsync("/api/embed", content);
-            response.EnsureSuccessStatusCode();
-
-            var result = await response.Content.ReadFromJsonAsync<OllamaEmbedResponse>();
-            return result?.Embeddings?.FirstOrDefault() ?? new List<float>();
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Ollama embedding failed");
-            return new List<float>();
-        }
-    }
-
-    private class OllamaResponse
-    {
-        public string? Response { get; set; }
-        public bool Done { get; set; }
-    }
-
-    private class OllamaEmbedResponse
-    {
-        public List<List<float>>? Embeddings { get; set; }
-    }
-
-    private static string FirstNonEmpty(params string?[] values)
-    {
-        foreach (var value in values)
-        {
-            if (!string.IsNullOrWhiteSpace(value))
-            {
-                return value.Trim();
-            }
-        }
-
-        return "";
-    }
-
-    private static string NormalizeBaseUrl(params string?[] values)
-    {
-        var baseUrl = FirstNonEmpty(values);
-
-        if (!baseUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
-            !baseUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
-        {
-            baseUrl = $"http://{baseUrl}";
-        }
-
-        return baseUrl.TrimEnd('/');
+        _logger.LogError("Ollama embedding failed (model {Model}): {Error}", result.ResolvedModel, result.Error);
+        return new List<float>();
     }
 }
