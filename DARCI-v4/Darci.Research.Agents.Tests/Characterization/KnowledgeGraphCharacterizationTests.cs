@@ -59,12 +59,21 @@ public sealed class KnowledgeGraphCharacterizationTests : IDisposable
         await _graph.UpsertEntityAsync("Unrelated widget", "Component", "misc", "Nothing to do with grip.");
     }
 
-    /// <summary>Captures the prompt the synthesizer built, so we can assert the graph context reached it.</summary>
+    /// <summary>
+    /// Captures the prompt the synthesizer built, and lets a test control the embedding a given text maps to
+    /// so semantic retrieval is deterministic (no live model involved).
+    /// </summary>
     private sealed class PromptCapturingToolbox : IResearchToolbox
     {
         public string? LastPrompt;
         private readonly string _response;
-        public PromptCapturingToolbox(string response) => _response = response;
+        private readonly Func<string, List<float>>? _embed;
+
+        public PromptCapturingToolbox(string response, Func<string, List<float>>? embed = null)
+        {
+            _response = response;
+            _embed = embed;
+        }
 
         public Task<string> GenerateAsync(string prompt, CancellationToken ct = default)
         {
@@ -72,8 +81,40 @@ public sealed class KnowledgeGraphCharacterizationTests : IDisposable
             return Task.FromResult(_response);
         }
         public Task<List<float>> GetEmbeddingAsync(string text, CancellationToken ct = default)
-            => Task.FromResult(new List<float> { 0.1f, 0.2f, 0.3f });
+            => Task.FromResult(_embed?.Invoke(text) ?? new List<float>());
         public Task<string> SearchWebAsync(string query, CancellationToken ct = default) => Task.FromResult("");
+    }
+
+    /// <summary>Toolbox whose embedding call fails, to exercise the name-search fallback.</summary>
+    private sealed class EmbeddingFailingToolbox : IResearchToolbox
+    {
+        public string? LastPrompt;
+        private readonly string _response;
+        public EmbeddingFailingToolbox(string response) => _response = response;
+        public Task<string> GenerateAsync(string prompt, CancellationToken ct = default)
+        {
+            LastPrompt = prompt;
+            return Task.FromResult(_response);
+        }
+        public Task<List<float>> GetEmbeddingAsync(string text, CancellationToken ct = default)
+            => throw new InvalidOperationException("embedding model unavailable");
+        public Task<string> SearchWebAsync(string query, CancellationToken ct = default) => Task.FromResult("");
+    }
+
+    // Deterministic 3-D "semantic space" for the tests below: each seeded entity gets an axis, and a
+    // question embeds near the axis of the entity it is actually about.
+    private static readonly float[] EmgVector = { 1f, 0f, 0f };
+    private static readonly float[] PidVector = { 0f, 1f, 0f };
+    private static readonly float[] UnrelatedVector = { 0f, 0f, 1f };
+
+    private async Task SeedGraphWithEmbeddingsAsync()
+    {
+        await _graph.UpsertEntityAsync("EMG sensor", "Component", "biomed",
+            "Measures muscle electrical activity.", embedding: EmgVector);
+        await _graph.UpsertEntityAsync("PID controller", "Technique", "control",
+            "Closed-loop controller using proportional, integral and derivative terms.", embedding: PidVector);
+        await _graph.UpsertEntityAsync("Unrelated widget", "Component", "misc",
+            "Nothing to do with grip.", embedding: UnrelatedVector);
     }
 
     private const string SolvableJson = """
@@ -108,25 +149,98 @@ public sealed class KnowledgeGraphCharacterizationTests : IDisposable
         Assert.True(proposal.Confidence.IsLow);
     }
 
+    // ─────────────────────── SEMANTIC GROUNDING (deliberate behavior change) ───────────────────────
+    //
+    // *** RE-BLESSED, NOT A REGRESSION. *** This test previously pinned the OLD behavior: a
+    // natural-language question found NOTHING, because GatherGraphContextAsync passed the whole question to
+    // a `name LIKE '%query%'` match. That made the innovation node's graph grounding effectively dead code
+    // in production (consistent with the live Run A/B runs, where innovation reached Unsolvable with no
+    // grounding). Grounding now goes through SEMANTIC search, so the assertion is inverted ON PURPOSE.
+
     [Fact]
-    public async Task Synthesizer_WithANaturalLanguageQuestion_FindsNothing()
+    public async Task Synthesizer_WithANaturalLanguageQuestion_NowRetrievesContextSemantically()
     {
-        // CHARACTERIZING A REAL PRE-EXISTING QUIRK, not endorsing it. GatherGraphContextAsync passes the
-        // WHOLE question to SearchEntitiesAsync, which matches `name LIKE '%<query>%'`. A natural-language
-        // question is therefore almost never a substring of an entity name, so the innovation node's
-        // "related concepts from the KG" grounding is effectively inert in production — which is consistent
-        // with the live Run A/B observations, where innovation reached Unsolvable with no graph grounding.
-        //
-        // This test pins TODAY'S behavior so the P2c.3 broker move is proven not to change it. Fixing the
-        // search (keyword extraction / semantic search) is a separate, deliberate change.
-        await SeedGraphAsync();
-        var toolbox = new PromptCapturingToolbox(SolvableJson);
+        await SeedGraphWithEmbeddingsAsync();
+
+        // A question that shares NO substring with any entity name — "myoelectric" is not "EMG sensor" —
+        // but is semantically near it. Under the old substring search this returned nothing at all.
+        var toolbox = new PromptCapturingToolbox(SolvableJson,
+            embed: _ => new List<float> { 0.95f, 0.15f, 0f });   // near the EMG axis
         var synthesizer = new OllamaInnovationSynthesizer(toolbox, Memory, NullLogger<OllamaInnovationSynthesizer>.Instance);
 
         await synthesizer.SynthesizeAsync(
-            new InnovationRequest("How do I close an EMG grip loop?", "build a grip controller"));
+            new InnovationRequest("How do I close a myoelectric grip loop?", "build a grip controller"));
+
+        Assert.Contains("Related concepts in the knowledge graph:", toolbox.LastPrompt);
+        Assert.Contains("EMG sensor", toolbox.LastPrompt);
+        Assert.Contains("Measures muscle electrical activity.", toolbox.LastPrompt);
+
+        // Sanity: the question is genuinely not a substring match, so this could only have come from
+        // semantic retrieval.
+        Assert.DoesNotContain("myoelectric", "EMG sensor", StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task SemanticGrounding_ExcludesEntitiesBelowTheRelevanceFloor()
+    {
+        // The graph's semantic search returns the top N by cosine with no relevance floor, so without the
+        // synthesizer's threshold every synthesis would be handed the least-unrelated entities in the graph
+        // as "related concepts". Irrelevant grounding is worse than none — it invites false connections.
+        await SeedGraphWithEmbeddingsAsync();
+
+        var toolbox = new PromptCapturingToolbox(SolvableJson,
+            embed: _ => new List<float> { 0.95f, 0.15f, 0f });   // near EMG, far from the others
+        var synthesizer = new OllamaInnovationSynthesizer(toolbox, Memory, NullLogger<OllamaInnovationSynthesizer>.Instance);
+
+        await synthesizer.SynthesizeAsync(new InnovationRequest("myoelectric grip control", "intent"));
+
+        Assert.Contains("EMG sensor", toolbox.LastPrompt);
+        Assert.DoesNotContain("Unrelated widget", toolbox.LastPrompt);   // orthogonal ⇒ below the floor
+    }
+
+    [Fact]
+    public async Task SemanticGrounding_WithNoRelevantEntity_AddsNoContextRatherThanNoise()
+    {
+        await SeedGraphWithEmbeddingsAsync();
+
+        // A question orthogonal to everything in the graph: nothing clears the floor, and the name-search
+        // fallback also finds nothing, so the model is grounded in silence rather than in noise.
+        var toolbox = new PromptCapturingToolbox(SolvableJson,
+            embed: _ => new List<float> { 0f, 0f, 0f, 1f });
+        var synthesizer = new OllamaInnovationSynthesizer(toolbox, Memory, NullLogger<OllamaInnovationSynthesizer>.Instance);
+
+        await synthesizer.SynthesizeAsync(new InnovationRequest("an entirely unrelated topic", "intent"));
 
         Assert.DoesNotContain("Related concepts in the knowledge graph:", toolbox.LastPrompt);
+    }
+
+    [Fact]
+    public async Task Grounding_FallsBackToNameSearch_WhenEmbeddingsAreUnavailable()
+    {
+        // Hosts without a working embedding model keep the OLD behavior exactly: degraded grounding beats
+        // none, and this path is what preserves them.
+        await SeedGraphWithEmbeddingsAsync();
+        var toolbox = new EmbeddingFailingToolbox(SolvableJson);
+        var synthesizer = new OllamaInnovationSynthesizer(toolbox, Memory, NullLogger<OllamaInnovationSynthesizer>.Instance);
+
+        // A substring query still matches by name, as it always did.
+        await synthesizer.SynthesizeAsync(new InnovationRequest("EMG sensor", "intent"));
+
+        Assert.Contains("Related concepts in the knowledge graph:", toolbox.LastPrompt);
+        Assert.Contains("EMG sensor", toolbox.LastPrompt);
+    }
+
+    [Fact]
+    public async Task SemanticGrounding_StillGoesThroughTheBroker_AndIsScopeChecked()
+    {
+        // Guards against the fix quietly reintroducing a direct-graph bypass: with a caller that lacks
+        // read:knowledge, retrieval must be denied rather than served.
+        await SeedGraphWithEmbeddingsAsync();
+        var broker = new MemoryBroker(_graph, NullLogger<MemoryBroker>.Instance);
+        var scopeless = MemoryAccess.ForNode("darci.rogue", Array.Empty<string>());
+
+        await Assert.ThrowsAsync<MemoryScopeDeniedException>(() =>
+            broker.SemanticSearchAsync(scopeless, EmgVector, limit: 6));
     }
 
     [Fact]

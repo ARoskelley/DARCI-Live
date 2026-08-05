@@ -3,6 +3,7 @@
 using System.Text;
 using System.Text.Json;
 using Darci.Memory.Graph;
+using Darci.Memory.Graph.Models;
 using Darci.Nodes;
 using Darci.Research.Agents.Models;
 using Microsoft.Extensions.Logging;
@@ -35,6 +36,16 @@ public interface IInnovationSynthesizer
 public sealed class OllamaInnovationSynthesizer : IInnovationSynthesizer
 {
     private const double InitialHypothesisScore = 0.3;   // capped to Innovated (always IsLow) downstream
+
+    /// <summary>How many graph entities may ground one synthesis.</summary>
+    private const int GraphContextLimit = 6;
+
+    /// <summary>
+    /// Minimum cosine similarity for an entity to count as "related". Tunable. The graph's semantic search
+    /// applies no relevance floor of its own, so without this every synthesis would receive the top-N
+    /// entities regardless of relevance — grounding the model in noise.
+    /// </summary>
+    private const float MinGraphRelevance = 0.40f;
 
     /// <summary>This node's memory access: its id plus the scopes its manifest declares. Read-only — the
     /// innovation node reads the graph for context and never writes to it.</summary>
@@ -78,12 +89,32 @@ public sealed class OllamaInnovationSynthesizer : IInnovationSynthesizer
                 new[] { "a clearer problem statement or additional data" });
     }
 
+    /// <summary>
+    /// Retrieve the knowledge-graph context that grounds a synthesis, by SEMANTIC (embedding) similarity to
+    /// the question.
+    ///
+    /// <para><b>Why this is not a substring search.</b> This previously passed the whole natural-language
+    /// question to <c>SearchEntitiesAsync</c>, which matches <c>name LIKE '%query%'</c>. A question is
+    /// essentially never a substring of an entity name, so grounding almost never fired and the innovation
+    /// node synthesized without the graph — the "related concepts" section was effectively dead code in
+    /// production. Semantic search matches MEANING, so "how do I close a myoelectric grip loop?" can retrieve
+    /// "EMG sensor" even though neither is a substring of the other.</para>
+    ///
+    /// <para>Substring search is kept as a FALLBACK for hosts where embeddings are unavailable or where no
+    /// entity has an embedding stored — degraded grounding beats none, and it preserves the old behavior
+    /// exactly on those hosts.</para>
+    ///
+    /// <para>TODO (separate future unit): retrieve NEAR + FAR entities rather than only the nearest, to feed
+    /// the loop governor's diversity/creativity goal. Deliberately not bundled here — this unit only makes
+    /// grounding work.</para>
+    /// </summary>
     private async Task<string> GatherGraphContextAsync(string question, CancellationToken ct)
     {
         try
         {
-            var entities = await _memory.SearchEntitiesAsync(Access, question, limit: 6, ct: ct);
+            var entities = await RetrieveRelevantEntitiesAsync(question, ct);
             if (entities.Count == 0) return "";
+
             var sb = new StringBuilder("Related concepts in the knowledge graph:\n");
             foreach (var e in entities)
                 sb.AppendLine($"- {e.Name}{(string.IsNullOrWhiteSpace(e.Description) ? "" : $": {e.Description}")}");
@@ -94,6 +125,49 @@ public sealed class OllamaInnovationSynthesizer : IInnovationSynthesizer
             _logger.LogDebug(ex, "Graph context lookup failed (non-fatal).");
             return "";
         }
+    }
+
+    private async Task<IReadOnlyList<KgEntity>> RetrieveRelevantEntitiesAsync(string question, CancellationToken ct)
+    {
+        // ── Primary: semantic similarity ──
+        List<float>? embedding = null;
+        try { embedding = await _toolbox.GetEmbeddingAsync(question, ct); }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogDebug(ex, "Question embedding failed; falling back to name search.");
+        }
+
+        if (embedding is { Count: > 0 })
+        {
+            var scored = await _memory.SemanticSearchAsync(Access, embedding.ToArray(), limit: GraphContextLimit, ct);
+
+            // The graph's semantic search returns the top N by cosine with NO relevance floor, so without a
+            // threshold every synthesis would be handed the N least-unrelated entities in the graph as
+            // "related concepts". Irrelevant grounding is worse than none — it invites false connections.
+            var relevant = scored
+                .Where(s => s.Score >= MinGraphRelevance)
+                .Select(s => s.Entity)
+                .ToList();
+
+            if (relevant.Count > 0)
+            {
+                _logger.LogInformation(
+                    "Innovation grounding: {Count} entity(ies) via semantic search (top score {Top:0.###}) — [{Names}]",
+                    relevant.Count, scored.Count > 0 ? scored[0].Score : 0f,
+                    string.Join(", ", relevant.Select(e => e.Name)));
+                return relevant;
+            }
+
+            _logger.LogDebug(
+                "Innovation grounding: semantic search found nothing above the relevance floor ({Floor}); " +
+                "falling back to name search.", MinGraphRelevance);
+        }
+
+        // ── Fallback: the original substring match (hosts without embeddings) ──
+        var byName = await _memory.SearchEntitiesAsync(Access, question, limit: GraphContextLimit, ct: ct);
+        if (byName.Count > 0)
+            _logger.LogInformation("Innovation grounding: {Count} entity(ies) via name search (fallback).", byName.Count);
+        return byName;
     }
 
     private static string BuildPrompt(InnovationRequest req, string relatedContext,
