@@ -23,7 +23,8 @@ public class MemoryExclusivityTests
     {
         // The graph itself and the broker that fronts it.
         ["IKnowledgeGraph.cs"] = "the interface",
-        ["KnowledgeGraph.cs"] = "the implementation",
+        ["KnowledgeGraph.cs"] = "the SQLite implementation",
+        ["Neo4jKnowledgeGraph.cs"] = "the Neo4j implementation (P2d) — a backing store behind the same interface",
         ["MemoryBroker.cs"] = "the broker — the one thing that legitimately holds the graph",
 
         // Core-internal services (doc §3): part of the core, not nodes.

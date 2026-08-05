@@ -301,10 +301,28 @@ builder.Services.AddSingleton<IResearchStore>(sp =>
         connectionString,
         sp.GetRequiredService<ILogger<ResearchStore>>()));
 
-builder.Services.AddSingleton<IKnowledgeGraph>(sp =>
-    new KnowledgeGraph(
-        connectionString,
-        sp.GetRequiredService<ILogger<KnowledgeGraph>>()));
+// === Knowledge graph backing store (Phase 2 P2d) ===
+// ONLY the knowledge graph moves to Neo4j. telemetry.db and every core store — research, confidence,
+// packets, proposals, campaigns, gaps — stay on SQLite. The swap is invisible above IKnowledgeGraph, so
+// IMemoryBroker and every node keep working untouched.
+//
+// Neo4j is opt-in: with no DARCI_NEO4J_PASSWORD configured the host stays on SQLite, which keeps a fresh
+// clone working with no external server to install.
+var neo4jOptions = Neo4jOptions.FromEnvironment() with { ClaimsConnectionString = connectionString };
+if (neo4jOptions.IsConfigured)
+{
+    builder.Services.AddSingleton<IKnowledgeGraph>(sp =>
+        new Neo4jKnowledgeGraph(
+            neo4jOptions,
+            sp.GetRequiredService<ILogger<Neo4jKnowledgeGraph>>()));
+}
+else
+{
+    builder.Services.AddSingleton<IKnowledgeGraph>(sp =>
+        new KnowledgeGraph(
+            connectionString,
+            sp.GetRequiredService<ILogger<KnowledgeGraph>>()));
+}
 
 builder.Services.AddSingleton<IConfidenceTracker>(sp =>
     new ConfidenceTracker(
