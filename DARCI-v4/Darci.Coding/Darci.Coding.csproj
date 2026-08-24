@@ -25,6 +25,7 @@
     <ProjectReference Include="..\Darci.Research.Agents\Darci.Research.Agents.csproj" />
     <!-- Node packet envelope + state machine + watchdog (Phase 0 node protocol) -->
     <ProjectReference Include="..\Darci.Nodes\Darci.Nodes.csproj" />
+    <ProjectReference Include="..\Darci.Shared\Darci.Shared.csproj" />
   </ItemGroup>
 
 </Project>

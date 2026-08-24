@@ -501,3 +501,241 @@ Note the guards held: because the build was broken, the loop did NOT report succ
 - Live API is currently STOPPED (killed to halt the runaway loop). Restart with `ASPNETCORE_URLS=http://localhost:5081` from `DARCI-v4/`.
 - Sandbox `C:\Users\aiden\DarciSandbox` reset to clean baseline `cbef061`.
 - All code changes compile; full-solution `dotnet build DARCI.sln` passes when the API is not holding DLL locks.
+
+---
+
+## Seventh-Pass — Backfill (Nodes layer) + Model Focus Gate
+
+Date: 2026-08-23
+
+### Why this entry exists
+
+This log stopped at the sixth pass (2026-06-11) while commits ran through 2026-06-25. Two weeks
+of work went undocumented, and a cold session reading only this log built a materially wrong
+picture of the system. That is the failure this entry closes.
+
+### Backfill — what shipped 2026-06-12 → 2026-06-25 and was never logged
+
+New first-class project **`Darci.Nodes`** (in `DARCI.sln`), ~840 lines:
+
+- `NodePacket.cs` — `NodePacket` (:10), `NodePacketStatus` (:147), `InvalidNodeTransitionException` (:163)
+- `NodePrimitives.cs` — `NodeId` (:11), `Capability` (:26), `NodeState` (:42) — all C# enums;
+  `NodeLogEntry` (:112), `PacketPayload` (:135)
+- `INodePacketStore.cs` / `SqliteNodePacketStore.cs` (362 lines)
+- `NodeWatchdog.cs` — generalises the fifth-pass orphaned-task fix into a reusable watchdog
+
+Supporting work:
+
+- **`Darci.Nodes.Tests`** — 4 test files (`ConfidenceTests`, `NodeStateMachineTests`,
+  `NodeWatchdogTests`, `SqliteNodePacketStoreTests`), in the solution
+- **`Darci.Coding/CodingNodeTracker.cs`** (157 lines) — mirrors every coding run as a node packet;
+  optional store, all calls best-effort
+- **`Darci.Api/NodeWatchdogService.cs`** + `Program.cs` wiring (registration, init, REST endpoints)
+- **`Darci.Coding.Tests/CodingModelsTests.cs`** — expanded by 530 lines
+- **`docs/NODE_PACKET_PROTOCOL.md`** (269 lines) — architecture audit + design
+
+**Not shipped:** `INodeRouter`. Zero references in the codebase. Packet, store, state machine and
+watchdog exist; routing does not. That remains the next build step.
+
+### Sixth-pass blockers — status check
+
+Re-verified 2026-08-23 against `8ba29f3`:
+
+- **Ollama contention** — was still unfixed. No mutex, semaphore, or focus-mode logic existed in
+  `Darci.Coding/*.cs` or `Program.cs`. **Addressed in this pass (below).**
+- **Model adherence / writes to files not named in the task** — still unfixed. No post-patch path
+  guard in `PatchApplier.cs` or `CodingAgentLoop.cs`. **Still open.**
+
+### Model Focus Gate (this pass)
+
+**Problem.** `Darci.Tools.Ollama.OllamaClient` (living loop, `gemma4:e4b`) and
+`Darci.Coding.ModelRouter` (coding loop, `qwen2.5-coder:7b`) both default to the same Ollama at
+`http://localhost:11434` and request *different* models. When VRAM cannot hold both resident,
+every alternation forces an unload/reload of a multi-GB model — the direct cause of the >90 minute
+runs recorded in the sixth pass.
+
+**Why not a second Ollama instance.** On single-GPU hardware two servers still compete for the
+same VRAM and compute, each trying to keep its own model resident. It helps only with a second GPU
+or VRAM sized for both models at once — neither assumable for AI Society team leads. It also
+doubles the bootstrapper's install and config surface.
+
+**Implementation.**
+
+- `Darci.Shared/ModelFocus.cs` — `IModelFocus` / `ModelFocus`, a `SemaphoreSlim(1,1)` gate with
+  holder name, timestamps, and acquisition/soft-skip counters. `Darci.Shared` is a leaf project
+  (no project references), so both callers can depend on it without a cycle.
+- `AcquireAsync(holder, ct)` — waits indefinitely. Used by `CodingAgentLoop.StartLoop`, which now
+  holds an exclusive lease for the entire run and releases it in `finally` before deregistering.
+- `TryAcquireAsync(holder, maxWait, ct)` — returns null on timeout. Used by `OllamaClient.Generate`
+  and `.GetEmbedding`, which **soft-skip** rather than block: `Generate` returns the sentinel
+  `OllamaClient.SkippedForFocus`, `GetEmbedding` returns an empty list. Both mirror the existing
+  error-path conventions, so callers that already tolerate a sentinel keep working.
+- Perception, messaging, and non-model actions continue during a coding run — only model calls
+  yield.
+- `Darci.Coding.csproj` gained a `Darci.Shared` ProjectReference.
+- Registered in `Program.cs` as a singleton; status at **`GET /model-focus/status`** (holder,
+  held-for seconds, total acquisitions, total soft-skips).
+
+**Narrow gate (revised 2026-08-23 — supersedes the first cut).**
+
+The first implementation gated `IOllamaClient` wholesale. That was too broad: a direct user message
+would block behind a coding run, so DARCI went silent for up to an hour. For the reference build
+that is actively harmful — a team lead who pokes at a core and gets nothing concludes it is broken.
+
+The contention recorded in the sixth pass came from long-running *background* work competing with
+the coding loop, not from short foreground replies. So the gate now distinguishes them:
+
+- `ModelCallKind.Background` (default) — Think cycles, memory consolidation, LLM-backed research,
+  goal decomposition, CAD planning. **Yields** during a coding run.
+- `ModelCallKind.Foreground` — `Toolkit.GenerateReply`, the path behind `ActionType.Reply`.
+  **Passes through** under the default policy.
+
+Policy lives in one place, `IModelFocus.TryAcquireForAsync(holder, kind, maxWait, ct)`, so callers
+do not each re-derive it.
+
+**Configuration — `DARCI_FOCUS_MODE`:**
+
+| Mode | Background | Foreground reply | For |
+|---|---|---|---|
+| `narrow` *(default)* | yields | passes through | most hosts |
+| `broad` | yields | yields | constrained VRAM — a mid-run reply forces a model swap costing tens of seconds, and repeated messages thrash |
+| `off` | — | — | VRAM for both models resident, or a second GPU |
+
+- `DARCI_FOCUS_CORE_WAIT_SECONDS` — background patience before soft-skipping. Default 5.
+- `DARCI_FOCUS_MODE_ENABLED=false` still honoured as an alias for `off`.
+
+`GET /model-focus/status` reports the active mode plus `totalForegroundBypasses` — replies that
+passed through mid-run. Non-zero on a low-VRAM host is the signal to switch to `broad`.
+
+> **Dependency for the bootstrapper (work order item 2):** the model tier recommendation must carry
+> a default focus mode with it. A host sized for one model at a time wants `broad`; a host with
+> headroom for both resident wants `narrow` or `off`. Tiering that does not also set this produces
+> cores that either feel broken (silent under `broad`) or thrash (swapping under `narrow`). This
+> note is duplicated at `ModelFocus.CurrentMode` so the tiering work encounters it in code.
+
+### FINDING: every persisted enum in Darci.Nodes round-trips as a raw integer
+
+Surfaced while scoping the `NodeId` open-set change. **Not caused by that change — a latent bug in
+committed Phase 0 code.**
+
+`SqliteNodePacketStore` stores five enum-valued columns as `INTEGER`:
+
+| Table | Column | Enum |
+|---|---|---|
+| `node_packets` | `address` | `NodeId` |
+| `node_packets` | `requested_capability` | `Capability` |
+| `node_packets` | `state` | `NodeState` |
+| `node_log` | `node` | `NodeId` |
+| `node_log` | `state_after` | `NodeState` |
+
+Write path casts to int (`(int)p.State` :144, `(int)e.Node` :168, `(int)e.StateAfter` :170).
+Read path casts back unchecked (`(NodeId)reader.GetInt32(...)` :303/:331,
+`(Capability)…` :332, `(NodeState)…` :305/:333).
+
+**Mitigating:** the enums carry explicit values (`Orchestrator = 0` … `Cad = 5`), so merely
+reordering declarations does not shift them. This is better than implicit ordinals.
+
+**Still broken in two ways:**
+
+1. *Nothing enforces value stability.* No test pins the numbers. A contributor inserting
+   `Biomed = 3` and renumbering `Knowledge`/`Cad` silently reinterprets every stored row — a
+   `Knowledge` packet reads back as `Cad`. No exception, no failed parse, just wrong data.
+2. *The read cast is unchecked.* A C# cast from an out-of-range int produces an invalid enum
+   instance rather than throwing. A row written by newer code and read by older code yields a
+   nonsense `NodeState` that `IsTerminal()` reports as non-terminal — so the watchdog either
+   sweeps a finished packet or fails to sweep a stuck one. That is a correctness hole in the exact
+   subsystem built to make orphaning "structurally impossible."
+
+Indexes `ix_node_packets_state`, `ix_node_packets_lease`, and `ix_node_log_node_success` are built
+on these integer columns, so any type change touches indexes too.
+
+**Consequence for the open-`NodeId` work:** string identifiers of the form `author/node-name`
+cannot live in an `INTEGER` column. `node_packets.address` and `node_log.node` must migrate to
+`TEXT` — two columns, two tables, two indexes. That migration is a prerequisite, not a detail, and
+its strategy is Tinman's call. **Not implemented; reported per the standing instruction.**
+
+Recommended regardless of the `NodeId` decision: pin `NodeState` and `Capability` numeric values
+with a test, and make the read path a checked parse that fails loudly on an unknown value.
+
+### Verification — PASSED (2026-08-23)
+
+`dotnet restore DARCI.sln` followed by `dotnet build DARCI.sln -v:minimal`:
+**0 errors, 18/18 projects built**, including `Darci.Shared`, `Darci.Tools`, `Darci.Coding`,
+`Darci.Core`, and `Darci.Api`.
+
+Sole warning is **pre-existing and unrelated** to this pass:
+`Darci.Coding.Tests/CodingModelsTests.cs(257,9): warning xUnit2002 — Do not use Assert.NotNull()
+on value type '(string Name, string Kind, string Signature)'`. It arrived with the 530-line test
+expansion of 2026-06-25. Worth fixing on its own merits: `Assert.NotNull()` on a value type can
+never fail, so that assertion is dead weight in a suite whose job is catching regressions — the
+same shape of problem as the fourth-pass false-success bug, one level down.
+
+**What the green build does and does not prove.** It proves the code compiles and the new
+`Darci.Coding` → `Darci.Shared` reference introduces no cycle. It does **not** prove focus-mode
+behaviour. There is no test covering `ModelFocus`: narrow-mode foreground bypass, broad-mode
+yielding, off-mode transparency, and lease release on the abort path are all unverified. Given
+`Darci.Nodes.Tests` and `Darci.Coding.Tests` already exist, a `ModelFocusTests` is cheap and
+should land before this is trusted under a real run.
+
+*(Original note retained: the SDK was unavailable in the environment this pass was authored from —
+the `dot.net` install script is blocked (HTTP 403) by network policy — so the build was run by
+Tinman on the host.)*
+
+**Outstanding, must run on the host with `Darci.Api` stopped:**
+
+```powershell
+cd DARCI-v4
+dotnet restore DARCI.sln
+dotnet build DARCI.sln -v:minimal
+```
+
+Nothing in this pass should be considered landed until that returns 0 errors.
+
+> **Do NOT use `--no-restore` after a `git reset --hard` or a fresh clone.** First attempt on
+> 2026-08-23 used it and produced 15 errors — all `NETSDK1064` / `NETSDK1004`, none of them
+> compile errors. Cause below.
+
+### FINDING: committed `obj/` artifacts break builds on any machine but the one that restored them
+
+`.gitignore` carries `**/bin/` and `**/obj/` (lines 8–9), but **287 `obj/` files remain tracked** —
+they were committed before those rules were added, and `.gitignore` does not untrack existing
+files.
+
+Consequence: `obj/project.assets.json` and `obj/project.nuget.cache` are version-controlled. They
+encode absolute NuGet paths from whichever machine last restored. Pulling them onto a different
+machine yields `NETSDK1064: Package <X> was not found` for essentially every package, because the
+assets file points at a package cache that does not exist there. `Darci.Nodes` and
+`Darci.Nodes.Tests` fail differently — `NETSDK1004`, no assets file at all — because their `obj/`
+was never committed.
+
+**Why this matters well beyond one bad build:** every AI Society team lead who clones this repo
+inherits Tinman's `project.assets.json` files and hits a wall of 15 errors on first build, before
+DARCI does anything. That is an onboarding blocker for the bootstrapper (work order item 2) and it
+directly violates the node-contract bar — "if writing a node takes a week to figure out, nobody
+writes one."
+
+**Recommended fix (repo-wide, Tinman's call — not applied):**
+
+```powershell
+git rm -r --cached DARCI-v4/*/obj DARCI-v4/*/bin
+git commit -m "Untrack bin/obj; .gitignore rules already present but never took effect"
+```
+
+287 tracked files disappear from the index while staying on disk. After this, a fresh clone plus
+`dotnet restore` works on any machine. Worth doing before contributors arrive, not after.
+
+### Documentation trued up alongside
+
+- `docs/NODE_PACKET_PROTOCOL.md` — the "DRAFT / not implemented / do not commit" header was false
+  once Phase 0 shipped; replaced with a partial-implementation status and a reading note. §6
+  now records §6.1 resolved (out-of-process transport) and §6.2 resolved (living-loop integration
+  deferred past the semester) per the Dispatch Brief of 2026-08-23.
+- `DARCI_SOCIETY_PLAN_RECONCILED.md` — reconciliation of the AI Society plan against `8ba29f3`.
+
+### Next
+
+1. Run the build above.
+2. Post-patch path guard — reject writes to files neither newly created nor named in the task
+   (the remaining sixth-pass blocker).
+3. Open the `Capability` set, per the §6.1 cascade.
+4. `INodeRouter`.

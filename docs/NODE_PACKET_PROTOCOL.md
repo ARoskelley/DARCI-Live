@@ -1,6 +1,14 @@
 # DARCI Node Packet Protocol — Design Doc
 
-**Status:** DRAFT for review — not implemented. Do not commit until Tinman signs off on the open decisions in §6.
+**Status:** PARTIALLY IMPLEMENTED — Phase 0 is built and committed. See §6 for which decisions are
+resolved and which remain open. Superseded on transport by the Dispatch Brief of 2026-08-23.
+
+> **Reading note (2026-08-23):** this document was drafted 2026-06-26 as a pre-implementation
+> design. Phase 0 has since shipped: `Darci.Nodes` provides `NodePacket`, `INodePacketStore` /
+> `SqliteNodePacketStore`, `NodeWatchdog`, and the `NodeState` machine, registered in
+> `Darci.Api/Program.cs` and covered by `Darci.Nodes.Tests`. What has *not* shipped is routing —
+> there is no `INodeRouter` in the codebase. Treat §1–§5 as accurate background and §6 as the
+> live decision record below.
 **Author:** drafted from a codebase audit on 2026-06-26.
 **Scope:** A shared envelope + addressing/routing layer for passing work between DARCI's specialized "nodes" (living loop, coding, engineering, KG/deep-research), plus a rigid redesign of the KG/DR node.
 
@@ -254,7 +262,38 @@ Stop after each phase and evaluate — Phase 0+1 alone may move reliability enou
 
 ---
 
-## 6. Open decisions — need Tinman's call
+## 6. Decisions — resolution status
+
+> **Resolved 2026-08-23** by the Dispatch Brief (DARCI × AI Society). Items 1 and 2 are settled;
+> do not re-litigate. The rest remain open.
+>
+> **§6.1 Transport — RESOLVED: out-of-process.**
+> The in-process recommendation below was written optimising for a single-developer core and
+> predates the AI Society collaboration. Since the objective is that people other than Tinman
+> write nodes, in-process means C#-only plus a core recompile per node — the exact failure the
+> node-contract work exists to prevent. **Decision: out-of-process HTTP/REST first**, consistent
+> with the Lizzy pattern. Keep the SQS-shaped seam for later.
+>
+> *Cascading consequence:* `Capability` (`Darci.Nodes/NodePrimitives.cs:26`) must become an **open
+> set** — string identifiers plus a runtime registry, or a manifest-driven capability table. A C#
+> `enum` is compile-time closed, so an out-of-process node cannot contribute a value to it.
+> Reassess `NodeId` (:11) on the same grounds. This changes committed Phase 0 code and is cheaper
+> now than after nodes exist.
+>
+> **§6.2 Does coding join the living loop? — RESOLVED: deferred past the semester.**
+> There is no `ActionType.Code`, and there will not be one this semester. Nodes are
+> **externally-triggered services**; the core does not autonomously route work to them. Contract
+> docs must state this actual behaviour, not the intended one. The living-loop question reopens
+> after the semester.
+>
+> **§6.3–§6.6 — still open.**
+>
+> Separately: the KG on `main` is SQLite-backed (`Darci.Memory.Graph.KnowledgeGraph`). Neo4j
+> exists only on `origin/feat/node-packet-protocol`. Any contract rule of the form "nodes never
+> touch the graph directly" must be labelled explicitly as **forward-looking**, because
+> contributors cannot see the component it refers to.
+
+### Original text (retained for context)
 
 1. **Packet transport — in-process vs queue.** Recommend **in-process** object passed through `INodeRouter` for now (local-first, simplest), with the interface shaped so an SQS/`SqsRelayService`-backed transport can drop in later. Do you want queue-backed from day one (enables the cloud/distributed story but adds serialization + failure-mode surface)?
 

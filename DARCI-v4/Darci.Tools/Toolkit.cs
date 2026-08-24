@@ -67,7 +67,12 @@ public class Toolkit : IToolkit, IResearchToolbox
     public async Task<string> GenerateReply(ReplyContext context)
     {
         var prompt = BuildReplyPrompt(context);
-        return await _ollama.Generate(prompt);
+
+        // Foreground: a person sent a message and is waiting on the answer. Under the default
+        // narrow focus policy this passes through even while a coding run holds model focus —
+        // DARCI must not go silent for the length of a run. Hosts too VRAM-constrained to absorb
+        // a mid-run model swap can opt into DARCI_FOCUS_MODE=broad, which makes this yield too.
+        return await _ollama.Generate(prompt, ModelCallKind.Foreground);
     }
 
     // === Language/Thinking ===

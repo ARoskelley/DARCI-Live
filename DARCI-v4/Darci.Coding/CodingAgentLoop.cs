@@ -5,6 +5,7 @@ using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using Darci.Nodes;
+using Darci.Shared;
 using Microsoft.Extensions.Logging;
 
 namespace Darci.Coding;
@@ -36,6 +37,12 @@ public sealed class CodingAgentLoop : ICodingAgentLoop
     private readonly ILogger<CodingAgentLoop> _logger;
     private readonly CodingNodeTracker _nodes;
 
+    /// <summary>
+    /// Shared gate that stops this loop and DARCI's living loop from alternating models on one
+    /// Ollama instance. Optional — when null the loop behaves exactly as before.
+    /// </summary>
+    private readonly IModelFocus? _focus;
+
     private readonly ConcurrentDictionary<string, Task> _runningTasks = new();
 
     public CodingAgentLoop(
@@ -47,7 +54,8 @@ public sealed class CodingAgentLoop : ICodingAgentLoop
         IRoadblockDetector roadblockDetector,
         PatchApplier patchApplier,
         ILogger<CodingAgentLoop> logger,
-        INodePacketStore? packetStore = null)
+        INodePacketStore? packetStore = null,
+        IModelFocus? modelFocus = null)
     {
         _store = store;
         _contextBuilder = contextBuilder;
@@ -57,6 +65,7 @@ public sealed class CodingAgentLoop : ICodingAgentLoop
         _roadblockDetector = roadblockDetector;
         _patchApplier = patchApplier;
         _logger = logger;
+        _focus = modelFocus;
         // Phase 0: every run is mirrored as a node packet. Optional (null store) so the loop still
         // works in environments that haven't wired the packet store; all calls are best-effort.
         _nodes = new CodingNodeTracker(packetStore, logger);
@@ -68,8 +77,22 @@ public sealed class CodingAgentLoop : ICodingAgentLoop
 
         var task = Task.Run(async () =>
         {
+            // Held for the whole run. While we hold focus, DARCI's living loop soft-skips its own
+            // model calls instead of competing for VRAM — see Darci.Shared/ModelFocus.cs.
+            IDisposable? focusLease = null;
+
             try
             {
+                if (_focus is not null)
+                {
+                    _logger.LogInformation(
+                        "Waiting for model focus before starting coding task {TaskId}.", taskId);
+                    focusLease = await _focus.AcquireAsync($"coding:{taskId}", CancellationToken.None);
+                    _logger.LogInformation(
+                        "Model focus acquired — coding task {TaskId} now has exclusive use of the local model.",
+                        taskId);
+                }
+
                 await RunLoopAsync(taskId, options, CancellationToken.None);
             }
             catch (Exception ex)
@@ -81,6 +104,14 @@ public sealed class CodingAgentLoop : ICodingAgentLoop
             }
             finally
             {
+                // Release focus before deregistering so a queued run cannot observe both
+                // "not running" and "focus still held".
+                focusLease?.Dispose();
+                if (_focus is not null)
+                {
+                    _logger.LogInformation("Model focus released by coding task {TaskId}.", taskId);
+                }
+
                 _runningTasks.TryRemove(taskId, out _);
             }
         });

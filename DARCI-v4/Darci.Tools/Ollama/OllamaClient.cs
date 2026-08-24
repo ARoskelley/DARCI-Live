@@ -1,6 +1,7 @@
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
+using Darci.Shared;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
@@ -11,7 +12,13 @@ namespace Darci.Tools.Ollama;
 /// </summary>
 public interface IOllamaClient
 {
-    Task<string> Generate(string prompt);
+    /// <summary>
+    /// Generate text. <paramref name="kind"/> defaults to Background, which yields to a running
+    /// coding task. Pass <see cref="ModelCallKind.Foreground"/> for calls a person is actively
+    /// waiting on — those pass through under the default narrow focus policy.
+    /// </summary>
+    Task<string> Generate(string prompt, ModelCallKind kind = ModelCallKind.Background);
+
     Task<List<float>> GetEmbedding(string text);
 }
 
@@ -25,13 +32,22 @@ public class OllamaClient : IOllamaClient
     private readonly string _model;
     private readonly string _embeddingModel;
 
+    /// <summary>
+    /// Shared gate that serialises local model use against the coding agent loop. Optional so
+    /// that any manual construction (tests, tooling) keeps working — when null, behaviour is
+    /// exactly as before this was introduced.
+    /// </summary>
+    private readonly IModelFocus? _focus;
+
     public OllamaClient(
         HttpClient http,
         ILogger<OllamaClient> logger,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        IModelFocus? focus = null)
     {
         _http = http;
         _logger = logger;
+        _focus = focus;
         _model = FirstNonEmpty(
             Environment.GetEnvironmentVariable("DARCI_OLLAMA_MODEL"),
             configuration["Darci:OllamaModel"],
@@ -58,8 +74,34 @@ public class OllamaClient : IOllamaClient
             _embeddingModel);
     }
 
-    public async Task<string> Generate(string prompt)
+    /// <summary>
+    /// Returned when the living loop yields its turn because the coding agent holds model focus.
+    /// Mirrors the existing "[Error generating response]" convention so callers that already
+    /// tolerate a bracketed sentinel keep working.
+    /// </summary>
+    public const string SkippedForFocus = "[Skipped: local model busy with a coding run]";
+
+    public async Task<string> Generate(string prompt, ModelCallKind kind = ModelCallKind.Background)
     {
+        // Background work yields to a running coding task rather than fighting it for VRAM.
+        // Foreground (a person is waiting) passes through under the default narrow policy.
+        // See Darci.Shared/ModelFocus.cs for why this is application-level and not a second
+        // Ollama instance.
+        IDisposable? lease = null;
+        if (_focus is not null)
+        {
+            lease = await _focus.TryAcquireForAsync("core:generate", kind, ModelFocus.DefaultCoreWait);
+            if (lease is null)
+            {
+                _logger.LogInformation(
+                    "Skipping {Kind} core generation — model focus held by '{Holder}' for {Seconds:0}s.",
+                    kind,
+                    _focus.Holder ?? "another subsystem",
+                    _focus.GetStatus().HeldForSeconds ?? 0);
+                return SkippedForFocus;
+            }
+        }
+
         try
         {
             var request = new
@@ -94,10 +136,29 @@ public class OllamaClient : IOllamaClient
             _logger.LogError(ex, "Ollama generation failed");
             return "[Error generating response]";
         }
+        finally
+        {
+            lease?.Dispose();
+        }
     }
 
     public async Task<List<float>> GetEmbedding(string text)
     {
+        IDisposable? lease = null;
+        if (_focus is not null)
+        {
+            // Embeddings are always background — nothing user-facing blocks on one.
+            lease = await _focus.TryAcquireForAsync(
+                "core:embed", ModelCallKind.Background, ModelFocus.DefaultCoreWait);
+            if (lease is null)
+            {
+                _logger.LogDebug(
+                    "Skipping core embedding — model focus held by '{Holder}'.",
+                    _focus.Holder ?? "another subsystem");
+                return new List<float>();
+            }
+        }
+
         try
         {
             var request = new
@@ -119,6 +180,10 @@ public class OllamaClient : IOllamaClient
         {
             _logger.LogError(ex, "Ollama embedding failed");
             return new List<float>();
+        }
+        finally
+        {
+            lease?.Dispose();
         }
     }
 

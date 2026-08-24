@@ -58,6 +58,14 @@ builder.Services.AddSwaggerGen(c =>
     c.SwaggerDoc("v1", new() { Title = "DARCI API", Version = "v4.0" });
 });
 
+// Model focus gate — serialises local model use between DARCI's living loop and the coding
+// agent loop. Both target the same Ollama instance with different models; without this they
+// force repeated multi-GB model reloads (see DARCI_CODING_ENVIRONMENT_LOG.md, sixth pass).
+// DARCI_FOCUS_MODE = narrow (default: background work yields, user replies pass through)
+//                  | broad (everything yields — for VRAM-constrained hosts)
+//                  | off   (transparent — for hosts with room for both models resident)
+builder.Services.AddSingleton<IModelFocus, ModelFocus>();
+
 // HTTP client for Ollama
 builder.Services.AddHttpClient<IOllamaClient, OllamaClient>();
 
@@ -463,6 +471,29 @@ app.MapGet("/", () => "DARCI v4.0 - Neural Autonomous Consciousness");
 
 // Get DARCI's status
 app.MapGet("/status", (Darci.Core.Darci darci) => darci.GetStatus());
+
+// Model focus: who currently owns the local model, and how often the living loop has yielded.
+// Useful when a coding run appears slow — if soft-skips are climbing, the core is correctly
+// standing down rather than competing.
+app.MapGet("/model-focus/status", (IModelFocus focus) =>
+{
+    var status = focus.GetStatus();
+    return Results.Ok(new
+    {
+        mode = status.Mode.ToString().ToLowerInvariant(),   // narrow | broad | off
+        enabled = ModelFocus.Enabled,
+        coreWaitSeconds = ModelFocus.DefaultCoreWait.TotalSeconds,
+        isHeld = status.IsHeld,
+        holder = status.Holder,
+        heldSinceUtc = status.HeldSinceUtc,
+        heldForSeconds = status.HeldForSeconds,
+        totalAcquisitions = status.TotalAcquisitions,
+        totalSoftSkips = status.TotalSoftSkips,
+        // Foreground replies that passed through mid-run. Non-zero here on a low-VRAM host is the
+        // signal to switch DARCI_FOCUS_MODE=broad, since each one may have forced a model swap.
+        totalForegroundBypasses = status.TotalForegroundBypasses
+    });
+});
 
 // Send a message to DARCI
 app.MapPost("/message", async (MessageRequest request, Awareness awareness) =>
