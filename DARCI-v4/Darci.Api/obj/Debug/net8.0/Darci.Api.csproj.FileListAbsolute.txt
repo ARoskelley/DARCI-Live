@@ -236,3 +236,5 @@ C:\Users\ROG\Documents\GitHub\DARCI-Live\DARCI-v4\Darci.Api\bin\Debug\net8.0\Dar
 C:\Users\ROG\Documents\GitHub\DARCI-Live\DARCI-v4\Darci.Api\bin\Debug\net8.0\Darci.Engineering.pdb
 C:\Users\ROG\Documents\GitHub\DARCI-Live\DARCI-v4\Darci.Api\bin\Debug\net8.0\Darci.Nodes.dll
 C:\Users\ROG\Documents\GitHub\DARCI-Live\DARCI-v4\Darci.Api\bin\Debug\net8.0\Darci.Nodes.pdb
+C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Api\bin\Debug\net8.0\Darci.Nodes.dll
+C:\Users\aiden\OneDrive\Documents\GitHub\ProgDS\DARCI-Live\DARCI-v4\Darci.Api\bin\Debug\net8.0\Darci.Nodes.pdb

@@ -471,14 +471,7 @@
       },
       "System.Diagnostics.DiagnosticSource/8.0.0": {},
       "System.Memory/4.5.5": {},
-      "System.Text.Json/8.0.5": {
-        "runtime": {
-          "lib/net8.0/System.Text.Json.dll": {
-            "assemblyVersion": "8.0.0.0",
-            "fileVersion": "8.0.1024.46610"
-          }
-        }
-      },
+      "System.Text.Json/8.0.5": {},
       "System.Threading.Channels/8.0.0": {},
       "Darci.Brain/1.0.0": {
         "dependencies": {
@@ -489,7 +482,10 @@
           "Microsoft.ML.OnnxRuntime": "1.19.2"
         },
         "runtime": {
-          "Darci.Brain.dll": {}
+          "Darci.Brain.dll": {
+            "assemblyVersion": "1.0.0",
+            "fileVersion": "1.0.0.0"
+          }
         }
       },
       "Darci.Cloud/1.0.0": {
@@ -502,7 +498,10 @@
           "Microsoft.Extensions.Logging.Abstractions": "8.0.0"
         },
         "runtime": {
-          "Darci.Cloud.dll": {}
+          "Darci.Cloud.dll": {
+            "assemblyVersion": "1.0.0",
+            "fileVersion": "1.0.0.0"
+          }
         }
       },
       "Darci.Coding/1.0.0": {
@@ -510,11 +509,15 @@
           "Darci.Memory.Graph": "1.0.0",
           "Darci.Nodes": "1.0.0",
           "Darci.Research.Agents": "1.0.0",
+          "Darci.Shared": "1.0.0",
           "Microsoft.Data.Sqlite": "8.0.0",
           "Microsoft.Extensions.Logging.Abstractions": "8.0.0"
         },
         "runtime": {
-          "Darci.Coding.dll": {}
+          "Darci.Coding.dll": {
+            "assemblyVersion": "1.0.0",
+            "fileVersion": "1.0.0.0"
+          }
         }
       },
       "Darci.Core/1.0.0": {
@@ -533,7 +536,10 @@
           "System.Threading.Channels": "8.0.0"
         },
         "runtime": {
-          "Darci.Core.dll": {}
+          "Darci.Core.dll": {
+            "assemblyVersion": "1.0.0",
+            "fileVersion": "1.0.0.0"
+          }
         }
       },
       "Darci.Engineering/1.0.0": {
@@ -545,7 +551,10 @@
           "System.Text.Json": "8.0.5"
         },
         "runtime": {
-          "Darci.Engineering.dll": {}
+          "Darci.Engineering.dll": {
+            "assemblyVersion": "1.0.0",
+            "fileVersion": "1.0.0.0"
+          }
         }
       },
       "Darci.Goals/1.0.0": {
@@ -556,7 +565,10 @@
           "Microsoft.Extensions.Logging.Abstractions": "8.0.0"
         },
         "runtime": {
-          "Darci.Goals.dll": {}
+          "Darci.Goals.dll": {
+            "assemblyVersion": "1.0.0",
+            "fileVersion": "1.0.0.0"
+          }
         }
       },
       "Darci.Memory/1.0.0": {
@@ -569,7 +581,10 @@
           "Microsoft.Extensions.Logging.Abstractions": "8.0.0"
         },
         "runtime": {
-          "Darci.Memory.dll": {}
+          "Darci.Memory.dll": {
+            "assemblyVersion": "1.0.0",
+            "fileVersion": "1.0.0.0"
+          }
         }
       },
       "Darci.Memory.Confidence/1.0.0": {
@@ -580,7 +595,10 @@
           "Microsoft.Extensions.Logging.Abstractions": "8.0.0"
         },
         "runtime": {
-          "Darci.Memory.Confidence.dll": {}
+          "Darci.Memory.Confidence.dll": {
+            "assemblyVersion": "1.0.0",
+            "fileVersion": "1.0.0.0"
+          }
         }
       },
       "Darci.Memory.Graph/1.0.0": {
@@ -590,7 +608,10 @@
           "Microsoft.Extensions.Logging.Abstractions": "8.0.0"
         },
         "runtime": {
-          "Darci.Memory.Graph.dll": {}
+          "Darci.Memory.Graph.dll": {
+            "assemblyVersion": "1.0.0",
+            "fileVersion": "1.0.0.0"
+          }
         }
       },
       "Darci.Nodes/1.0.0": {
@@ -599,7 +620,10 @@
           "Microsoft.Extensions.Logging.Abstractions": "8.0.0"
         },
         "runtime": {
-          "Darci.Nodes.dll": {}
+          "Darci.Nodes.dll": {
+            "assemblyVersion": "1.0.0",
+            "fileVersion": "1.0.0.0"
+          }
         }
       },
       "Darci.Personality/1.0.0": {
@@ -610,7 +634,10 @@
           "Microsoft.Extensions.Logging.Abstractions": "8.0.0"
         },
         "runtime": {
-          "Darci.Personality.dll": {}
+          "Darci.Personality.dll": {
+            "assemblyVersion": "1.0.0",
+            "fileVersion": "1.0.0.0"
+          }
         }
       },
       "Darci.Research/1.0.0": {
@@ -621,7 +648,10 @@
           "Microsoft.Extensions.Logging.Abstractions": "8.0.0"
         },
         "runtime": {
-          "Darci.Research.dll": {}
+          "Darci.Research.dll": {
+            "assemblyVersion": "1.0.0",
+            "fileVersion": "1.0.0.0"
+          }
         }
       },
       "Darci.Research.Agents/1.0.0": {
@@ -633,12 +663,18 @@
           "Microsoft.Extensions.Logging.Abstractions": "8.0.0"
         },
         "runtime": {
-          "Darci.Research.Agents.dll": {}
+          "Darci.Research.Agents.dll": {
+            "assemblyVersion": "1.0.0",
+            "fileVersion": "1.0.0.0"
+          }
         }
       },
       "Darci.Shared/1.0.0": {
         "runtime": {
-          "Darci.Shared.dll": {}
+          "Darci.Shared.dll": {
+            "assemblyVersion": "1.0.0",
+            "fileVersion": "1.0.0.0"
+          }
         }
       },
       "Darci.Tools/1.0.0": {
@@ -651,7 +687,10 @@
           "Microsoft.Extensions.Logging.Abstractions": "8.0.0"
         },
         "runtime": {
-          "Darci.Tools.dll": {}
+          "Darci.Tools.dll": {
+            "assemblyVersion": "1.0.0",
+            "fileVersion": "1.0.0.0"
+          }
         }
       }
     }

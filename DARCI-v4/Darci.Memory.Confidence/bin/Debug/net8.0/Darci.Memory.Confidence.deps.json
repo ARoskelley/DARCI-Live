@@ -207,7 +207,10 @@
           "Microsoft.Extensions.Logging.Abstractions": "8.0.0"
         },
         "runtime": {
-          "Darci.Memory.Graph.dll": {}
+          "Darci.Memory.Graph.dll": {
+            "assemblyVersion": "1.0.0",
+            "fileVersion": "1.0.0.0"
+          }
         }
       }
     }
