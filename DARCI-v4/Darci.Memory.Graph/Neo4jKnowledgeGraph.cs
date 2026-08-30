@@ -83,6 +83,39 @@ public sealed class Neo4jKnowledgeGraph : IKnowledgeGraph, IAsyncDisposable
 
     private IAsyncSession Session() => _driver.AsyncSession(o => o.WithDatabase(_options.Database));
 
+    /// <summary>
+    /// Cheap, BOUNDED reachability check used to decide the backing store at startup.
+    ///
+    /// <para>Configuration presence is not the same question as reachability. Credentials sitting in
+    /// .env.local say a host WANTS Neo4j, not that Neo4j is running — and the driver's own retry policy
+    /// spends 30 seconds discovering the difference before throwing, which is long enough to look like a
+    /// hang and fatal enough to take the process down. This answers in <paramref name="timeout"/> and
+    /// never throws, so the caller can fall back instead of crashing.</para>
+    /// </summary>
+    public static async Task<(bool Reachable, string Reason)> ProbeAsync(
+        Neo4jOptions options, TimeSpan timeout, CancellationToken ct = default)
+    {
+        try
+        {
+            await using var driver = GraphDatabase.Driver(
+                options.Uri, AuthTokens.Basic(options.User, options.Password));
+
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            cts.CancelAfter(timeout);
+
+            await driver.VerifyConnectivityAsync().WaitAsync(cts.Token);
+            return (true, "connected");
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        {
+            return (false, $"no response within {timeout.TotalSeconds:0.#}s");
+        }
+        catch (Exception ex)
+        {
+            return (false, ex.GetBaseException().Message);
+        }
+    }
+
     public async Task InitializeAsync(CancellationToken ct = default)
     {
         await using var session = Session();

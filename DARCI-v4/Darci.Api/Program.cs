@@ -308,8 +308,41 @@ builder.Services.AddSingleton<IResearchStore>(sp =>
 //
 // Neo4j is opt-in: with no DARCI_NEO4J_PASSWORD configured the host stays on SQLite, which keeps a fresh
 // clone working with no external server to install.
+//
+// CONFIGURED IS NOT THE SAME AS REACHABLE. Credentials in .env.local say this host WANTS Neo4j; they say
+// nothing about whether it is running. Selecting the backing store on configuration alone meant a host with
+// creds and a stopped Neo4j died on boot with an unhandled ServiceUnavailableException — the worst failure
+// shape for a packaged/standalone core, because the whole system is gone rather than degraded. So the
+// choice is made on a bounded reachability probe, and an unreachable Neo4j falls back to SQLite loudly.
 var neo4jOptions = Neo4jOptions.FromEnvironment() with { ClaimsConnectionString = connectionString };
+var neo4jFallbackReason = (string?)null;
+var useNeo4j = false;
+
 if (neo4jOptions.IsConfigured)
+{
+    var (reachable, reason) = await Neo4jKnowledgeGraph.ProbeAsync(neo4jOptions, TimeSpan.FromSeconds(5));
+    neo4jFallbackReason = reachable ? null : reason;
+
+    if (reachable)
+    {
+        // Prove it can actually be initialized, not merely dialed, BEFORE committing the registration —
+        // once the container hands this singleton out there is no honest way to swap it, so the decision
+        // has to be final here. Initialization is idempotent (CREATE ... IF NOT EXISTS), so the real
+        // instance repeating it after Build() costs nothing.
+        try
+        {
+            await using var probe = new Neo4jKnowledgeGraph(neo4jOptions);
+            await probe.InitializeAsync();
+            useNeo4j = true;
+        }
+        catch (Exception ex)
+        {
+            neo4jFallbackReason = ex.GetBaseException().Message;
+        }
+    }
+}
+
+if (useNeo4j)
 {
     builder.Services.AddSingleton<IKnowledgeGraph>(sp =>
         new Neo4jKnowledgeGraph(
@@ -651,6 +684,14 @@ await experienceBuffer.InitializeAsync();
 var researchStore = app.Services.GetRequiredService<IResearchStore>();
 await researchStore.InitializeAsync();
 
+if (neo4jFallbackReason is not null)
+{
+    app.Services.GetRequiredService<ILogger<Program>>().LogWarning(
+        "Neo4j configured but unreachable — falling back to SQLite for the knowledge graph. Reason: {Reason}. "
+        + "The graph will be served from {Db}; anything written only to Neo4j is not visible in this session.",
+        neo4jFallbackReason, dbPath);
+}
+
 var knowledgeGraph = app.Services.GetRequiredService<IKnowledgeGraph>();
 await knowledgeGraph.InitializeAsync();
 
@@ -735,6 +776,14 @@ app.MapGet("/status", (Darci.Core.Darci darci) => darci.GetStatus());
 // Send a message to DARCI
 app.MapPost("/message", async (MessageRequest request, Awareness awareness) =>
 {
+    // A malformed request is the caller's bug, and it should say so. Without this the null Content reached
+    // Awareness.NotifyMessage, which dereferences it to log a preview — turning a bad payload into a 500.
+    // The SignalR hub has always guarded this; this is the REST path catching up.
+    if (!IncomingMessageRules.IsValidContent(request?.Message))
+    {
+        return Results.BadRequest(new { error = IncomingMessageRules.MissingContentError });
+    }
+
     var message = new IncomingMessage
     {
         Content = request.Message,

@@ -72,6 +72,22 @@ public enum Mood
 // MESSAGE TYPES
 // ============================================================
 
+/// <summary>
+/// The one rule about inbound message content, in one place.
+///
+/// <para>Every consumer of <see cref="IncomingMessage.Content"/> assumes it is non-null — the awareness
+/// loop dereferences it immediately to log a preview. The SignalR hub always guarded this; the REST
+/// endpoint did not, so a body missing <c>message</c> bound to a null Content and surfaced as a 500 on
+/// what is plainly a malformed request. Callers get to find out they sent something invalid.</para>
+/// </summary>
+public static class IncomingMessageRules
+{
+    public const string MissingContentError = "message is required and cannot be empty";
+
+    /// <summary>True when <paramref name="content"/> is usable as message content.</summary>
+    public static bool IsValidContent(string? content) => !string.IsNullOrWhiteSpace(content);
+}
+
 public class IncomingMessage
 {
     public int Id { get; init; }
