@@ -6,7 +6,10 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.Threading;
+using Avalonia.Platform.Storage;
 using DarciControl.Logic.Chat;
+using DarciControl.Logic.Nodes;
+using DarciControl.Logic.Packaging;
 using DarciControl.Logic.Prerequisites;
 using DarciControl.Logic.Runtime;
 
@@ -37,6 +40,22 @@ public sealed class PrereqRow
     public required IBrush Colour { get; init; }
 }
 
+/// <summary>One selectable node in the builder.</summary>
+public sealed class NodeRow
+{
+    public required string NodeId { get; init; }
+    public required string DisplayName { get; init; }
+    public required string Version { get; init; }
+    public required string Capabilities { get; init; }
+    public required string Transport { get; init; }
+    public string Problem { get; init; } = "";
+    public bool HasProblem => !string.IsNullOrEmpty(Problem);
+    public bool IsSelectable => !HasProblem;
+
+    /// <summary>Bound two-way to the checkbox. Plain mutable state — the build reads it once, on click.</summary>
+    public bool IsSelected { get; set; }
+}
+
 public partial class MainWindow : Window
 {
     private readonly DarciConnection _connection = new();
@@ -44,6 +63,8 @@ public partial class MainWindow : Window
     private readonly ObservableCollection<PrereqRow> _prereqs = new();
     private readonly PrerequisiteChecker _checker;
     private readonly CoreLauncher _launcher;
+    private readonly ObservableCollection<NodeRow> _nodes = new();
+    private readonly DarciPaths _paths;
 
     public MainWindow()
     {
@@ -55,9 +76,12 @@ public partial class MainWindow : Window
         Messages.ItemsSource = _messages;
         PrereqList.ItemsSource = _prereqs;
 
-        var paths = new DarciPaths { Root = FindRepoRoot() };
-        _checker = new PrerequisiteChecker(paths);
-        _launcher = new CoreLauncher(paths, _checker);
+        _paths = new DarciPaths { Root = FindRepoRoot() };
+        _checker = new PrerequisiteChecker(_paths);
+        _launcher = new CoreLauncher(_paths, _checker);
+
+        NodeList.ItemsSource = _nodes;
+        LoadNodes();
 
         // A core this app started can outlive an app crash. Find it rather than leaving it invisible.
         if (_launcher.FindAdoptable() is { } orphan)
@@ -274,6 +298,106 @@ public partial class MainWindow : Window
     {
         StartLog.Text = string.IsNullOrEmpty(StartLog.Text) ? line : StartLog.Text + "\n" + line;
     }
+
+    // ── build a distributable ──
+
+    private void LoadNodes()
+    {
+        _nodes.Clear();
+
+        foreach (var entry in NodeCatalog.Scan(_paths.NodesPath))
+        {
+            _nodes.Add(new NodeRow
+            {
+                NodeId = entry.NodeId,
+                DisplayName = entry.DisplayName,
+                Version = "v" + entry.Version,
+                Capabilities = entry.Capabilities.Count > 0
+                    ? string.Join(", ", entry.Capabilities)
+                    : "(no capabilities declared)",
+                Transport = entry.IsOutOfProcess ? "[http]" : "[in-process]",
+                Problem = entry.Problem ?? "",
+                // Everything that CAN ship is ticked by default: the common case is "package what I have",
+                // and a bare core is then one deliberate action away rather than the accidental outcome of
+                // not noticing a list.
+                IsSelected = entry.IsSelectable,
+            });
+        }
+    }
+
+    private void OnRefreshNodesClick(object? sender, RoutedEventArgs e)
+    {
+        LoadNodes();
+        BuildLog.Text = $"Found {_nodes.Count} node(s) in {_paths.NodesPath}.";
+    }
+
+    private async void OnBuildZipClick(object? sender, RoutedEventArgs e)
+    {
+        var platform = TargetCombo.SelectedIndex == 1 ? TargetPlatform.Linux : TargetPlatform.Windows;
+        var selected = _nodes.Where(n => n.IsSelected && n.IsSelectable).Select(n => n.NodeId).ToList();
+
+        var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = "Save distributable",
+            SuggestedFileName = $"darci-{platform.Os.ToString().ToLowerInvariant()}.zip",
+            DefaultExtension = "zip",
+        });
+
+        if (file is null) return;   // cancelled
+
+        BuildZipButton.IsEnabled = false;
+        BuildLog.Text = "";
+
+        try
+        {
+            var request = new ZipBuildRequest
+            {
+                RepoRoot = _paths.Root,
+                OutputPath = file.Path.LocalPath,
+                SelectedNodeIds = selected,
+                IncludeOnnxModels = OnnxCheck.IsChecked == true,
+                Platform = platform,
+            };
+
+            BuildLine(selected.Count == 0
+                ? $"Building a BARE CORE for {platform.Os} - valid, and it will say so honestly."
+                : $"Building for {platform.Os} with: {string.Join(", ", selected)}");
+            BuildLine($"Publishing self-contained ({platform.Rid}) - this takes a few minutes...");
+
+            var publishDir = Path.Combine(Path.GetTempPath(), $"darci-publish-{platform.Rid}");
+            var publish = await new CorePublisher().PublishAsync(request.RepoRoot, publishDir, request.Runtime);
+            if (!publish.Success)
+            {
+                BuildLine("FAILED to publish: " + publish.Error);
+                return;
+            }
+
+            BuildLine("Publish OK. Assembling the zip...");
+
+            var catalog = NodeCatalog.Scan(_paths.NodesPath);
+            var plan = ZipPlan.Create(request, catalog, publishDir);
+            var readme = ZipAssembler.BuildReadme(request, plan, _paths.HostProfilePath);
+            var result = ZipAssembler.Write(plan, request.OutputPath, readme, platform);
+
+            foreach (var warning in result.Warnings) BuildLine("  note: " + warning);
+
+            BuildLine(result.Success
+                ? $"DONE: {result.ZipPath} ({result.Bytes / 1024 / 1024} MB), nodes: "
+                  + (result.IncludedNodeIds.Count == 0 ? "(bare core)" : string.Join(", ", result.IncludedNodeIds))
+                : "FAILED: " + result.Error);
+        }
+        catch (Exception ex)
+        {
+            BuildLine("FAILED: " + ex.GetBaseException().Message);
+        }
+        finally
+        {
+            BuildZipButton.IsEnabled = true;
+        }
+    }
+
+    private void BuildLine(string line) =>
+        BuildLog.Text = string.IsNullOrEmpty(BuildLog.Text) ? line : BuildLog.Text + "\n" + line;
 
     /// <summary>
     /// Stop a core this app started, so closing the window does not leave one holding port 5081 and
