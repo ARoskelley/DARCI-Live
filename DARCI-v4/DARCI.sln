@@ -45,6 +45,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DarciControl.Logic", "..\DA
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DarciControl.Logic.Tests", "..\DARCI-Control\DarciControl.Logic.Tests\DarciControl.Logic.Tests.csproj", "{5AA19E62-3333-403F-9CC3-D778D3A1C99E}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DarciControl.App", "..\DARCI-Control\DarciControl.App\DarciControl.App.csproj", "{1CF42612-FB3C-4DA0-98FB-B3DA79D27CB7}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -307,6 +309,18 @@ Global
 		{5AA19E62-3333-403F-9CC3-D778D3A1C99E}.Release|x64.Build.0 = Release|Any CPU
 		{5AA19E62-3333-403F-9CC3-D778D3A1C99E}.Release|x86.ActiveCfg = Release|Any CPU
 		{5AA19E62-3333-403F-9CC3-D778D3A1C99E}.Release|x86.Build.0 = Release|Any CPU
+		{1CF42612-FB3C-4DA0-98FB-B3DA79D27CB7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1CF42612-FB3C-4DA0-98FB-B3DA79D27CB7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1CF42612-FB3C-4DA0-98FB-B3DA79D27CB7}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{1CF42612-FB3C-4DA0-98FB-B3DA79D27CB7}.Debug|x64.Build.0 = Debug|Any CPU
+		{1CF42612-FB3C-4DA0-98FB-B3DA79D27CB7}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{1CF42612-FB3C-4DA0-98FB-B3DA79D27CB7}.Debug|x86.Build.0 = Debug|Any CPU
+		{1CF42612-FB3C-4DA0-98FB-B3DA79D27CB7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1CF42612-FB3C-4DA0-98FB-B3DA79D27CB7}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1CF42612-FB3C-4DA0-98FB-B3DA79D27CB7}.Release|x64.ActiveCfg = Release|Any CPU
+		{1CF42612-FB3C-4DA0-98FB-B3DA79D27CB7}.Release|x64.Build.0 = Release|Any CPU
+		{1CF42612-FB3C-4DA0-98FB-B3DA79D27CB7}.Release|x86.ActiveCfg = Release|Any CPU
+		{1CF42612-FB3C-4DA0-98FB-B3DA79D27CB7}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -9,12 +9,14 @@
 
   <!--
     DELIBERATELY UI-AGNOSTIC and deliberately not Windows-targeted. Every non-UI concern of the control
-    centre lives here: prerequisite checks, model resolution, node scanning, zip building. The shell (WPF
-    today) is the cheap half to redo; this is the expensive half, so it stays portable and testable. A
-    later Avalonia or CLI front-end is then a UI swap rather than a rewrite.
+    centre lives here: prerequisite checks, model resolution, node scanning, zip building, and the chat
+    transport. The shell (Avalonia) is the cheap half to redo; this is the expensive half, so it stays
+    portable and testable. A later CLI front-end is then an additional face, not a rewrite.
   -->
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.0" />
+    <!-- The chat transport is a non-UI concern: portable, and reusable by a future CLI front-end. -->
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="8.0.0" />
   </ItemGroup>
 
   <!-- Reuses the core's manifest and host-profile types rather than reimplementing them: the control
