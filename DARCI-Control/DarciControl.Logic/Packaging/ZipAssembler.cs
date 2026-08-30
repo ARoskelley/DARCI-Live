@@ -23,8 +23,10 @@ public static class ZipAssembler
     /// <summary>Directories never copied into the zip: build noise and per-machine state.</summary>
     private static readonly string[] ExcludedDirectories = { "bin", "obj", ".git", "Data", "Workspaces" };
 
-    public static ZipBuildResult Write(ZipPlan plan, string outputPath, string readme)
+    public static ZipBuildResult Write(ZipPlan plan, string outputPath, string readme, TargetPlatform? target = null)
     {
+        var platform = target ?? TargetPlatform.Host;
+
         // REFUSE rather than filter. If a secret reached the plan, the plan is wrong, and quietly dropping
         // the file would hide that from the next person who changes it.
         var forbidden = plan.FindForbidden();
@@ -49,8 +51,10 @@ public static class ZipAssembler
 
                 WriteText(archive, "darci/README.md", readme);
 
-                // Generated for THIS layout — the repo launcher cannot work here. See PackagedStartScript.
-                WriteText(archive, $"darci/{PackagedStartScript.FileName}", PackagedStartScript.Build());
+                // Generated for THIS layout and THIS target OS — the repo launcher cannot work here, and a
+                // Windows launcher in a Linux zip is just as useless. See PackagedStartScript.
+                var launcher = PackagedStartScript.FileNameFor(platform);
+                WriteText(archive, $"darci/{launcher}", PackagedStartScript.Build(platform), platform);
             }
 
             return new ZipBuildResult(true, outputPath, new FileInfo(outputPath).Length,
@@ -63,15 +67,27 @@ public static class ZipAssembler
         }
     }
 
-    private static void WriteText(ZipArchive archive, string entryPath, string content)
+    /// <summary>Unix rw-r--r-- and rwxr-xr-x, in the high 16 bits where the zip format keeps them.</summary>
+    private const int UnixExecutableAttributes = unchecked((int)0x81ED0000);   // 0100755
+
+    private static void WriteText(ZipArchive archive, string entryPath, string content, TargetPlatform? platform = null)
     {
         var entry = archive.CreateEntry(entryPath);
 
-        // A BOM for scripts, deliberately. Windows PowerShell 5.1 reads a .ps1 as ANSI unless one is
+        // A BOM for PowerShell, deliberately. Windows PowerShell 5.1 reads a .ps1 as ANSI unless one is
         // present, so BOM-less UTF-8 turns any non-ASCII character into mojibake — and mojibake inside a
         // script is not a cosmetic problem, it is a parse error on the recipient's machine. Found by
         // running a generated launcher rather than by asserting on its text.
+        //
+        // A .sh must NOT get one: bash would read the BOM as part of the shebang line and refuse to run.
         var needsBom = entryPath.EndsWith(".ps1", StringComparison.OrdinalIgnoreCase);
+
+        // A zip carries Unix permissions only if we set them, and a shell script without the executable
+        // bit fails with a bare "Permission denied" that tells the recipient nothing. The script also
+        // re-chmods the core itself for the same reason.
+        if (entryPath.EndsWith(".sh", StringComparison.OrdinalIgnoreCase))
+            entry.ExternalAttributes = UnixExecutableAttributes;
+
         using var writer = new StreamWriter(entry.Open(), new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: needsBom));
         writer.Write(content);
     }
@@ -128,11 +144,14 @@ public static class ZipAssembler
         ## Running it
 
         ```
-        .\Start-DARCI.ps1
+        {(request.Platform.IsLinux ? "./start-darci.sh" : @".\Start-DARCI.ps1")}
         ```
 
         It checks prerequisites, starts the core on <http://localhost:5081>, and opens the web UI at
         <http://localhost:5081/app/>.
+        {(request.Platform.IsLinux
+            ? "\nIf the script will not run, restore its executable bit: `chmod +x start-darci.sh`.\n"
+            : "")}
 
         ## What is included
 

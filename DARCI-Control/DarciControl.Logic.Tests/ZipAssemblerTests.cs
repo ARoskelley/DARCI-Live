@@ -194,8 +194,14 @@ public sealed class ZipAssemblerTests : IDisposable
         // cosmetic blemish. Belt and braces: emit the BOM, and keep the content ASCII anyway.
         BuildAndRead(Request(), Array.Empty<NodeCatalogEntry>());
 
-        var script = PackagedStartScript.Build();
-        Assert.All(script, c => Assert.True(c < 128, $"non-ASCII character '{c}' in the packaged launcher"));
+        // Both launchers, not just the one this host builds by default: a Linux zip cross-built from
+        // Windows must be just as clean, and nobody here will notice if it is not.
+        foreach (var platform in new[] { TargetPlatform.Windows, TargetPlatform.Linux })
+        {
+            var text = PackagedStartScript.Build(platform);
+            Assert.All(text, c => Assert.True(c < 128,
+                $"non-ASCII character '{c}' in the {platform.Os} launcher"));
+        }
 
         using var archive = ZipFile.OpenRead(Path.Combine(_root, "darci.zip"));
         using var stream = archive.GetEntry("darci/Start-DARCI.ps1")!.Open();

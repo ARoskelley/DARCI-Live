@@ -20,8 +20,16 @@ public sealed record ZipBuildRequest
     /// separately"), and the core degrades to its priority ladder without them.</summary>
     public bool IncludeOnnxModels { get; init; }
 
+    /// <summary>
+    /// Which OS this distributable is FOR. Defaults to the machine building it, which is the common case;
+    /// cross-building is a deliberate choice. Everything that differs — the publish RID, the executable
+    /// name, the launcher — comes from here rather than being hardcoded, so a Linux zip is a parameter
+    /// rather than a second code path that quietly rots.
+    /// </summary>
+    public TargetPlatform Platform { get; init; } = TargetPlatform.Host;
+
     /// <summary>Publish RID. Self-contained, so the target machine needs no .NET SDK.</summary>
-    public string Runtime { get; init; } = "win-x64";
+    public string Runtime => Platform.Rid;
 }
 
 /// <summary>One file or folder that will be written into the zip, and where.</summary>
