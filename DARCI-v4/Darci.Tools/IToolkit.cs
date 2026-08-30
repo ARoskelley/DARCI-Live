@@ -11,7 +11,11 @@ namespace Darci.Tools;
 public interface IToolkit
 {
     // === Communication ===
-    Task SendMessage(string userId, string content, bool externalNotify = false);
+    /// <summary>
+    /// Queue a message to the user. <paramref name="inResponseToMessageId"/> is optional: unprompted
+    /// messages genuinely have nothing to correlate to, and inventing one would be a lie.
+    /// </summary>
+    Task SendMessage(string userId, string content, bool externalNotify = false, int? inResponseToMessageId = null);
     Task<string> GenerateReply(ReplyContext context);
 
     // === Language/Thinking ===

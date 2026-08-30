@@ -433,7 +433,12 @@ public class Darci : BackgroundService
         if (string.IsNullOrEmpty(action.MessageContent) || string.IsNullOrEmpty(action.RecipientId))
             return null;
 
-        await _tools.SendMessage(action.RecipientId, action.MessageContent, externalNotify: action.ExternalNotify);
+        // Carry the correlation the decision layer already worked out. A Reply knows which message it
+        // answers; dropping that here is what left every client unable to match reply to question.
+        await _tools.SendMessage(
+            action.RecipientId, action.MessageContent,
+            externalNotify: action.ExternalNotify,
+            inResponseToMessageId: action.InResponseToMessageId);
 
         await _tools.StoreMemory(
             $"I said to {action.RecipientId}: {action.MessageContent}",

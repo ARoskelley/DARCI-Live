@@ -245,6 +245,10 @@ builder.Services.AddSingleton<IDecisionNetwork>(sp =>
 
 // Core DARCI components (singletons - one consciousness)
 builder.Services.AddSingleton<Awareness>();
+
+// One sequence for BOTH ingress paths (REST and the hub), so ids are unique across a session no matter
+// which client sent the message.
+builder.Services.AddSingleton<MessageIdSequence>();
 builder.Services.AddSingleton<State>();
 // Constructor: (ILogger, IToolkit, IGoalManager, IStateEncoder, ExperienceBuffer, IDecisionNetwork, EngineeringGoalDetector?, IConfidenceTracker?, GoalDecomposer?)
 // The last three parameters are nullable — use GetService<> so they resolve to null
@@ -790,7 +794,7 @@ app.MapGet("/", () => "DARCI v4.0 - Neural Autonomous Consciousness");
 app.MapGet("/status", (Darci.Core.Darci darci) => darci.GetStatus());
 
 // Send a message to DARCI
-app.MapPost("/message", async (MessageRequest request, Awareness awareness) =>
+app.MapPost("/message", async (MessageRequest request, Awareness awareness, MessageIdSequence ids) =>
 {
     // A malformed request is the caller's bug, and it should say so. Without this the null Content reached
     // Awareness.NotifyMessage, which dereferences it to log a preview — turning a bad payload into a 500.
@@ -802,6 +806,9 @@ app.MapPost("/message", async (MessageRequest request, Awareness awareness) =>
 
     var message = new IncomingMessage
     {
+        // Without an id the reply cannot point back at anything, and a client watching a broadcast hub
+        // cannot tell its own answer from one meant for another device.
+        Id = ids.Next(),
         Content = request.Message,
         UserId = request.UserId ?? "Tinman",
         Source = "api",

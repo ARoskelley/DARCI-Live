@@ -53,14 +53,24 @@ public class Toolkit : IToolkit, IResearchToolbox
 
     // === Communication ===
 
-    public async Task SendMessage(string userId, string content, bool externalNotify = false)
+    /// <summary>
+    /// Queue a reply to the user.
+    ///
+    /// <para><paramref name="inResponseToMessageId"/> is optional because plenty of outgoing messages are
+    /// unprompted — a notification, a proactive nudge — and inventing a correlation for those would be a
+    /// lie. When the message IS an answer, passing it lets a client match reply to question; the decision
+    /// layer already carries the id on the action, it was simply being dropped here.</para>
+    /// </summary>
+    public async Task SendMessage(
+        string userId, string content, bool externalNotify = false, int? inResponseToMessageId = null)
     {
         await _outgoingMessages.Writer.WriteAsync(new OutgoingMessage
         {
             UserId = userId,
             Content = content,
             CreatedAt = DateTime.UtcNow,
-            ExternalNotify = externalNotify
+            ExternalNotify = externalNotify,
+            InResponseToMessageId = inResponseToMessageId
         });
     }
 

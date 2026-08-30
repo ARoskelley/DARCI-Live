@@ -27,17 +27,20 @@ public sealed class DarciHub : Hub
     private readonly Darci.Core.Darci _darci;
     private readonly IResearchStore _research;
     private readonly ILogger<DarciHub> _logger;
+    private readonly MessageIdSequence _ids;
 
     public DarciHub(
         Awareness awareness,
         Darci.Core.Darci darci,
         IResearchStore research,
-        ILogger<DarciHub> logger)
+        ILogger<DarciHub> logger,
+        MessageIdSequence ids)
     {
         _awareness = awareness;
         _darci     = darci;
         _research  = research;
         _logger    = logger;
+        _ids       = ids;
     }
 
     public override async Task OnConnectedAsync()
@@ -77,6 +80,9 @@ public sealed class DarciHub : Hub
 
         var incoming = new IncomingMessage
         {
+            // The hub broadcasts replies to Clients.All, so without an id a client cannot tell its own
+            // answer from one meant for another device the same person has connected.
+            Id          = _ids.Next(),
             Content     = message,
             UserId      = userId ?? "Tinman",
             Source      = "hub",
@@ -145,7 +151,11 @@ public sealed class DarciHubNotifier
             message.UserId,
             message.Content,
             CreatedAt     = message.CreatedAt.ToString("O"),
-            message.ExternalNotify
+            message.ExternalNotify,
+            // This goes to Clients.All, so every connected device sees every reply. Without the id a
+            // client cannot tell which reply is the answer to the message IT sent, and cannot clear a
+            // pending state on the right message. Null for unprompted messages, which is honest.
+            message.InResponseToMessageId
         });
 
     /// <summary>Notify clients that a new research file is ready to download.</summary>
