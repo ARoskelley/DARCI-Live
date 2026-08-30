@@ -44,6 +44,9 @@ public sealed class CampaignEligibilitySweepTests : IDisposable
 
     private sealed class StubRouter : INodeRouter
     {
+        // These fakes stand in for a node that IS available; the unavailable path has its own tests.
+        public bool CanServe(string capability) => true;
+
         public Task<NodePacket> DispatchAsync(NodePacket packet, CancellationToken ct = default) => Task.FromResult(packet);
     }
 

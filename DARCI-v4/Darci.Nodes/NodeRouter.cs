@@ -21,6 +21,7 @@ public sealed class NodeRouter : INodeRouter
     private readonly NodeDispatcher _dispatcher;
     private readonly INodePacketStore _store;
     private readonly ILogger<NodeRouter> _logger;
+    private readonly IGapStore? _gaps;
 
     /// <summary>
     /// THE ONLY public constructor — deliberately. This type previously had a second, convenience constructor,
@@ -35,13 +36,19 @@ public sealed class NodeRouter : INodeRouter
         INodeRegistry registry,
         NodeDispatcher dispatcher,
         INodePacketStore store,
-        ILogger<NodeRouter> logger)
+        ILogger<NodeRouter> logger,
+        IGapStore? gaps = null)
     {
         _registry = registry;
         _dispatcher = dispatcher;
         _store = store;
         _logger = logger;
+        _gaps = gaps;
     }
+
+    /// <inheritdoc />
+    public bool CanServe(string capability) =>
+        !string.IsNullOrWhiteSpace(capability) && _registry.Resolve(capability) is not null;
 
     /// <summary>
     /// CONVENIENCE factory for packet-native <see cref="INode"/>s: wraps each in a
@@ -69,16 +76,24 @@ public sealed class NodeRouter : INodeRouter
         var (registration, capability) = Resolve(packet);
         if (registration is null)
         {
-            var failed = packet.State.IsTerminal()
+            // NOT a failure (doc §5.4 missing-environment). Nothing was attempted, so calling this Failed
+            // would feed phantom negative evidence into the confidence and campaign paths — and it would
+            // lie to a collaborator running a core without this node. Blocked is terminal, so the packet
+            // does not leak as an active orphan waiting for a node that cannot appear at runtime; the
+            // ACTIONABLE half goes into a durable GapRecord below, which survives restarts.
+            var blocked = packet.State.IsTerminal()
                 ? packet
-                : packet.Transition(NodeId.Orchestrator, NodeState.Failed,
-                    "No node could be resolved for this packet.",
-                    success: false,
-                    error: $"No node matches address={packet.Address?.ToString() ?? "—"} / capability={packet.RequestedCapability?.ToString() ?? "—"}.");
-            await _store.SavePacketAsync(failed, ct);
-            _logger.LogWarning("NodeRouter: no node for packet {Id} (address={Addr}, capability={Cap}).",
-                packet.Id, packet.Address, packet.RequestedCapability);
-            return failed;
+                : packet.Transition(NodeId.Orchestrator, NodeState.Blocked,
+                    "No node serves this capability — nothing was attempted.",
+                    success: null,
+                    error: $"No node matches address={packet.Address?.ToString() ?? "—"} / capability={capability}.");
+            await _store.SavePacketAsync(blocked, ct);
+            _logger.LogWarning(
+                "NodeRouter: no node serves capability {Cap} (address={Addr}) for packet {Id} — blocked, not failed.",
+                capability, packet.Address, packet.Id);
+
+            await RecordUnavailableCapabilityGapAsync(packet, capability, ct);
+            return blocked;
         }
 
         _logger.LogInformation("NodeRouter dispatching packet {Id} to {Node}.", packet.Id, registration.NodeId);
@@ -100,6 +115,35 @@ public sealed class NodeRouter : INodeRouter
                     success: false, error: $"{ex.GetType().Name}: {ex.Message}");
             await _store.SavePacketAsync(aborted, ct);
             return aborted;
+        }
+    }
+
+    /// <summary>
+    /// The restart-safe home for "this core cannot do X". The packet terminates; the standing need does
+    /// not live in it. Best-effort by design — a core with no gap store still degrades correctly, it just
+    /// has nowhere to write the note, and failing to record a gap must never turn a clean degradation into
+    /// an exception.
+    /// </summary>
+    private async Task RecordUnavailableCapabilityGapAsync(NodePacket packet, string capability, CancellationToken ct)
+    {
+        if (_gaps is null) return;
+
+        try
+        {
+            await _gaps.AddAsync(new GapRecord
+            {
+                CorrelationId = packet.CorrelationId,
+                OriginPacketId = packet.Id,
+                OriginNode = NodeId.Orchestrator,
+                Question = $"No node serves capability '{capability}'.",
+                Intent = packet.Payload.Intent,
+                Missing = $"a node providing capability {capability}",
+                Status = GapStatus.Open,
+            }, ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogDebug(ex, "Could not record a gap for unavailable capability {Cap} (non-fatal).", capability);
         }
     }
 

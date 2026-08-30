@@ -37,6 +37,9 @@ public sealed class SandboxPoCGateTests : IDisposable
 
     private sealed class FakeRouter : INodeRouter
     {
+        // These fakes stand in for a node that IS available; the unavailable path has its own tests.
+        public bool CanServe(string capability) => true;
+
         private readonly bool _pass;
         public FakeRouter(bool pass) => _pass = pass;
         public Task<NodePacket> DispatchAsync(NodePacket packet, CancellationToken ct = default)

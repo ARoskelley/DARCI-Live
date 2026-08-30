@@ -492,7 +492,10 @@ builder.Services.AddSingleton<INodeRouter>(sp => new NodeRouter(
     sp.GetRequiredService<INodeRegistry>(),
     sp.GetRequiredService<NodeDispatcher>(),
     sp.GetRequiredService<INodePacketStore>(),
-    sp.GetRequiredService<ILogger<NodeRouter>>()));
+    sp.GetRequiredService<ILogger<NodeRouter>>(),
+    // A capability nobody serves terminates the packet as Blocked; the standing need ("no node serves
+    // coding.write") goes here, where it outlives the packet and survives a restart.
+    sp.GetRequiredService<IGapStore>()));
 
 // Gap-driven action: persist gaps, decide immediate-fill vs deferred auto-goal. The handler routes via
 // a Lazy<INodeRouter> to break the cycle (KnowledgeNode → GapHandler → router → KnowledgeNode).

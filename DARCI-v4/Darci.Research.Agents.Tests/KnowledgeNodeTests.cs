@@ -180,6 +180,9 @@ public class KnowledgeNodeTests
 
     private sealed class FakeInnovationRouter : INodeRouter
     {
+        // These fakes stand in for a node that IS available; the unavailable path has its own tests.
+        public bool CanServe(string capability) => true;
+
         private readonly InnovationProposal _proposal;
         public Capability? DispatchedCapability;
         public bool Called;

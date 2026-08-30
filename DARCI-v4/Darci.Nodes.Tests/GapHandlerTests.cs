@@ -24,6 +24,9 @@ public sealed class GapHandlerTests : IDisposable
     // Router that records dispatches and returns a Succeeded packet.
     private sealed class RecordingRouter : INodeRouter
     {
+        // These fakes stand in for a node that IS available; the unavailable path has its own tests.
+        public bool CanServe(string capability) => true;
+
         public NodePacket? Dispatched;
         public Task<NodePacket> DispatchAsync(NodePacket packet, CancellationToken ct = default)
         {

@@ -290,7 +290,9 @@ public sealed class SqliteNodePacketStore : INodePacketStore
         await using var conn = new SqliteConnection(_connectionString);
         await conn.OpenAsync(ct);
 
-        // Active = state < Succeeded (Created..AwaitingDependency are 0..4; terminal are 5..7).
+        // Active = state <= AwaitingDependency (Created..AwaitingDependency are 0..4; terminal are 5..8,
+        // Blocked being the appended 8). The ordinal order is load-bearing here: a terminal state added
+        // below 4 would silently become an orphan-sweep target for every stored packet.
         var ids = new List<string>();
         await using (var cmd = conn.CreateCommand())
         {

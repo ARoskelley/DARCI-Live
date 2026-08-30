@@ -229,7 +229,12 @@ public sealed class NodeDispatcherTests : IDisposable
         var router = RouterFor(registry, new NodeDispatcher(NullLogger<NodeDispatcher>.Instance));
         var result = await router.DispatchAsync(NodePacket.Create("x", capability: Capability.WriteCode));
 
-        Assert.Equal(NodeState.Failed, result.State);
+        // *** RE-BLESSED IN PHASE 3 SU 3.1, NOT A REGRESSION ***
+        // Was NodeState.Failed. A degraded node means the capability is not currently served, which is the
+        // same honest answer as "no node has it": Blocked, not failed. The node was never reached, so there
+        // is nothing to call a failure.
+        Assert.Equal(NodeState.Blocked, result.State);
+        Assert.False(result.State.IsFailure());
         Assert.Contains("No node", result.LastEntry!.Decision);
     }
 

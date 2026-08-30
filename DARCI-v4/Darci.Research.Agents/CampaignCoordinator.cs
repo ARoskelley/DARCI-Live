@@ -391,7 +391,13 @@ public sealed class CampaignCoordinator : ICampaignCoordinator
             Enum.TryParse<ValidationStepOutcome>(explicitOutcome, ignoreCase: true, out var parsed))
             return (parsed, measurements);
 
-        var succeeded = result.State == NodeState.Succeeded && (result.LastEntry?.Success ?? false);
+        // A step nothing could run is BLOCKED, not failed. Recording it as Failed would count a hypothesis
+        // as falsified by a test that never executed — phantom negative evidence against something the
+        // human gate then has to un-do.
+        if (result.State == NodeState.Blocked)
+            return (ValidationStepOutcome.Blocked, measurements);
+
+        var succeeded = result.State.IsSuccess() && (result.LastEntry?.Success ?? false);
         return (succeeded ? ValidationStepOutcome.Passed : ValidationStepOutcome.Failed, measurements);
     }
 

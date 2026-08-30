@@ -219,16 +219,25 @@ public class CharacterizationBaselineTests
     // ─────────────────── Router contract: capability resolution is the single seam ───────────────────
 
     [Fact]
-    public async Task Router_UnresolvableCapability_FailsPacketWithNamedError()
+    public async Task Router_UnresolvableCapability_BlocksPacketWithNamedError()
     {
+        // *** RE-BLESSED IN PHASE 3 SU 3.1, NOT A REGRESSION ***
+        // This asserted NodeState.Failed and Success == false. Phase 3 Fork 1 (approved) makes "no node
+        // serves this capability" a BLOCKED outcome, not a failure: nothing was attempted, so reporting
+        // failure both lies to a core running without that node and feeds phantom negative evidence into
+        // the confidence and campaign paths. NodeState.Blocked is a third TERMINAL state, so the packet
+        // still terminates and is still named — only the verdict changed, from "it broke" to "nothing
+        // here can do this". Success is now null (neither true nor false) for the same reason.
         using var h = new CharacterizationHarness();
 
         // No node advertises DesignGeometry.
         var packet = NodePacket.Create("design a bracket", capability: Capability.DesignGeometry);
         var result = await h.Router.DispatchAsync(packet);
 
-        Assert.Equal(NodeState.Failed, result.State);
-        Assert.False(result.LastEntry!.Success);
+        Assert.Equal(NodeState.Blocked, result.State);
+        Assert.True(result.State.IsTerminal());
+        Assert.False(result.State.IsFailure());
+        Assert.Null(result.LastEntry!.Success);
         Assert.Contains("No node", result.LastEntry.Decision);
         Assert.NotNull(result.LastEntry.Error);
     }

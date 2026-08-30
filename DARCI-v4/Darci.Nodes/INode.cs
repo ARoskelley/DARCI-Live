@@ -36,4 +36,14 @@ public interface INodeRouter
     /// entry rather than throwing.
     /// </summary>
     Task<NodePacket> DispatchAsync(NodePacket packet, CancellationToken ct = default);
+
+    /// <summary>
+    /// Can ANY registered node serve <paramref name="capability"/> right now?
+    ///
+    /// <para>This exists because call sites kept asking the wrong question. Branching on "is a router
+    /// wired?" as a proxy for "can anything actually do this?" is wrong in the case Phase 3 is built for —
+    /// a core running without some of the nodes — and it silently skipped a working fallback in the coding
+    /// loop. Ask this instead.</para>
+    /// </summary>
+    bool CanServe(string capability);
 }

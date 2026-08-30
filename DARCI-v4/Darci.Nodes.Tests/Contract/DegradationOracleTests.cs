@@ -14,10 +14,15 @@ namespace Darci.Nodes.Tests.Contract;
 /// ZERO nodes, or any SUBSET of them, must run and answer honestly. A capability nobody serves must produce
 /// a clean, well-formed outcome — never a crash, a hang, or an NRE.</para>
 ///
-/// <para>This suite is written BEFORE the Phase 3 changes so it can catch regressions in them, which means
-/// part of it deliberately pins behavior we are about to CHANGE. Those tests are marked
-/// <c>*** PINS TODAY'S BEHAVIOR — SU 3.1 RE-BLESSES THIS ***</c>. Inverting a marked test in 3.1 is the
-/// plan; inverting an UNMARKED test is a regression and must be treated as one.</para>
+/// <para>This suite landed BEFORE the Phase 3 changes so it could catch regressions in them. One test was
+/// written to pin behavior we intended to change and is now marked
+/// <c>*** RE-BLESSED IN SU 3.1, NOT A REGRESSION ***</c>: an unservable capability reported
+/// <c>Failed</c> and now reports <c>Blocked</c>. Inverting a marked test is a deliberate, reviewed act;
+/// inverting an UNMARKED one is a regression and must be treated as one.</para>
+///
+/// <para>The three "terminal" assertions did NOT need re-blessing, which is the point of Option 3:
+/// <see cref="NodeState.Blocked"/> is a THIRD TERMINAL state, so degraded packets stay terminal and never
+/// become orphan-sweep targets.</para>
 ///
 /// <para>The evidence-loop guardrails at the bottom are the non-negotiable half. Fork 1 moves
 /// "no node serves this" from <c>Failed</c> to <c>blocked</c>/<c>missing-environment</c>, and the one thing
@@ -27,6 +32,7 @@ public sealed class DegradationOracleTests : IDisposable
 {
     private readonly string _dbPath;
     private readonly SqliteNodePacketStore _packets;
+    private readonly string _gapDbPath;
     private readonly string _innovatedDbPath;
     private readonly SqliteInnovatedKnowledgeStore _innovated;
 
@@ -36,6 +42,7 @@ public sealed class DegradationOracleTests : IDisposable
         _packets = new SqliteNodePacketStore($"Data Source={_dbPath}", NullLogger<SqliteNodePacketStore>.Instance);
         _packets.InitializeAsync().GetAwaiter().GetResult();
 
+        _gapDbPath = Path.Combine(Path.GetTempPath(), $"darci-degrade-gap-{Guid.NewGuid():N}.db");
         _innovatedDbPath = Path.Combine(Path.GetTempPath(), $"darci-degrade-inv-{Guid.NewGuid():N}.db");
         _innovated = new SqliteInnovatedKnowledgeStore(
             $"Data Source={_innovatedDbPath}", NullLogger<SqliteInnovatedKnowledgeStore>.Instance);
@@ -45,7 +52,7 @@ public sealed class DegradationOracleTests : IDisposable
     public void Dispose()
     {
         Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
-        foreach (var p in new[] { _dbPath, _innovatedDbPath })
+        foreach (var p in new[] { _dbPath, _innovatedDbPath, _gapDbPath })
         {
             try { if (File.Exists(p)) File.Delete(p); } catch { /* best effort */ }
         }
@@ -174,22 +181,117 @@ public sealed class DegradationOracleTests : IDisposable
         Assert.Null(registry.Resolve(Capabilities.InnovationSynthesize));
     }
 
-    // ══ *** PINS TODAY'S BEHAVIOR — SU 3.1 RE-BLESSES THIS *** ══
+    // ══ *** RE-BLESSED IN SU 3.1, NOT A REGRESSION *** ══
 
     [Fact]
-    public async Task Today_AnUnservableCapability_ReportsFailed()
+    public async Task AnUnservableCapability_IsBlocked_NotFailed()
     {
-        // *** PINS TODAY'S BEHAVIOR — SU 3.1 RE-BLESSES THIS ***
-        // Fork 1: "no node serves this" is not a failure, it is a dependency the goal is blocked on, and
-        // Rev 0.1.1 added `blocked`/`missing-environment` precisely for it. 3.1 flips this to Blocked.
-        // "Attempted and genuinely broke" must STILL map to Failed — see the test below, which is not
-        // marked and must not change.
+        // *** RE-BLESSED IN SU 3.1, NOT A REGRESSION ***
+        // This test previously asserted Failed. Fork 1 (approved): "no node serves this" is not a failure,
+        // it is a dependency the goal is blocked on, and Rev 0.1.1 added `blocked`/`missing-environment`
+        // for exactly this. NodeState.Blocked was APPENDED at 8 as a THIRD terminal outcome — terminal so
+        // the packet cannot leak as an active orphan, distinct so it is never counted as success or
+        // failure. "Attempted and genuinely broke" still maps to Failed; that test is unmarked below.
         var router = Router();
 
         var result = await router.DispatchAsync(
             NodePacket.Create("write code", capability: Capability.WriteCode));
 
-        Assert.Equal(NodeState.Failed, result.State);
+        Assert.Equal(NodeState.Blocked, result.State);
+    }
+
+    [Fact]
+    public async Task Blocked_IsTerminal_SoItIsNeverAnOrphanSweepTarget()
+    {
+        // The reason Blocked is terminal rather than a parked AwaitingDependency: a packet waiting for a
+        // node that cannot appear at runtime is a leak, and the watchdog's startup orphan sweep would
+        // abort it at the next restart — a delayed, silent state change.
+        var router = Router();
+
+        var result = await router.DispatchAsync(
+            NodePacket.Create("write code", capability: Capability.WriteCode));
+
+        Assert.True(result.State.IsTerminal());
+        Assert.False(result.State.IsActive());
+    }
+
+    [Fact]
+    public async Task Blocked_IsNeitherSuccessNorFailure()
+    {
+        // The whole point of the third terminal state. Anything asking "did this go wrong" must get NO.
+        var router = Router();
+
+        var result = await router.DispatchAsync(
+            NodePacket.Create("write code", capability: Capability.WriteCode));
+
+        Assert.False(result.State.IsFailure());
+        Assert.False(result.State.IsSuccess());
+        Assert.NotEqual(true, result.LastEntry?.Success);
+        Assert.NotEqual(false, result.LastEntry?.Success);
+    }
+
+    [Fact]
+    public void TheStateMachine_TreatsBlockedAsTerminalAndUnleavable()
+    {
+        Assert.True(NodeState.Blocked.IsTerminal());
+        Assert.False(NodeStateMachine.CanTransition(NodeState.Blocked, NodeState.Working));
+        Assert.False(NodeStateMachine.CanTransition(NodeState.Blocked, NodeState.Succeeded));
+
+        // Ordinal order is load-bearing: the store's "active" query is state <= AwaitingDependency (4).
+        Assert.True((int)NodeState.Blocked > (int)NodeState.AwaitingDependency);
+    }
+
+    [Fact]
+    public async Task AnUnservableCapability_RecordsADurableGap_TheRestartSafeHomeForTheNeed()
+    {
+        // The packet terminates, so the standing need must live somewhere that outlives it. This is what
+        // makes a bare core honest: it can say "I need a node for coding.write" after a restart.
+        var gaps = new SqliteGapStore($"Data Source={_gapDbPath}", NullLogger<SqliteGapStore>.Instance);
+        await gaps.InitializeAsync();
+
+        var router = new NodeRouter(
+            new NodeRegistry(NullLogger<NodeRegistry>.Instance),
+            new NodeDispatcher(NullLogger<NodeDispatcher>.Instance),
+            _packets,
+            NullLogger<NodeRouter>.Instance,
+            gaps);
+
+        var root = $"root-{Guid.NewGuid():N}";
+        await router.DispatchAsync(NodePacket.Create(
+            "write code", capability: Capability.WriteCode, correlationId: root));
+
+        // Read back through a SEPARATE store instance — proving it is on disk, not in memory.
+        var reopened = new SqliteGapStore($"Data Source={_gapDbPath}", NullLogger<SqliteGapStore>.Instance);
+        var recorded = await reopened.GetByCorrelationAsync(root);
+
+        var gap = Assert.Single(recorded);
+        Assert.Contains(Capabilities.CodingWrite, gap.Missing);
+        Assert.Equal(GapStatus.Open, gap.Status);
+    }
+
+    [Fact]
+    public async Task AZeroNodeCore_WithNoGapStore_StillDegradesCleanly()
+    {
+        // A core with nowhere to write the note must still degrade, not throw. Recording the gap is
+        // best-effort; the degradation is not.
+        var router = Router();
+
+        var result = await router.DispatchAsync(
+            NodePacket.Create("write code", capability: Capability.WriteCode));
+
+        Assert.Equal(NodeState.Blocked, result.State);
+    }
+
+    [Fact]
+    public void CanServe_AnswersTheHonestQuestion()
+    {
+        var withNode = NodeRouter.ForNodes(
+            new INode[] { new FakeNode(NodeId.Coding, Capability.WriteCode) },
+            _packets, NullLogger<NodeRouter>.Instance);
+
+        Assert.True(withNode.CanServe(Capabilities.CodingWrite));
+        Assert.False(withNode.CanServe(Capabilities.KnowledgeGapFill));
+        Assert.False(Router().CanServe(Capabilities.CodingWrite));
     }
 
     [Fact]

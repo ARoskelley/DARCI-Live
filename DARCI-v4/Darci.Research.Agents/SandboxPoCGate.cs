@@ -91,7 +91,18 @@ public sealed class SandboxPoCGate : ISandboxPoCGate
             slots: new Dictionary<string, string> { [PacketSlots.Question] = entry.Hypothesis });
 
         var result = await _router.DispatchAsync(child, ct);
-        var passed = result.State == NodeState.Succeeded && (result.LastEntry?.Success ?? false);
+
+        // Nothing ran, so there is nothing to learn. Writing FailureEvidence here would demote a hypothesis
+        // because the OPERATOR is missing a sandbox node — punishing an idea for the host's configuration.
+        if (result.State == NodeState.Blocked)
+        {
+            _logger.LogInformation(
+                "Sandbox PoC for {Id} skipped: no node serves the sandbox capability — no evidence recorded.",
+                entry.Id);
+            return null;
+        }
+
+        var passed = result.State.IsSuccess() && (result.LastEntry?.Success ?? false);
         var measurements = ParseMeasurements(result.Payload.Slot(PacketSlots.StepMeasurements));
 
         // WEIGHT CAP: clamp this run's contribution so cumulative sandbox weight never exceeds the ceiling.

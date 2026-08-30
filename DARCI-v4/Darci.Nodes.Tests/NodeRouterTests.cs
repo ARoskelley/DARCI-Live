@@ -99,10 +99,15 @@ public sealed class NodeRouterTests : IDisposable
         var knowledge = new FakeNode(NodeId.Knowledge, Capability.FillKnowledgeGap);
         var router = Router(knowledge);
 
+        // *** RE-BLESSED IN PHASE 3 SU 3.1, NOT A REGRESSION ***
+        // Was NodeState.Failed. "No node serves this capability" is now Blocked — a third TERMINAL state,
+        // so this still degrades gracefully and still names the reason; it just no longer claims that
+        // something was attempted and broke.
         var packet = NodePacket.Create("do coding", capability: Capability.WriteCode);
         var result = await router.DispatchAsync(packet);
 
-        Assert.Equal(NodeState.Failed, result.State);
+        Assert.Equal(NodeState.Blocked, result.State);
+        Assert.True(result.State.IsTerminal());
         Assert.False(knowledge.WasCalled);
         Assert.Contains("No node", result.LastEntry!.Decision, StringComparison.OrdinalIgnoreCase);
     }
