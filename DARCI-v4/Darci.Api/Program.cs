@@ -451,46 +451,50 @@ builder.Services.AddSingleton<NodeManifestLoader>();
 builder.Services.AddSingleton<INodeRegistrationStore>(sp =>
     new SqliteNodeRegistrationStore(connectionString, sp.GetRequiredService<ILogger<SqliteNodeRegistrationStore>>()));
 
+// The per-process loopback secret for out-of-process nodes (D4, minimal). Generated fresh each start:
+// it is a local handshake token, not a credential anybody stores.
+var nodeSharedSecret = Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(16));
+
+builder.Services.AddSingleton(new NodeDiscoveryOptions
+{
+    HandshakeTimeout = TimeSpan.FromSeconds(3),
+    SharedSecret = nodeSharedSecret,
+});
+builder.Services.AddSingleton<NodeDiscoveryReportHolder>();
+builder.Services.AddHttpClient("darci-node");
+
 builder.Services.AddSingleton<INodeRegistry>(sp =>
 {
-    var log = sp.GetRequiredService<ILogger<Program>>();
     var registry = new NodeRegistry(sp.GetRequiredService<ILogger<NodeRegistry>>());
+    var options = sp.GetRequiredService<NodeDiscoveryOptions>();
 
     // Manifests are the source of truth for the capability surface. A manifest reviewed and merged into the
     // repo IS the human-authored capability grant (Phase E §14c); there is no runtime self-registration.
-    var manifests = sp.GetRequiredService<NodeManifestLoader>().LoadAll(nodesDirectory)
-        .ToDictionary(m => m.Manifest.NodeId, StringComparer.Ordinal);
-
-    // THE MANIFEST GATES REGISTRATION (Phase 3 SU 3.2). A compiled-in node with no darci-node.json is NOT
-    // registered, so its capabilities are simply not served.
     //
-    // This inverts the previous fallback, which synthesized a manifest and registered the node anyway. That
-    // made every built-in unavoidable: there was no supported way to run a core without them. The manifest
-    // is already defined as the human-authored capability grant (§14c), so absence of one is a decision,
-    // not an accident — delete the folder and you get an honest core that does not claim to code.
-    //
-    // Nothing is silently lost: an unserved capability now terminates as Blocked with a durable gap record
-    // (SU 3.1), so the core can say WHICH node it would need.
-    foreach (var node in sp.GetServices<INode>())
-    {
-        var nodeKey = CapabilityKey.From(node.Id);
-        if (manifests.TryGetValue(nodeKey, out var loaded))
-        {
-            registry.Register(new LegacyPacketNodeAdapter(node, loaded.Manifest));
-        }
-        else
-        {
-            log.LogInformation(
-                "Node {NodeId} is compiled in but has no darci-node.json under {Dir} — NOT registered. "
-                + "Its capabilities will be unavailable (requests block honestly). Add a manifest to enable it.",
-                nodeKey, nodesDirectory);
-        }
-    }
+    // Tolerant load (Phase 3 Fork 2): a stranger's malformed manifest must not brick this core. Discovery
+    // decides which failures are fatal — only a first-party one, i.e. a manifest naming a node compiled in
+    // here, is a repo bug worth refusing to start over.
+    var (manifests, failures) = sp.GetRequiredService<NodeManifestLoader>().LoadAllTolerant(nodesDirectory);
 
-    foreach (var orphan in manifests.Keys.Where(k => registry.ResolveNode(k) is null))
-        log.LogWarning("Manifest for {NodeId} declares capabilities but no in-process node implements it; not routable.",
-            orphan);
+    var discovery = new NodeDiscovery(
+        registry,
+        options,
+        manifest => new HttpNodeAdapter(
+            manifest,
+            sp.GetRequiredService<IHttpClientFactory>().CreateClient("darci-node"),
+            sp.GetRequiredService<ILogger<HttpNodeAdapter>>(),
+            options.SharedSecret),
+        sp.GetRequiredService<ILogger<NodeDiscovery>>());
 
+    // Startup-only (Fork 4): a periodic re-health-check is a flagged follow-on, not this phase. Blocking
+    // here is deliberate and BOUNDED — the per-node handshake timeout means a slow or absent node costs a
+    // known amount ONCE, and the core starts regardless. Inheriting an unbounded retry window at startup is
+    // exactly how the Neo4j boot hang happened.
+    var report = discovery
+        .DiscoverAsync(manifests, failures, sp.GetServices<INode>())
+        .GetAwaiter().GetResult();
+
+    sp.GetRequiredService<NodeDiscoveryReportHolder>().Report = report;
     return registry;
 });
 
@@ -1662,6 +1666,32 @@ app.MapPost("/coding/workspaces/{id}/rollback", async Task<IResult> (
 });
 
 // Knowledge graph search
+// === Node diagnostics (Phase 3 SU 3.5) ===
+// What this core can actually do right now, and — just as importantly — what it CANNOT and why. A node
+// that failed its handshake is invisible without this: the capability simply isn't there, and "why" would
+// otherwise live only in a startup log line that has already scrolled past.
+app.MapGet("/nodes", (INodeRegistry registry, NodeDiscoveryReportHolder holder) =>
+{
+    var report = holder.Report;
+    return Results.Ok(new
+    {
+        registered = registry.Registrations.Select(r => new
+        {
+            nodeId = r.NodeId,
+            version = r.Manifest.NodeVersion,
+            kind = r.Manifest.Kind.ToString(),
+            transport = r.Manifest.IsInProcess ? "in-process" : "http",
+            endpoint = r.Manifest.Endpoint,
+            capabilities = r.Manifest.Capabilities.Select(c => c.Name),
+            manifestSha256 = r.ManifestSha256,
+        }),
+        capabilities = registry.RoutableCapabilities,
+        // The honest half: declared but not serving, with the reason.
+        skipped = report.Skipped,
+        summary = new { inProcess = report.InProcess, remote = report.Remote, registered = report.RegisteredCount },
+    });
+});
+
 app.MapGet("/knowledge/entities/search", async (
     IKnowledgeGraph graph,
     string q,

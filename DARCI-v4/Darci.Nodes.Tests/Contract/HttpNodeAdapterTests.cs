@@ -88,7 +88,7 @@ public sealed class HttpNodeAdapterTests : IDisposable
     public async Task FetchManifest_ReturnsWhatTheNodeReports()
     {
         _server.ManifestResponse = (200, JsonSerializer.Serialize(
-            ManifestFor(_server.BaseUrl), HttpNodeAdapter.Json));
+            ManifestFor(_server.BaseUrl), ManifestJson.Options));
 
         var fetched = await Adapter().FetchManifestAsync();
 

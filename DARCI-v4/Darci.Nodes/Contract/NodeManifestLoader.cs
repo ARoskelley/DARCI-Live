@@ -48,6 +48,65 @@ public sealed class NodeManifestLoader
         return results;
     }
 
+    /// <summary>
+    /// Scan like <see cref="LoadAll"/>, but COLLECT failures instead of throwing on the first bad file.
+    ///
+    /// <para>Phase 3 Fork 2: a third party's broken manifest must never brick this core (requirement A),
+    /// while a first-party one still has to be loud and fatal. Those are different verdicts about the same
+    /// kind of file, and only the caller knows which is which — it is the one that can tell whether a
+    /// manifest's node_id matches something compiled in. So the loader reports; discovery decides.</para>
+    /// </summary>
+    public (IReadOnlyList<LoadedManifest> Loaded, IReadOnlyList<ManifestLoadFailure> Failures) LoadAllTolerant(
+        string nodesDirectory)
+    {
+        var loaded = new List<LoadedManifest>();
+        var failures = new List<ManifestLoadFailure>();
+
+        if (!Directory.Exists(nodesDirectory))
+        {
+            _logger.LogInformation("No nodes directory at {Dir}; only code-registered nodes will be available.", nodesDirectory);
+            return (loaded, failures);
+        }
+
+        var files = Directory.EnumerateFiles(nodesDirectory, ManifestFileName, SearchOption.AllDirectories)
+            .OrderBy(f => f, StringComparer.Ordinal)
+            .ToList();
+
+        foreach (var file in files)
+        {
+            try
+            {
+                loaded.Add(Load(file));
+            }
+            catch (NodeRegistrationException ex)
+            {
+                failures.Add(new ManifestLoadFailure(file, ex.Message, TryReadNodeId(file)));
+            }
+        }
+
+        _logger.LogInformation("Loaded {Count} node manifest(s) from {Dir} ({Failed} unreadable).",
+            loaded.Count, nodesDirectory, failures.Count);
+        return (loaded, failures);
+    }
+
+    /// <summary>
+    /// Best-effort node_id from a manifest that failed to load, so a failure can still be ATTRIBUTED.
+    /// Returns null when the file is too broken to say anything about — in which case it cannot be shown
+    /// to be first-party, and discovery treats it as foreign.
+    /// </summary>
+    private static string? TryReadNodeId(string path)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(File.ReadAllText(path));
+            return doc.RootElement.TryGetProperty("node_id", out var id) ? id.GetString() : null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     /// <summary>Load and validate one manifest file.</summary>
     public LoadedManifest Load(string path)
     {
@@ -77,3 +136,9 @@ public sealed class NodeManifestLoader
 }
 
 public sealed record LoadedManifest(NodeManifest Manifest, string SourcePath, string Sha256);
+
+/// <summary>A manifest file that could not be loaded, with enough context to attribute it (Phase 3 Fork 2).</summary>
+/// <param name="Path">Where the bad file is.</param>
+/// <param name="Reason">Why it could not be loaded — quoted verbatim in logs so it is actionable.</param>
+/// <param name="DeclaredNodeId">Its node_id if readable at all; null when the file is too broken to attribute.</param>
+public sealed record ManifestLoadFailure(string Path, string Reason, string? DeclaredNodeId);

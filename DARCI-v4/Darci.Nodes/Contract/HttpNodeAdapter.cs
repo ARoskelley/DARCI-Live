@@ -92,7 +92,15 @@ public sealed class HttpNodeAdapter : INodeAdapter
             if (!response.IsSuccessStatusCode) return null;
 
             var body = await response.Content.ReadAsStringAsync(ct);
-            return string.IsNullOrWhiteSpace(body) ? null : JsonSerializer.Deserialize<NodeManifest>(body, Json);
+
+            // Deserialize with the SAME options the on-disk loader uses, not this class's envelope options.
+            // Two reasons, one of which cost a live boot: ManifestJson carries the string-enum converter, so
+            // without it a perfectly valid `"kind": "capability"` fails to parse and the node is silently
+            // skipped as "unparseable". And the handshake compares SHAs — a hash is only comparable if both
+            // sides were parsed by identical rules.
+            return string.IsNullOrWhiteSpace(body)
+                ? null
+                : JsonSerializer.Deserialize<NodeManifest>(body, ManifestJson.Options);
         }
         catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
         {
