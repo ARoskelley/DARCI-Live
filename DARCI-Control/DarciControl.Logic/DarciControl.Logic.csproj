@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>DarciControl.Logic</RootNamespace>
+  </PropertyGroup>
+
+  <!--
+    DELIBERATELY UI-AGNOSTIC and deliberately not Windows-targeted. Every non-UI concern of the control
+    centre lives here: prerequisite checks, model resolution, node scanning, zip building. The shell (WPF
+    today) is the cheap half to redo; this is the expensive half, so it stays portable and testable. A
+    later Avalonia or CLI front-end is then a UI swap rather than a rewrite.
+  -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.0" />
+  </ItemGroup>
+
+  <!-- Reuses the core's manifest and host-profile types rather than reimplementing them: the control
+       centre must agree with the core about what a node is and which models a host needs, and the only
+       way to guarantee that is to read the same code. -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\DARCI-v4\Darci.Nodes\Darci.Nodes.csproj" />
+  </ItemGroup>
+
+</Project>
