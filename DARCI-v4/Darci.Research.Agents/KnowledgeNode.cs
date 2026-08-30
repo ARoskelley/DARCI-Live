@@ -64,8 +64,13 @@ public sealed class KnowledgeNode : INode
             // ESCALATE TO INNOVATION (§10): the KG + deep research are exhausted (not answered) on a
             // blocking, critical-path request. Innovation synthesizes a candidate hypothesis (or honestly
             // concludes it needs external input). Runs above the pipeline, KGMA-orchestrated.
+            // Capability, not router presence: a core running without the innovation node must skip this
+            // cleanly and let the gaps fall through to the handler below, rather than spending a dispatch
+            // to discover nothing serves it.
             var innovationRan = false;
-            if (topLevel && !response.Answered && response.Gaps.Count > 0 && blocking && _innovationRouter is not null)
+            if (topLevel && !response.Answered && response.Gaps.Count > 0 && blocking
+                && _innovationRouter is not null
+                && _innovationRouter.Value.CanServe(Darci.Nodes.Capabilities.InnovationSynthesize))
             {
                 (packet, response) = await EscalateToInnovationAsync(packet, request, response, ct);
                 innovationRan = true;

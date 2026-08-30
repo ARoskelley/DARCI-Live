@@ -76,7 +76,14 @@ public sealed class GapHandler : IGapHandler
         var depth = ParseDepth(packet);
 
         // ── IMMEDIATE: blocking gap on the critical path, with fill budget remaining ──
-        if (context.Blocking && depth < _options.MaxImmediateFillDepth)
+        //
+        // Requires a node that actually serves the fill. Without that check this branch marked every gap
+        // record Filling and then dispatched into nothing, leaving them stuck in Filling forever — strictly
+        // worse than not trying. When no node serves it we fall through to DEFERRED, which persists the gap
+        // and raises an auto-goal, so the need is still recorded and still surfaced for later learning.
+        if (context.Blocking
+            && depth < _options.MaxImmediateFillDepth
+            && _router.Value.CanServe(Capabilities.KnowledgeGapFill))
         {
             var records = new List<GapRecord>();
             foreach (var gap in context.Gaps)

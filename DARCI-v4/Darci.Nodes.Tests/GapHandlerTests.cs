@@ -24,8 +24,9 @@ public sealed class GapHandlerTests : IDisposable
     // Router that records dispatches and returns a Succeeded packet.
     private sealed class RecordingRouter : INodeRouter
     {
-        // These fakes stand in for a node that IS available; the unavailable path has its own tests.
-        public bool CanServe(string capability) => true;
+        /// <summary>Defaults to "a node is available"; set false to model a core without a knowledge node.</summary>
+        public bool Serves = true;
+        public bool CanServe(string capability) => Serves;
 
         public NodePacket? Dispatched;
         public Task<NodePacket> DispatchAsync(NodePacket packet, CancellationToken ct = default)
@@ -88,6 +89,25 @@ public sealed class GapHandlerTests : IDisposable
         // Gap persisted as "filling".
         var filling = await _store.GetByStatusAsync(GapStatus.Filling);
         Assert.Single(filling);
+    }
+
+    [Fact]
+    public async Task BlockingGap_WithNoNodeServingTheFill_DefersInsteadOfStrandingRecordsInFilling()
+    {
+        // Phase 3 SU 3.2. Previously this branch ran on "blocking + budget" alone: it marked every gap
+        // record Filling, dispatched into nothing, and left them stuck in Filling forever — strictly worse
+        // than not trying. With no node serving the fill we fall through to DEFERRED, so the need is still
+        // persisted and still raised as an auto-goal.
+        var router = new RecordingRouter { Serves = false };
+        var sink = new RecordingGoalSink();
+        var handler = Handler(router, sink);
+
+        var outcome = await handler.HandleAsync(WorkingPacket(depth: 0), Ctx(blocking: true));
+
+        Assert.Equal(GapDisposition.Deferred, outcome.Disposition);
+        Assert.Null(router.Dispatched);                             // no pointless dispatch
+        Assert.Empty(await _store.GetByStatusAsync(GapStatus.Filling));  // nothing stranded
+        Assert.NotEmpty(sink.Created);                              // the need still surfaced
     }
 
     [Fact]

@@ -509,7 +509,13 @@ public sealed class CodingAgentLoop : ICodingAgentLoop
             }
 
             // GENUINE GAP: route to the knowledge node via the generic router (packet handoff).
-            if (_nodeRouter is not null)
+            //
+            // Ask whether the CAPABILITY is served, not merely whether a router exists. Branching on
+            // "_nodeRouter is not null" made the fallback below unreachable on any host that wired a router
+            // but had no knowledge node: the dispatch came back unservable, findings were empty, and this
+            // returned — skipping the roadblock detector that would have worked. That is exactly the
+            // "core without the nodes I built" case Phase 3 is for.
+            if (_nodeRouter is not null && _nodeRouter.CanServe(Capabilities.KnowledgeGapFill))
             {
                 var findings = await RouteKnowledgeGapAsync(task, taskId, command, failureOutput, ct);
                 if (!string.IsNullOrWhiteSpace(findings))
@@ -523,7 +529,8 @@ public sealed class CodingAgentLoop : ICodingAgentLoop
                 return;
             }
 
-            // FALLBACK: no router wired — use the legacy roadblock detector directly.
+            // FALLBACK: no node serves knowledge.gapfill (or no router at all) — use the legacy roadblock
+            // detector directly. Degraded escalation beats none.
             var research = await _roadblockDetector.CheckAndResearchAsync(
                 workspaceId, taskId, command, failureOutput, ct);
             if (!string.IsNullOrWhiteSpace(research) && research != task.RoadblockResearch)

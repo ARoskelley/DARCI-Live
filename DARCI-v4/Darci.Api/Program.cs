@@ -461,6 +461,16 @@ builder.Services.AddSingleton<INodeRegistry>(sp =>
     var manifests = sp.GetRequiredService<NodeManifestLoader>().LoadAll(nodesDirectory)
         .ToDictionary(m => m.Manifest.NodeId, StringComparer.Ordinal);
 
+    // THE MANIFEST GATES REGISTRATION (Phase 3 SU 3.2). A compiled-in node with no darci-node.json is NOT
+    // registered, so its capabilities are simply not served.
+    //
+    // This inverts the previous fallback, which synthesized a manifest and registered the node anyway. That
+    // made every built-in unavoidable: there was no supported way to run a core without them. The manifest
+    // is already defined as the human-authored capability grant (§14c), so absence of one is a decision,
+    // not an accident — delete the folder and you get an honest core that does not claim to code.
+    //
+    // Nothing is silently lost: an unserved capability now terminates as Blocked with a durable gap record
+    // (SU 3.1), so the core can say WHICH node it would need.
     foreach (var node in sp.GetServices<INode>())
     {
         var nodeKey = CapabilityKey.From(node.Id);
@@ -470,11 +480,10 @@ builder.Services.AddSingleton<INodeRegistry>(sp =>
         }
         else
         {
-            // No manifest on disk: fall back to a synthesized one so the node still routes, but say so —
-            // a built-in node without a reviewed manifest is a gap to close, not a normal state.
-            log.LogWarning("Node {NodeId} has no darci-node.json under {Dir}; using a synthesized manifest.",
+            log.LogInformation(
+                "Node {NodeId} is compiled in but has no darci-node.json under {Dir} — NOT registered. "
+                + "Its capabilities will be unavailable (requests block honestly). Add a manifest to enable it.",
                 nodeKey, nodesDirectory);
-            registry.Register(LegacyPacketNodeAdapter.ForLegacyNode(node));
         }
     }
 
