@@ -167,7 +167,11 @@ foreach ($baseUrl in Get-OllamaCandidates) {
 if (-not $ollamaReady) {
     Add-Check "Ollama server" "WARN" "No response on the usual local URLs. Start with: ollama serve"
 } else {
-    foreach ($requiredModel in @("gemma4:e4b", "nomic-embed-text")) {
+    # Derived from host-profile.json, never hardcoded — see Get-DarciRequiredModels.ps1. The previous
+    # hardcoded pair named `gemma4:e4b`, a tag that does not exist, so this check reported "WARN: run
+    # ollama pull gemma4:e4b" forever while the model the core actually loads went unverified.
+    $requiredModels = & (Join-Path $PSScriptRoot "Get-DarciRequiredModels.ps1")
+    foreach ($requiredModel in $requiredModels) {
         if (Test-OllamaModelAvailable -ModelName $requiredModel -AvailableModels $ollamaModels) {
             Add-Check "Ollama model $requiredModel" "OK" "available"
         } else {

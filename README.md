@@ -12,7 +12,8 @@ The older `DARCI-v3` folder still has useful historical notes, but its startup i
 - `.NET 8 SDK`
 - `Ollama`
 - Ollama models:
-  - `gemma4:e4b`
+  - `gemma2:9b`
+  - `qwen2.5-coder:7b`
   - `nomic-embed-text`
 
 ## Environment Preflight
@@ -34,7 +35,8 @@ powershell -ExecutionPolicy Bypass -File .\Test-DARCIEnvironment.ps1 -Build
 Open PowerShell in the repo root and run:
 
 ```powershell
-ollama pull gemma4:e4b
+ollama pull gemma2:9b
+ollama pull qwen2.5-coder:7b
 ollama pull nomic-embed-text
 ollama serve
 powershell -ExecutionPolicy Bypass -File .\Start-DARCI.ps1

@@ -1,6 +1,7 @@
 # Start-DARCI.ps1
 # Double-click this (or run in PowerShell) to start DARCI.
-# Prerequisites: .NET 8 SDK, Ollama running with gemma4:e4b + nomic-embed-text pulled.
+# Prerequisites: .NET 8 SDK, and Ollama running with the models host-profile.json resolves to
+#                (checked at startup; see Get-DarciRequiredModels.ps1 — nothing hardcodes a model list).
 
 param(
     [switch]$NoBrowser  # pass -NoBrowser to suppress auto-opening the web UI
@@ -112,6 +113,21 @@ $ollamaCandidates = Get-OllamaBaseUrls
 $ollamaReadyUrl = Find-ReadyBaseUrl -BaseUrls $ollamaCandidates
 if ($ollamaReadyUrl) {
     $env:DARCI_OLLAMA_BASE_URL = $ollamaReadyUrl
+
+    # Verify the models the host profile actually resolves to. Derived, never hardcoded — a hardcoded list
+    # is how `gemma4:e4b` outlived the tag itself in three files.
+    try {
+        $requiredModels = & (Join-Path $PSScriptRoot "Get-DarciRequiredModels.ps1")
+        $installed = (Invoke-RestMethod -Uri "$ollamaReadyUrl/api/tags" -TimeoutSec 5).models | ForEach-Object { $_.name }
+        foreach ($m in $requiredModels) {
+            $have = $installed | Where-Object { $_ -eq $m -or $_ -eq "${m}:latest" -or $_ -like "${m}:*" }
+            if (-not $have) {
+                Write-Warning "Model '$m' (from host-profile.json) is not pulled. Run: ollama pull $m"
+            }
+        }
+    } catch {
+        Write-Warning "Could not verify Ollama models: $($_.Exception.Message)"
+    }
 } else {
     Write-Warning "Ollama doesn't appear to be reachable at any of: $($ollamaCandidates -join ', ')."
     Write-Warning "If 'ollama serve' says the socket is already in use, Ollama is probably already running but bound to a different host."
