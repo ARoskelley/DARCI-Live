@@ -8,6 +8,7 @@ using Avalonia.Media;
 using Avalonia.Threading;
 using DarciControl.Logic.Chat;
 using DarciControl.Logic.Prerequisites;
+using DarciControl.Logic.Runtime;
 
 namespace DarciControl.App;
 
@@ -42,6 +43,7 @@ public partial class MainWindow : Window
     private readonly ObservableCollection<ChatEntry> _messages = new();
     private readonly ObservableCollection<PrereqRow> _prereqs = new();
     private readonly PrerequisiteChecker _checker;
+    private readonly CoreLauncher _launcher;
 
     public MainWindow()
     {
@@ -53,7 +55,18 @@ public partial class MainWindow : Window
         Messages.ItemsSource = _messages;
         PrereqList.ItemsSource = _prereqs;
 
-        _checker = new PrerequisiteChecker(new DarciPaths { Root = FindRepoRoot() });
+        var paths = new DarciPaths { Root = FindRepoRoot() };
+        _checker = new PrerequisiteChecker(paths);
+        _launcher = new CoreLauncher(paths, _checker);
+
+        // A core this app started can outlive an app crash. Find it rather than leaving it invisible.
+        if (_launcher.FindAdoptable() is { } orphan)
+        {
+            Log($"Adopted a core this app started earlier (pid {orphan.Pid}). Stop is available.");
+            StopCoreButton.IsEnabled = true;
+        }
+
+        StartNeo4jButton.IsEnabled = Neo4jController.FindLauncher() is not null;
 
         _connection.ReplyReceived += OnReply;
         _connection.Notification += text => Post(() => AddSystem(text));
@@ -191,8 +204,86 @@ public partial class MainWindow : Window
         Remedy = r.Remedy ?? "",
     };
 
-    private void OnStartCoreClick(object? sender, RoutedEventArgs e) =>
-        ShowHint("Starting the core from here lands in D3. For now, run Start-DARCI.ps1.");
+    // ── core lifecycle ──
+
+    private async void OnStartCoreClick(object? sender, RoutedEventArgs e)
+    {
+        StartCoreButton.IsEnabled = false;
+        Log("Starting DARCI...");
+
+        try
+        {
+            // Neo4j is checked but never required: the core falls back to SQLite on its own, so a missing
+            // graph database must not stop a start.
+            if (await Neo4jController.IsListeningAsync())
+                Log("  Neo4j is listening - the core will use it.");
+            else
+                Log("  Neo4j is not running - the core will use SQLite (a valid setup).");
+
+            var result = await _launcher.StartAsync(onOutput: line =>
+            {
+                // Surface only what an operator would act on; the full log is the core's own.
+                if (line.Contains("warn:", StringComparison.OrdinalIgnoreCase) ||
+                    line.Contains("Registered node", StringComparison.Ordinal) ||
+                    line.Contains("knowledge graph", StringComparison.OrdinalIgnoreCase))
+                    Post(() => Log("  " + line.Trim()));
+            });
+
+            Log(result.Ready ? "  " + result.Detail : "  FAILED: " + result.Detail);
+
+            if (result.Ready)
+            {
+                StopCoreButton.IsEnabled = true;
+                await _connection.StartAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            Log("  FAILED: " + ex.GetBaseException().Message);
+        }
+        finally
+        {
+            StartCoreButton.IsEnabled = true;
+        }
+    }
+
+    private async void OnStopCoreClick(object? sender, RoutedEventArgs e)
+    {
+        StopCoreButton.IsEnabled = false;
+        Log(await _launcher.StopAsync() ? "Stopped the core." : "Nothing to stop.");
+    }
+
+    private async void OnStartNeo4jClick(object? sender, RoutedEventArgs e)
+    {
+        StartNeo4jButton.IsEnabled = false;
+        Log("Starting Neo4j...");
+
+        try
+        {
+            Log(await Neo4jController.StartAsync()
+                ? "  Neo4j is listening on bolt://localhost:7687."
+                : "  Could not start Neo4j. DARCI will run on SQLite, which is fine.");
+        }
+        finally
+        {
+            StartNeo4jButton.IsEnabled = true;
+        }
+    }
+
+    private void Log(string line)
+    {
+        StartLog.Text = string.IsNullOrEmpty(StartLog.Text) ? line : StartLog.Text + "\n" + line;
+    }
+
+    /// <summary>
+    /// Stop a core this app started, so closing the window does not leave one holding port 5081 and
+    /// writing to the database with nobody owning it.
+    /// </summary>
+    protected override void OnClosed(EventArgs e)
+    {
+        _launcher.StopOnExit();
+        base.OnClosed(e);
+    }
 
     // ── plumbing ──
 

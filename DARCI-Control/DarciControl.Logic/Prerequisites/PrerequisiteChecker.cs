@@ -2,7 +2,6 @@
 
 using System.Diagnostics;
 using System.Net.Http.Json;
-using System.Net.Sockets;
 using System.Text.Json.Serialization;
 
 namespace DarciControl.Logic.Prerequisites;
@@ -156,24 +155,14 @@ public sealed class PrerequisiteChecker
         if (!configured)
             return PrereqResult.Ok("Knowledge graph", "SQLite (Neo4j not configured — this is a valid setup)");
 
-        // A TCP probe, deliberately, rather than dragging the Neo4j driver into a desktop app: the core
-        // does the authoritative connect-and-authenticate at startup and falls back to SQLite on its own.
-        // All this needs to answer is "is something listening", so the UI can say which store will be used.
-        try
-        {
-            using var client = new TcpClient();
-            using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-            cts.CancelAfter(TimeSpan.FromSeconds(3));
-            await client.ConnectAsync("localhost", 7687, cts.Token);
-
-            return PrereqResult.Ok("Knowledge graph", "Neo4j is listening on bolt://localhost:7687");
-        }
-        catch (Exception)
-        {
-            return PrereqResult.Warning("Knowledge graph",
+        // ONE probe, shared with Neo4jController. Keeping a second copy here is how the same screen came
+        // to report "Neo4j is not running" and "Neo4j is listening" simultaneously: the two had different
+        // timeouts, and the shorter one gave up during IPv6 resolution.
+        return await Runtime.Neo4jController.IsListeningAsync(ct)
+            ? PrereqResult.Ok("Knowledge graph", "Neo4j is listening on bolt://localhost:7687")
+            : PrereqResult.Warning("Knowledge graph",
                 "Neo4j is configured but not running — the core will fall back to SQLite",
                 "Start Neo4j, or leave it stopped to run on SQLite");
-        }
     }
 
     // ── the core itself ──
