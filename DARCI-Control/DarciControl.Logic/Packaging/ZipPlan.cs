@@ -94,6 +94,10 @@ public sealed record ZipPlan
 
         // The host profile IS the model contract. Without it the packaged startup script cannot know what
         // to check for, and the core falls back to env-compat defaults that may not match this machine.
+        // ONLY the committed default profile, which is all-local and KEYLESS — never an alternate profile
+        // selected via DARCI_HOST_PROFILE. A recipient has no access to this machine's private endpoints,
+        // so shipping a profile that names an api_key_env would hand them a core that refuses to start
+        // over a credential they can never obtain. Guarded by a test.
         var profile = Path.Combine(request.RepoRoot, "DARCI-v4", "host-profile.json");
         if (File.Exists(profile)) entries.Add(new ZipEntry(profile, "darci/host-profile.json", false));
         else warnings.Add("host-profile.json was not found; the zip will rely on env-compat model defaults.");
