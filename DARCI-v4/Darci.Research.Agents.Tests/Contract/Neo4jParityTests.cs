@@ -507,24 +507,32 @@ public sealed class Neo4jCollection
 /// without one. The probe result is cached: an unreachable server should cost one timeout per run, not one
 /// per test.
 ///
-/// <para>The suite requires <c>DARCI_NEO4J_TEST_WIPE=1</c> in addition to the connection settings, because
-/// it empties the graph between tests (see <see cref="WipeAsync"/>). That opt-in is the safety interlock:
-/// pointing the tests at a real graph by accident costs nothing, since without the flag they simply do not
-/// run.</para>
+/// <para><b>These tests never touch the configured instance.</b> They empty the graph between tests, so
+/// their target is <c>DARCI_NEO4J_TEST_URI</c> — a SEPARATE Neo4j, on its own port — and never
+/// <c>DARCI_NEO4J_URI</c>. <see cref="Neo4jWipeGuard"/> enforces that, and enforces it again at the
+/// deletion itself, because <c>DARCI_NEO4J_TEST_WIPE=1</c> alone proved insufficient: a flag left exported
+/// in a shell that later ran the full suite emptied the real graph. The flag is still required; it is no
+/// longer the only thing standing between a test run and the host's data.</para>
+///
+/// <para>Consequence, worth knowing before reading a green run as coverage: a host with only one Neo4j gets
+/// no parity coverage at all, because there is nowhere safe to run it. <see cref="Reason"/> says so.</para>
 /// </summary>
 internal static class Neo4jAvailability
 {
     private static readonly Lazy<(bool Available, string Reason)> Probe = new(() =>
     {
-        var options = Neo4jOptions.FromEnvironment();
+        // Asked FIRST, before credentials or connectivity: whether a wipe is permissible at all is a
+        // question about which instance is being targeted, and the answer must not depend on whether some
+        // other instance happens to be reachable.
+        var decision = Neo4jWipeGuard.EvaluateFromEnvironment();
+        if (!decision.Allowed) return (false, decision.Reason);
+
+        var options = Options;
         if (!options.IsConfigured)
         {
-            return (false, "DARCI_NEO4J_PASSWORD is not set — no Neo4j configured for this host.");
-        }
-
-        if (Environment.GetEnvironmentVariable("DARCI_NEO4J_TEST_WIPE") != "1")
-        {
-            return (false, "DARCI_NEO4J_TEST_WIPE is not 1 — refusing to wipe a graph that was not declared disposable.");
+            return (false,
+                $"no password for the test instance — set DARCI_NEO4J_TEST_PASSWORD (or DARCI_NEO4J_PASSWORD "
+                + $"if {Neo4jWipeGuard.TestUriEnv} shares its credentials).");
         }
 
         try
@@ -532,15 +540,33 @@ internal static class Neo4jAvailability
             using var driver = Neo4j.Driver.GraphDatabase.Driver(
                 options.Uri, Neo4j.Driver.AuthTokens.Basic(options.User, options.Password));
             driver.VerifyConnectivityAsync().Wait(TimeSpan.FromSeconds(10));
-            return (true, "connected");
+            return (true, $"connected to the designated test instance at {options.Uri}");
         }
         catch (Exception ex)
         {
-            return (false, $"Neo4j unreachable at {options.Uri}: {ex.GetBaseException().Message}");
+            return (false, $"test Neo4j unreachable at {options.Uri}: {ex.GetBaseException().Message}");
         }
     });
 
-    public static Neo4jOptions Options { get; } = Neo4jOptions.FromEnvironment();
+    /// <summary>
+    /// The DISPOSABLE instance, which is what every Neo4j-touching test reads and writes. Connection
+    /// details fall back to the main variables where they are shared (one server install, two ports, same
+    /// credentials) — but the URI never does, because an inherited URI is exactly the accident being
+    /// prevented.
+    /// </summary>
+    public static Neo4jOptions Options { get; } = new()
+    {
+        Uri = Environment.GetEnvironmentVariable(Neo4jWipeGuard.TestUriEnv) ?? "",
+        User = Environment.GetEnvironmentVariable("DARCI_NEO4J_TEST_USER")
+               ?? Environment.GetEnvironmentVariable("DARCI_NEO4J_USER")
+               ?? "neo4j",
+        Password = Environment.GetEnvironmentVariable("DARCI_NEO4J_TEST_PASSWORD")
+                   ?? Environment.GetEnvironmentVariable("DARCI_NEO4J_PASSWORD")
+                   ?? "",
+        Database = Environment.GetEnvironmentVariable("DARCI_NEO4J_TEST_DATABASE")
+                   ?? Environment.GetEnvironmentVariable("DARCI_NEO4J_DATABASE")
+                   ?? "neo4j",
+    };
 
     public static bool IsAvailable => Probe.Value.Available;
 
@@ -549,6 +575,10 @@ internal static class Neo4jAvailability
     /// <summary>Empties the graph so each test starts from the same blank slate the SQLite side gets.</summary>
     public static async Task WipeAsync()
     {
+        // Re-checked here, against the URI the delete will actually run against, rather than trusting that
+        // whoever got this far was gated correctly.
+        Neo4jWipeGuard.EnsureWipeAllowed(Options.Uri);
+
         await using var driver = Neo4j.Driver.GraphDatabase.Driver(
             Options.Uri, Neo4j.Driver.AuthTokens.Basic(Options.User, Options.Password));
         await using var session = driver.AsyncSession(o => o.WithDatabase(Options.Database));
