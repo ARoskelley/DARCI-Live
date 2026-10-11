@@ -56,9 +56,17 @@ public sealed class ModelBroker : IModelBroker
                     $"implementation for. Available: {string.Join(", ", _providers.Keys)}.");
         }
 
+        // Logs the PROVIDER as well as the model, not just the model name. With a hybrid profile the
+        // difference between a local and a remote tier is the whole operational story — which calls leave
+        // the machine, and what breaks when the network does — and inferring that from a model name alone
+        // only works while the names happen to look distinctive.
         _logger.LogInformation("Model broker ready on profile '{Profile}': {Bindings}",
             profile.ProfileId,
-            string.Join(", ", ModelClasses.All.Select(c => $"{c}→{profile.Resolve(c)!.Model}")));
+            string.Join(", ", ModelClasses.All.Select(c =>
+            {
+                var b = profile.Resolve(c)!;
+                return $"{c}→{b.Provider}/{profile.Provider(b.Provider)!.Kind}/{b.Model}";
+            })));
     }
 
     public HostProfile Profile { get; }

@@ -1,11 +1,18 @@
 {
-  "profile_id": "tinman-3070ti-local",
-  "description": "All-local Ollama profile for a single 8GB-VRAM host. Every class resolves to an installed model and requires no external API key. Bindings intentionally reproduce the pre-broker DARCI_OLLAMA_* routing exactly, so introducing the model broker changes no behavior. See host-profile.claude.example.json for a hybrid profile.",
+  "profile_id": "tinman-3070ti-hybrid",
+  "description": "Hybrid profile: the HEAVY tiers (code.generate, chat.deep) run on a remote OpenAI-compatible LiteLLM proxy; everything latency-sensitive or high-volume stays on local Ollama. The remote key is NOT here - api_key_env names the environment variable, and HostProfile.Validate() refuses to start if it is unset (doc 6.2 fail-fast). To run with no remote at all, copy host-profile.local-only.example.json over this file.",
   "providers": {
     "ollama": {
       "kind": "ollama",
       "base_url": "http://localhost:11434",
       "timeout_minutes": 12
+    },
+    "litellm": {
+      "kind": "openai",
+      "base_url": "https://lite.wireframehosting.com/v1",
+      "api_key_env": "DARCI_LITELLM_API_KEY",
+      "timeout_minutes": 10,
+      "note": "LiteLLM proxy, OpenAI-compatible. The base URL INCLUDES /v1: the proxy answers on both / and /v1, but /v1 is the canonical OpenAI root and is what /chat/completions is appended to."
     }
   },
   "classes": {
@@ -19,27 +26,29 @@
       "model": "gemma2:9b"
     },
     "chat.deep": {
-      "provider": "ollama",
-      "model": "gemma2:9b",
-      "note": "ASPIRATIONAL: mapped to the balanced model on purpose. llama3.3 (42GB) is installed but impractical on an 8GB card - heavy CPU offload makes it minutes-per-call. Point this at a larger local model or the Claude profile when one is available."
+      "provider": "litellm",
+      "model": "coder-120b",
+      "note": "REMOTE. This tier was aspirational while it pointed at the same 9B as chat.balanced; it is now a genuinely deeper model. coder-120b is a REASONING model - it spends completion tokens thinking before emitting an answer, so callers on this tier need a generous max_tokens or they get an empty completion (the provider reports that as a named error rather than a silent empty success)."
     },
     "classify.intent": {
       "provider": "ollama",
       "model": "gemma2:9b",
-      "note": "The doc suggests a dedicated classifier (Lizzy/ONNX); none is wired in this repo yet."
+      "note": "Stays local on purpose: classification is high-volume and latency-sensitive, and a remote round trip per classification would dominate the loop."
     },
     "embed.text": {
       "provider": "ollama",
-      "model": "nomic-embed-text"
+      "model": "nomic-embed-text",
+      "note": "Stays local. The proxy also fronts nomic-embed-text, but embeddings are called constantly (KG enrichment, semantic grounding) and the stored vectors must stay comparable - switching the embedding model would invalidate every embedding already in the graph."
     },
     "code.generate": {
-      "provider": "ollama",
-      "model": "qwen2.5-coder:7b"
+      "provider": "litellm",
+      "model": "coder-120b",
+      "note": "REMOTE. The 120B coder, in place of the local 7B. This is the tier the synthesis comparison is about."
     },
     "code.fast": {
       "provider": "ollama",
       "model": "qwen2.5-coder:7b",
-      "note": "Same model as code.generate today; kept as a distinct class so the fast/full distinction the code already makes is preserved."
+      "note": "Stays local on purpose - this is the fast/cheap path, and keeping it local preserves a working local coder when the remote is unavailable."
     }
   }
 }

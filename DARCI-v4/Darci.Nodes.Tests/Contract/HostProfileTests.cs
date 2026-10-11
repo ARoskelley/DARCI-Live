@@ -170,28 +170,114 @@ public sealed class HostProfileTests : IDisposable
     // ── the profiles actually committed to the repo ──
 
     [Fact]
-    public void TheRepoDefaultProfile_IsValid_AndAllLocal_AndReproducesTodaysRouting()
+    public void TheRepoDefaultProfile_IsValid_AndRoutesTheHeavyTiersRemote_KeepingTheRestLocal()
     {
+        // *** RE-BLESSED, NOT A REGRESSION ***
+        // This asserted the default profile was ALL-LOCAL. The default is now deliberately HYBRID: the two
+        // heavy tiers (code.generate, chat.deep) run on a remote OpenAI-compatible proxy, and everything
+        // latency-sensitive or high-volume stays on Ollama. The all-local arrangement this test used to
+        // pin now lives in host-profile.local-only.example.json and is asserted separately below, so the
+        // keyless path is still covered rather than lost.
         var path = FindRepoFile(HostProfileLoader.FileName);
+        Assert.NotNull(path);
+
+        // The hybrid profile legitimately REFUSES to validate without its key — that is the §6.2 fail-fast
+        // doing its job, and there is a separate test for it below. What this test is about is the routing
+        // SHAPE, which is a property of the committed file rather than of whoever happens to be running it,
+        // so a placeholder key stands in for the host's.
+        const string keyEnv = "DARCI_LITELLM_API_KEY";
+        var previous = Environment.GetEnvironmentVariable(keyEnv);
+        if (string.IsNullOrWhiteSpace(previous)) Environment.SetEnvironmentVariable(keyEnv, "sk-placeholder-for-tests");
+
+        try
+        {
+            var profile = HostProfileLoader.LoadFile(path!);
+            Assert.Empty(profile.Validate());
+            AssertHybridRouting(profile);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(keyEnv, previous);
+        }
+    }
+
+    [Fact]
+    public void TheRepoDefaultProfile_RefusesToLoadWithoutItsRemoteKey_ByName()
+    {
+        // The flip side, and the reason the local-only example exists: the committed default needs a
+        // secret, so a host without one must be told exactly which variable is missing rather than
+        // discovering it mid-task.
+        const string keyEnv = "DARCI_LITELLM_API_KEY";
+        var previous = Environment.GetEnvironmentVariable(keyEnv);
+        Environment.SetEnvironmentVariable(keyEnv, null);
+
+        try
+        {
+            var path = FindRepoFile(HostProfileLoader.FileName);
+            var ex = Assert.Throws<HostProfileException>(() => HostProfileLoader.LoadFile(path!));
+
+            Assert.Contains(keyEnv, ex.Message);
+            Assert.Contains("not set", ex.Message);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(keyEnv, previous);
+        }
+    }
+
+    private static void AssertHybridRouting(HostProfile profile)
+    {
+        // The heavy tiers are remote, and share one model.
+        foreach (var heavy in new[] { ModelClasses.CodeGenerate, ModelClasses.ChatDeep })
+        {
+            var binding = profile.Resolve(heavy)!;
+            Assert.Equal("openai", profile.Provider(binding.Provider)!.Kind);
+            Assert.Equal("coder-120b", binding.Model);
+        }
+
+        // Everything else stays local, unchanged. code.fast staying local is the point: it preserves a
+        // working local coder for when the remote is unavailable.
+        Assert.Equal("gemma2:9b", profile.Resolve(ModelClasses.ChatBalanced)!.Model);
+        Assert.Equal("gemma2:9b", profile.Resolve(ModelClasses.ChatFast)!.Model);
+        Assert.Equal("gemma2:9b", profile.Resolve(ModelClasses.ClassifyIntent)!.Model);
+        Assert.Equal("nomic-embed-text", profile.Resolve(ModelClasses.EmbedText)!.Model);
+        Assert.Equal("qwen2.5-coder:7b", profile.Resolve(ModelClasses.CodeFast)!.Model);
+        foreach (var local in new[]
+                 {
+                     ModelClasses.ChatBalanced, ModelClasses.ChatFast, ModelClasses.ClassifyIntent,
+                     ModelClasses.EmbedText, ModelClasses.CodeFast,
+                 })
+            Assert.Equal("ollama", profile.Provider(profile.Resolve(local)!.Provider)!.Kind);
+
+        // A remote provider NAMES its key env var and never carries the secret — profiles are committed.
+        var remote = profile.Provider(profile.Resolve(ModelClasses.CodeGenerate)!.Provider)!;
+        Assert.False(string.IsNullOrWhiteSpace(remote.ApiKeyEnv));
+        Assert.DoesNotContain("sk-", System.Text.Json.JsonSerializer.Serialize(profile));
+
+        // The OpenAI root must be explicit: /chat/completions is appended to this base.
+        Assert.EndsWith("/v1", remote.BaseUrl);
+
+        // A tier that is still pretending must SAY so. chat.deep no longer pretends (it is genuinely
+        // deeper now), but chat.fast still maps to the 9B, so its note must survive.
+        Assert.False(string.IsNullOrWhiteSpace(profile.Resolve(ModelClasses.ChatFast)!.Note));
+    }
+
+    [Fact]
+    public void TheLocalOnlyExampleProfile_IsValid_AndNeedsNoApiKey()
+    {
+        // The escape hatch the hybrid default requires: a host with no remote key must still be able to
+        // run every class. Copy this over host-profile.json and nothing needs a secret.
+        var path = FindRepoFile("host-profile.local-only.example.json");
         Assert.NotNull(path);
 
         var profile = HostProfileLoader.LoadFile(path!);
         Assert.Empty(profile.Validate());
 
-        // All-local: no provider needs an API key (there is no Claude key on this host).
         Assert.All(profile.Providers.Values, p => Assert.True(string.IsNullOrEmpty(p.ApiKeyEnv)));
         Assert.All(profile.Classes.Values, b => Assert.Equal("ollama", profile.Provider(b.Provider)!.Kind));
 
-        // Reproduces today's effective routing exactly — this is what makes the broker behavior-preserving.
-        Assert.Equal("gemma2:9b", profile.Resolve(ModelClasses.ChatBalanced)!.Model);
-        Assert.Equal("gemma2:9b", profile.Resolve(ModelClasses.ChatDeep)!.Model);
-        Assert.Equal("nomic-embed-text", profile.Resolve(ModelClasses.EmbedText)!.Model);
-        Assert.Equal("qwen2.5-coder:7b", profile.Resolve(ModelClasses.CodeGenerate)!.Model);
-        Assert.Equal("qwen2.5-coder:7b", profile.Resolve(ModelClasses.CodeFast)!.Model);
-
-        // The tiers that are pretending must SAY so, rather than implying a capability the host lacks.
-        Assert.False(string.IsNullOrWhiteSpace(profile.Resolve(ModelClasses.ChatDeep)!.Note));
-        Assert.False(string.IsNullOrWhiteSpace(profile.Resolve(ModelClasses.ChatFast)!.Note));
+        // Every class binds, so the broker's startup check passes without a remote implementation.
+        foreach (var c in ModelClasses.All) Assert.NotNull(profile.Resolve(c));
     }
 
     [Fact]

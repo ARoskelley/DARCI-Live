@@ -70,6 +70,16 @@ var (hostProfile, hostProfileFromFile) = HostProfileLoader.LoadOrDefault(Path.Ge
 builder.Services.AddSingleton(hostProfile);
 builder.Services.AddHttpClient<OllamaModelProvider>();
 builder.Services.AddSingleton<IModelProvider>(sp => sp.GetRequiredService<OllamaModelProvider>());
+
+// The OpenAI-compatible provider (LiteLLM proxy, or anything else speaking /chat/completions). Registered
+// unconditionally: it is the PROTOCOL implementation, and whether any class actually uses it is the host
+// profile's decision. A profile that binds a class here without its api_key_env set fails at startup with a
+// named error rather than mid-task (doc §6.2).
+//
+// The per-provider HttpClient timeout is left at the framework default on purpose — the provider applies
+// the profile's own bound via a linked CancellationTokenSource, so the budget lives in one place.
+builder.Services.AddHttpClient<OpenAiCompatibleModelProvider>();
+builder.Services.AddSingleton<IModelProvider>(sp => sp.GetRequiredService<OpenAiCompatibleModelProvider>());
 builder.Services.AddSingleton<ModelCallStoreSink>();
 builder.Services.AddSingleton<IModelCallSink>(sp => sp.GetRequiredService<ModelCallStoreSink>());
 builder.Services.AddSingleton<IModelBroker>(sp => new ModelBroker(
@@ -763,7 +773,11 @@ var activeProfile = app.Services.GetRequiredService<IModelBroker>().Profile;
 app.Logger.LogInformation("Model profile '{Profile}' active ({Source}): {Bindings}",
     activeProfile.ProfileId,
     hostProfileFromFile ? Path.GetFullPath(hostProfilePath) : "synthesized from DARCI_OLLAMA_* env vars",
-    string.Join(", ", ModelClasses.All.Select(c => $"{c}→{activeProfile.Resolve(c)!.Model}")));
+    string.Join(", ", ModelClasses.All.Select(c =>
+    {
+        var b = activeProfile.Resolve(c)!;
+        return $"{c}→{b.Provider}/{activeProfile.Provider(b.Provider)!.Kind}/{b.Model}";
+    })));
 // The startup sweep must run AFTER the proposal store is initialized so its carve-out can recognise
 // packets legitimately parked pending a human decision (and not reap them as orphans).
 var nodeWatchdog = app.Services.GetRequiredService<NodeWatchdog>();
