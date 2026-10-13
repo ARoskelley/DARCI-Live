@@ -112,7 +112,19 @@ public sealed class NodeManifestLoaderTests : IDisposable
         Assert.Contains(NodeKeys.Coding, byId.Keys);
         Assert.Contains(NodeKeys.Knowledge, byId.Keys);
         Assert.Contains(NodeKeys.Innovation, byId.Keys);
+
+        // EVERY manifest in the repo must be valid, built-in or not — an invalid one that happens to be
+        // first-party is a fatal boot (Fork 2), so it must never reach main.
         Assert.All(all, m => Assert.Empty(m.Manifest.Validate()));
+
+        // The assertions below describe the BUILT-IN nodes specifically. They used to run against every
+        // manifest in the directory, which was true only while `nodes/` held nothing else. Phase 3 made
+        // that directory the place a third-party, out-of-process node declares itself — darci.modeling is
+        // the first — so applying "in-process, needs model classes, needs memory scopes" to all of them
+        // would make the test assert the opposite of what Phase 3 was built to allow.
+        var builtIns = new[] { NodeKeys.Coding, NodeKeys.Knowledge, NodeKeys.Innovation }
+            .Select(id => byId[id])
+            .ToList();
 
         // Every built-in capability must be claimed by exactly one manifest.
         var declared = all.SelectMany(m => m.Manifest.Capabilities.Select(c => c.Name)).ToList();
@@ -124,12 +136,28 @@ public sealed class NodeManifestLoaderTests : IDisposable
                  })
             Assert.Single(declared, d => d == expected);
 
-        // In-process in Phase 1 (no endpoints yet).
-        Assert.All(all, m => Assert.True(m.Manifest.IsInProcess));
+        // The built-ins are compiled into this core, so they must stay in-process: a manifest naming a
+        // compiled-in node but pointing at a URL is ambiguous about which copy should serve, and
+        // discovery refuses it.
+        Assert.All(builtIns, m => Assert.True(m.Manifest.IsInProcess));
 
-        // ADD-5b: the requires inventory is real, not empty boilerplate.
-        Assert.All(all, m => Assert.NotEmpty(m.Manifest.Requires.ModelClasses));
-        Assert.All(all, m => Assert.NotEmpty(m.Manifest.Requires.MemoryScopes));
+        // ADD-5b: the requires inventory is real, not empty boilerplate. An out-of-process node may
+        // legitimately need neither — darci.modeling is deterministic and consults no model class — so
+        // this is asserted of the built-ins, whose declarations the core actually acts on.
+        Assert.All(builtIns, m => Assert.NotEmpty(m.Manifest.Requires.ModelClasses));
+        Assert.All(builtIns, m => Assert.NotEmpty(m.Manifest.Requires.MemoryScopes));
+
+        // What an out-of-process manifest must get right instead: a loopback endpoint (Phase 3 is
+        // local-only until the broker-token work lands) and a capability surface that does not collide
+        // with a built-in one.
+        var builtInCapabilities = builtIns.SelectMany(m => m.Manifest.Capabilities.Select(c => c.Name)).ToHashSet();
+        foreach (var remote in all.Where(m => !m.Manifest.IsInProcess))
+        {
+            Assert.True(NodeDiscovery.IsLoopback(remote.Manifest.Endpoint),
+                $"{remote.Manifest.NodeId} declares non-loopback endpoint '{remote.Manifest.Endpoint}'; discovery will skip it.");
+            Assert.All(remote.Manifest.Capabilities,
+                c => Assert.DoesNotContain(c.Name, builtInCapabilities));
+        }
 
         // The knowledge node fetches outside content, so it must declare it (doc §4.3/§7).
         Assert.True(byId[NodeKeys.Knowledge].Manifest.Requires.EmitsUntrusted);

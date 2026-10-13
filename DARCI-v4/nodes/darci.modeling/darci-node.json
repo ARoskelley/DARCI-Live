@@ -1,0 +1,59 @@
+{
+  "contract_version": "0.1.1",
+  "node_id": "darci.modeling",
+  "display_name": "3D Modeling (parametric CAD)",
+  "node_version": "0.1.0",
+  "kind": "capability",
+  "endpoint": "http://127.0.0.1:7801",
+  "health": "/health",
+  "capabilities": [
+    {
+      "name": "model.build",
+      "description": "Build a parametric 3D model from a structured spec and export it to STEP and STL. Deterministic: the spec fully determines the geometry, and no model class is consulted.",
+      "input_schema": {
+        "type": "object",
+        "required": ["spec"],
+        "description": "The node contract carries payloads as a flat map of string to string, so every slot below is a STRING - including 'spec', which is a JSON object encoded as a string rather than a nested object.",
+        "properties": {
+          "spec": {
+            "type": "string",
+            "description": "JSON object encoded as a string: {\"shape\": \"box|plate|bracket|cylinder\", \"dimensions_mm\": {...}, \"features\": [...]}."
+          },
+          "formats": {
+            "type": "string",
+            "description": "Comma-separated subset of 'step,stl'. Defaults to both."
+          },
+          "name": {
+            "type": "string",
+            "description": "Base filename for the exported artifacts. Defaults to 'model'."
+          }
+        }
+      },
+      "output_schema": {
+        "type": "object",
+        "description": "Also a flat map of string to string; numeric values are decimal strings and booleans are 'true'/'false'.",
+        "properties": {
+          "step_path": { "type": "string" },
+          "stl_path": { "type": "string" },
+          "bbox_mm": { "type": "string" },
+          "volume_mm3": { "type": "string" },
+          "watertight": { "type": "string" },
+          "triangle_count": { "type": "string" },
+          "script_sha256": { "type": "string" }
+        }
+      },
+      "typical_latency_ms": 4000,
+      "deadline_ms": 120000
+    }
+  ],
+  "requires": {
+    "model_classes": [],
+    "memory_scopes": [],
+    "permissions": ["write:workspace-files"],
+    "emits_untrusted": false
+  },
+  "max_runtime_s": 120,
+  "network": "none",
+  "author": "ARoskelley",
+  "repository": "https://github.com/ARoskelley/DARCI-Live"
+}

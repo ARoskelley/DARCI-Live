@@ -465,9 +465,20 @@ builder.Services.AddSingleton<NodeManifestLoader>();
 builder.Services.AddSingleton<INodeRegistrationStore>(sp =>
     new SqliteNodeRegistrationStore(connectionString, sp.GetRequiredService<ILogger<SqliteNodeRegistrationStore>>()));
 
-// The per-process loopback secret for out-of-process nodes (D4, minimal). Generated fresh each start:
-// it is a local handshake token, not a credential anybody stores.
-var nodeSharedSecret = Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(16));
+// The loopback secret sent to out-of-process nodes as X-Darci-Token (D4, minimal).
+//
+// Configurable on purpose. Per decision D3 the core does not launch nodes — it connects to ones already
+// running — so a secret minted here at startup is one the node could never have learned, and the header
+// becomes decoration: the node can see that SOME token arrived, never that it is the right one. Setting
+// DARCI_NODE_SHARED_SECRET in both processes makes the check real.
+//
+// Unset keeps the old behaviour (a fresh random value per boot), which is the right default: it costs
+// nothing, and a node that verifies the token will refuse to serve rather than quietly accept anyone —
+// an honest failure that says the two sides were not configured together.
+var nodeSharedSecret = Environment.GetEnvironmentVariable("DARCI_NODE_SHARED_SECRET");
+var nodeSecretIsShared = !string.IsNullOrWhiteSpace(nodeSharedSecret);
+if (!nodeSecretIsShared)
+    nodeSharedSecret = Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(16));
 
 builder.Services.AddSingleton(new NodeDiscoveryOptions
 {
@@ -766,6 +777,14 @@ foreach (var registration in nodeRegistry.Registrations)
 }
 app.Logger.LogInformation("Node registry ready: {Count} node(s) serving [{Capabilities}].",
     nodeRegistry.Registrations.Count, string.Join(", ", nodeRegistry.RoutableCapabilities));
+
+// Says which of the two postures is live, because they differ in what a node can actually prove about a
+// request, and a reader of this log should not have to guess which one they are in. The secret itself is
+// never logged.
+app.Logger.LogInformation(
+    nodeSecretIsShared
+        ? "Out-of-process node auth: DARCI_NODE_SHARED_SECRET is set, so nodes configured with the same value can VERIFY X-Darci-Token."
+        : "Out-of-process node auth: no DARCI_NODE_SHARED_SECRET, so X-Darci-Token is a per-boot random value no pre-started node can verify. Set it in both processes to make the check real.");
 
 // Which model profile is live, and what each class actually resolves to. Worth logging plainly: silent
 // model-name drift is the failure mode this whole broker exists to prevent.
