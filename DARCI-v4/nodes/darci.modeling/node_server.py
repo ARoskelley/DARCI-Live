@@ -27,9 +27,11 @@ The manifest's schemas say so rather than pretending otherwise.
 
 from __future__ import annotations
 
+import hashlib
 import hmac
 import json
 import os
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -39,6 +41,22 @@ from fastapi.responses import JSONResponse
 
 NODE_DIR = Path(__file__).resolve().parent
 MANIFEST_PATH = NODE_DIR / "darci-node.json"
+
+#: Exports land here, not in the legacy service's directory. Set BEFORE importing cad_engine, whose
+#: CAD_OUTPUT_DIR is read and created at import time.
+OUTPUT_DIR = Path(os.getenv("DARCI_MODELING_OUTPUT_DIR") or (NODE_DIR / "output"))
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+os.environ.setdefault("CAD_OUTPUT_DIR", str(OUTPUT_DIR))
+
+# The CAD engine is IMPORTED from the existing service rather than reimplemented. It already carries the
+# parts that are expensive to get right - AST script filtering, restricted builtins, an execution timeout
+# with a Windows fallback, and mesh validation - and duplicating them would mean two sandboxes to keep
+# honest. Darci.Python itself is left untouched: this node adds a second consumer, not a fork.
+_LEGACY_CAD = NODE_DIR.parents[1] / "Darci.Python"
+if str(_LEGACY_CAD) not in sys.path:
+    sys.path.insert(0, str(_LEGACY_CAD))
+
+import spec_to_script  # noqa: E402  (local module; after the path setup above for symmetry)
 
 #: Read once at import. A node whose manifest changed under it should be restarted, not quietly serve a
 #: surface the core verified against a different file.
@@ -76,10 +94,18 @@ def health() -> dict[str, str]:
 
 def _kernel_available() -> bool:
     try:
-        import cadquery  # noqa: F401
+        _engine()
     except Exception:
         return False
     return True
+
+
+def _engine():
+    """The legacy CAD engine, imported lazily so an import failure is a 'degraded' health answer rather
+    than a process that will not start."""
+    from cad import cad_engine
+
+    return cad_engine
 
 
 # ── section 5.2: GET /manifest ───────────────────────────────────────────────────────────────────
@@ -129,11 +155,7 @@ async def invoke(request: Request, x_darci_token: str | None = Header(default=No
 
 
 def _build_model(trace_id: str, payload: dict[str, str]) -> Response:
-    """M1: a stub that proves the transport. Real geometry arrives in M2.
-
-    It reports stub="true" in its own payload rather than returning a plausible-looking empty success,
-    so a passing end-to-end run cannot be mistaken for a working CAD pipeline.
-    """
+    """Spec in, geometry out: script -> sandboxed execution -> STEP/STL export -> mesh validation."""
     spec_raw = payload.get("spec")
     if not spec_raw:
         return _error(trace_id, "INVALID_INPUT", "payload.spec is required (a JSON object as a string).",
@@ -148,12 +170,105 @@ def _build_model(trace_id: str, payload: dict[str, str]) -> Response:
         return _error(trace_id, "INVALID_INPUT",
                       f"payload.spec must encode a JSON object, got {type(spec).__name__}.", retryable=False)
 
-    return _ok(trace_id, {
-        "stub": "true",
-        "detail": "M1 transport proof: the envelope arrived and parsed. No geometry was built.",
-        "shape": str(spec.get("shape", "")),
-        "formats": payload.get("formats", "step,stl"),
-    })
+    try:
+        script = spec_to_script.build_script(spec)
+    except spec_to_script.SpecError as e:
+        # The caller can fix this. Deliberately distinct from an engine failure, which they cannot.
+        return _error(trace_id, "INVALID_INPUT", str(e), retryable=False)
+
+    formats = {f.strip().lower() for f in (payload.get("formats") or "step,stl").split(",") if f.strip()}
+    unknown = formats - {"step", "stl"}
+    if unknown:
+        return _error(trace_id, "INVALID_INPUT",
+                      f"unsupported format(s) {sorted(unknown)}; supported: step, stl.", retryable=False)
+    if not formats:
+        return _error(trace_id, "INVALID_INPUT", "payload.formats named no format.", retryable=False)
+
+    engine = _engine()
+    base = _safe_stem(payload.get("name") or "model")
+    script_sha = hashlib.sha256(script.encode("utf-8")).hexdigest()
+
+    try:
+        workplane = engine.execute_cadquery_script(script)
+    except engine.ScriptSecurityError as e:
+        return _error(trace_id, "PERMISSION_DENIED", f"the generated script was refused: {e}", retryable=False)
+    except engine.ExecutionTimeout as e:
+        return _error(trace_id, "DEADLINE_EXCEEDED", str(e), retryable=True)
+    except Exception as e:
+        return _error(trace_id, "INTERNAL", f"the CAD kernel failed to build the solid: {e}", retryable=False)
+
+    import cadquery as cq
+
+    result: dict[str, str] = {"script_sha256": script_sha, "shape": str(spec.get("shape", ""))}
+
+    try:
+        # STEP first: it is the format an engineer hands to a machinist, and the one the legacy pipeline
+        # never produced. STL is the mesh, and is also what validation reads back.
+        if "step" in formats:
+            step_path = engine.safe_export_path(f"{base}.step")
+            cq.exporters.export(workplane, str(step_path), exportType="STEP")
+            result["step_path"] = str(step_path)
+
+        stl_path = engine.safe_export_path(f"{base}.stl")
+        cq.exporters.export(workplane, str(stl_path), exportType="STL")
+        if "stl" in formats:
+            result["stl_path"] = str(stl_path)
+    except Exception as e:
+        return _error(trace_id, "INTERNAL", f"export failed: {e}", retryable=False)
+
+    # Validation reads the exported mesh rather than the kernel's own shape, so it measures the artifact
+    # that actually leaves this node.
+    try:
+        import trimesh
+
+        mesh = trimesh.load_mesh(str(stl_path))
+        if not isinstance(mesh, trimesh.Trimesh):
+            return _error(trace_id, "INTERNAL", "the export produced a scene rather than a single solid.",
+                          retryable=False)
+
+        validation = engine.validate_mesh(mesh)
+        bbox = validation.bounding_box_mm
+        result.update({
+            "bbox_mm": f"{bbox.get('x')}x{bbox.get('y')}x{bbox.get('z')}",
+            "volume_mm3": f"{validation.volume_cc * 1000.0:.3f}",
+            "watertight": "true" if validation.is_watertight else "false",
+            "triangle_count": str(validation.triangle_count),
+            "validation_passed": "true" if validation.passed else "false",
+        })
+        if validation.warnings:
+            result["warnings"] = "; ".join(validation.warnings)
+    except Exception as e:
+        # The model exists and is on disk; only the measurement failed. Saying so beats discarding a
+        # good part because a mesh library tripped.
+        result["validation_error"] = str(e)
+
+    result["renders"] = _render_count(engine, stl_path)
+    return _ok(trace_id, result)
+
+
+def _render_count(engine, stl_path: Path) -> str:
+    """Orthographic previews are a NICE-TO-HAVE and must never fail a build.
+
+    The renderer needs an OpenGL context, which a headless box does not have. The engine already
+    swallows per-view failures and returns None for each, but it is called inside its own guard anyway:
+    a missing renderer must cost the caller a preview, not a part.
+    """
+    try:
+        import trimesh
+
+        mesh = trimesh.load_mesh(str(stl_path))
+        views = engine.render_orthographic_views(mesh)
+        rendered = [name for name, data in views.items() if data]
+        return f"{len(rendered)}/{len(views)}"
+    except Exception:
+        return "0/3 (renderer unavailable)"
+
+
+def _safe_stem(name: str) -> str:
+    """Filenames come from the caller, so reduce to a bare stem before the engine's own traversal check."""
+    stem = Path(str(name)).stem
+    cleaned = "".join(c for c in stem if c.isalnum() or c in "-_")
+    return cleaned or "model"
 
 
 # ── envelope helpers (section 5.3) ───────────────────────────────────────────────────────────────

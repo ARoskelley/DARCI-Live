@@ -1732,6 +1732,67 @@ app.MapGet("/nodes", (INodeRegistry registry, NodeDiscoveryReportHolder holder) 
     });
 });
 
+// Ask a node to do something (Phase 3 fork F4). Until now a capability could only be reached from inside
+// a goal or campaign flow, which meant a freshly registered node was observable but not USABLE — nothing
+// a person or the Control Centre could actually call.
+//
+// A thin pass-through to INodeRouter ON PURPOSE. The router is the one dispatch point: it persists the
+// packet before anything is attempted, resolves the capability, emits the telemetry record, and turns
+// "no node serves this" into a BLOCKED packet plus a durable gap rather than a failure. Re-implementing
+// any of that here would produce a second, divergent dispatch path — exactly what the contract work
+// spent Phase 3 removing.
+//
+// No deadline parameter. The binding deadline is the one the capability's manifest declares, which is
+// the reviewed figure; letting an HTTP caller pass their own would quietly move a limit that exists to
+// be reviewed. Same loopback-only, unauthenticated posture as the rest of the local surface.
+app.MapPost("/nodes/invoke", async Task<IResult> (
+    NodeInvokeRequest request,
+    INodeRouter router,
+    CancellationToken ct) =>
+{
+    if (string.IsNullOrWhiteSpace(request.Capability))
+        return Results.BadRequest(new { error = "capability is required (e.g. 'model.build')." });
+
+    if (!CapabilityKey.IsValidName(request.Capability))
+        return Results.BadRequest(new { error = $"'{request.Capability}' is not a valid 'domain.action' capability name." });
+
+    var packet = new NodePacket
+    {
+        // ADD-2: the correlation root, the durable key the evidence loop counts by. A caller that wants
+        // several invocations treated as one piece of work passes the same one.
+        CorrelationId = string.IsNullOrWhiteSpace(request.CorrelationId)
+            ? Guid.NewGuid().ToString("N")
+            : request.CorrelationId!,
+        RequestedCapabilityKey = request.Capability,
+        Payload = new PacketPayload
+        {
+            Intent = request.Intent ?? $"Direct invocation of {request.Capability}.",
+            SuccessCriteria = request.SuccessCriteria,
+            Slots = request.Payload ?? new Dictionary<string, string>(),
+        },
+    };
+
+    var result = await router.DispatchAsync(packet, ct);
+
+    return Results.Ok(new
+    {
+        packetId = result.Id,
+        correlationId = result.CorrelationId,
+        state = result.State.ToString(),
+        terminal = result.State.IsTerminal(),
+        // Null rather than the -1.0 sentinel when nothing assessed it, so a reader is not invited to
+        // treat "unassessed" as a very low score.
+        confidence = result.Log.Count > 0 && result.Log[^1].Confidence.IsAssessed
+            ? result.Log[^1].Confidence.Score
+            : (double?)null,
+        payload = result.Payload.Slots,
+        // The last log entry carries the node's own account of what happened, including the error text
+        // on a failure and the reason on a blocked packet.
+        lastDecision = result.Log.Count > 0 ? result.Log[^1].Decision : "",
+        error = result.Log.Count > 0 ? result.Log[^1].Error : null,
+    });
+});
+
 app.MapGet("/knowledge/entities/search", async (
     IKnowledgeGraph graph,
     string q,
@@ -1968,3 +2029,12 @@ public record EngineeringConnectionMotionRequest(
 
 public record CheckpointRequest(string? TaskId = null, string? Message = null);
 public record RollbackRequest(string? TaskId = null, string? CheckpointId = null);
+
+/// <summary>Body of POST /nodes/invoke. Payload slots are flat string→string, matching the node contract's
+/// wire shape exactly — a structured argument travels as a JSON-encoded string in one slot.</summary>
+public record NodeInvokeRequest(
+    string Capability,
+    Dictionary<string, string>? Payload = null,
+    string? Intent = null,
+    string? SuccessCriteria = null,
+    string? CorrelationId = null);

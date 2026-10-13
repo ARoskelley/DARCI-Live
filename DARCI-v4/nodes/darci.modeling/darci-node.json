@@ -17,7 +17,7 @@
         "properties": {
           "spec": {
             "type": "string",
-            "description": "JSON object encoded as a string: {\"shape\": \"box|plate|bracket|cylinder\", \"dimensions_mm\": {...}, \"features\": [...]}."
+            "description": "JSON object encoded as a string: {\"shape\": \"box|cylinder|plate|bracket\", \"dimensions_mm\": {...}, \"features\": [{\"type\": \"hole\", \"diameter_mm\": 8, \"at_mm\": [20, 0]}]}. All lengths are millimetres."
           },
           "formats": {
             "type": "string",
@@ -33,13 +33,18 @@
         "type": "object",
         "description": "Also a flat map of string to string; numeric values are decimal strings and booleans are 'true'/'false'.",
         "properties": {
-          "step_path": { "type": "string" },
-          "stl_path": { "type": "string" },
-          "bbox_mm": { "type": "string" },
+          "step_path": { "type": "string", "description": "Absolute path to the exported STEP file." },
+          "stl_path": { "type": "string", "description": "Absolute path to the exported STL file." },
+          "shape": { "type": "string" },
+          "bbox_mm": { "type": "string", "description": "Measured extents as XxYxZ." },
           "volume_mm3": { "type": "string" },
-          "watertight": { "type": "string" },
+          "watertight": { "type": "string", "description": "'true' or 'false'." },
           "triangle_count": { "type": "string" },
-          "script_sha256": { "type": "string" }
+          "validation_passed": { "type": "string", "description": "'true' or 'false'." },
+          "warnings": { "type": "string", "description": "Semicolon-separated mesh warnings, when any." },
+          "validation_error": { "type": "string", "description": "Present only when the model exported but could not be measured; the files are still valid." },
+          "renders": { "type": "string", "description": "How many orthographic previews were produced, e.g. '3/3' or '0/3 (renderer unavailable)'. A headless host produces none, which never fails a build." },
+          "script_sha256": { "type": "string", "description": "SHA-256 of the generated CadQuery script, so a build is reproducible from its inputs." }
         }
       },
       "typical_latency_ms": 4000,

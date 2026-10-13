@@ -25,6 +25,10 @@ client = TestClient(node_server.app)
 
 FUTURE = (datetime.now(timezone.utc) + timedelta(minutes=5)).isoformat()
 
+#: A spec that actually builds, so the envelope tests exercise the success path rather than the
+#: validator. Deliberately the smallest real part, not a stand-in.
+VALID_SPEC = {"shape": "box", "dimensions_mm": {"length": 20, "width": 15, "height": 5}}
+
 
 def envelope(capability: str = "model.build", payload: dict | None = None, deadline: str | None = None) -> dict:
     """A minimal invocation shaped like the one HttpNodeAdapter.ToWire emits."""
@@ -39,7 +43,7 @@ def envelope(capability: str = "model.build", payload: dict | None = None, deadl
         "taint": {"level": "clean", "sources": []},
         "broker": {"url": None, "token": None},
         "intent": "test",
-        "payload": payload if payload is not None else {"spec": json.dumps({"shape": "box"})},
+        "payload": payload if payload is not None else {"spec": json.dumps(VALID_SPEC)},
     }
 
 
@@ -93,11 +97,73 @@ def test_invoke_returns_a_well_formed_result_envelope():
     assert all(isinstance(v, str) for v in body["payload"].values())
 
 
-def test_the_m1_stub_says_it_is_a_stub():
-    # So that a green end-to-end run cannot be mistaken for a working CAD pipeline.
-    body = client.post("/invoke", json=envelope()).json()
+def test_a_build_produces_real_step_and_stl_files():
+    spec = {"shape": "plate", "dimensions_mm": {"length": 60, "width": 40, "thickness": 5},
+            "features": [{"type": "hole", "diameter_mm": 6, "at_mm": [0, 0]}]}
 
-    assert body["payload"]["stub"] == "true"
+    body = client.post("/invoke", json=envelope(payload={"spec": json.dumps(spec), "name": "unit-plate"})).json()
+
+    assert body["outcome"] == "ok", body
+    step = Path(body["payload"]["step_path"])
+    stl = Path(body["payload"]["stl_path"])
+    assert step.exists() and "ISO-10303-21" in step.read_text(encoding="utf-8", errors="replace")[:200]
+    assert stl.exists() and stl.stat().st_size > 0
+
+    # Measured from the exported mesh, not asserted from the request.
+    assert body["payload"]["bbox_mm"] == "60.0x40.0x5.0"
+    assert body["payload"]["watertight"] == "true"
+    assert float(body["payload"]["volume_mm3"]) == pytest.approx(60 * 40 * 5 - 3.14159 * 9 * 5, rel=0.01)
+
+
+def test_only_the_requested_formats_come_back():
+    spec = json.dumps({"shape": "box", "dimensions_mm": {"length": 10, "width": 10, "height": 10}})
+
+    body = client.post("/invoke", json=envelope(payload={"spec": spec, "formats": "stl"})).json()
+
+    assert "stl_path" in body["payload"]
+    assert "step_path" not in body["payload"]
+
+
+def test_an_unsupported_format_is_rejected_by_name():
+    spec = json.dumps({"shape": "box", "dimensions_mm": {"length": 10, "width": 10, "height": 10}})
+
+    body = client.post("/invoke", json=envelope(payload={"spec": spec, "formats": "3mf"})).json()
+
+    assert body["error"]["code"] == "INVALID_INPUT"
+    assert "3mf" in body["error"]["message"]
+
+
+def test_a_missing_renderer_never_fails_the_build():
+    # The orthographic preview needs an OpenGL context this box has no reason to have. The build must
+    # still succeed and still report its geometry; only the preview count degrades.
+    spec = json.dumps({"shape": "box", "dimensions_mm": {"length": 20, "width": 20, "height": 20}})
+
+    body = client.post("/invoke", json=envelope(payload={"spec": spec})).json()
+
+    assert body["outcome"] == "ok"
+    assert "renders" in body["payload"]          # reported either way, never thrown
+    assert body["payload"]["watertight"] == "true"
+
+
+def test_a_geometrically_impossible_spec_is_invalid_input_not_a_crash():
+    spec = json.dumps({"shape": "plate", "dimensions_mm": {"length": 20, "width": 20, "thickness": 3},
+                       "features": [{"type": "hole", "diameter_mm": 30, "at_mm": [0, 0]}]})
+
+    body = client.post("/invoke", json=envelope(payload={"spec": spec})).json()
+
+    assert body["outcome"] == "error"
+    assert body["error"]["code"] == "INVALID_INPUT"
+
+
+def test_a_caller_supplied_filename_cannot_escape_the_output_directory():
+    spec = json.dumps({"shape": "box", "dimensions_mm": {"length": 10, "width": 10, "height": 10}})
+
+    body = client.post("/invoke", json=envelope(
+        payload={"spec": spec, "name": "../../../../etc/passwd"})).json()
+
+    assert body["outcome"] == "ok"
+    written = Path(body["payload"]["stl_path"]).resolve()
+    assert written.parent == node_server.OUTPUT_DIR.resolve(), written
 
 
 def test_an_unknown_capability_is_not_implemented_rather_than_a_crash():
