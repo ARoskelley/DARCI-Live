@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from typing import Any
 
-SHAPES = ("box", "cylinder", "plate", "bracket")
+SHAPES = ("box", "cylinder", "plate", "bracket", "flange")
 
 
 class SpecError(ValueError):
@@ -43,6 +43,7 @@ def build_script(spec: dict[str, Any]) -> str:
         "cylinder": _cylinder,
         "plate": _plate,
         "bracket": _bracket,
+        "flange": _flange,
     }[shape]
     return builder(dims, features)
 
@@ -106,6 +107,95 @@ def _bracket(dims: dict, features: list) -> str:
     ]
     lines += _holes(features, length, width, on_face=">Z")
     return "\n".join(lines)
+
+
+def _flange(dims: dict, features: list) -> str:
+    """A hubbed pipe flange: plate, concentric hub, through bore, bolt circle, fillet, chamfer.
+
+    The one shape here that exercises what the kernel is actually for — a polar feature pattern, a
+    fillet on a specific found edge, and a chamfer on another — rather than boxes with holes in them.
+    """
+    od = _dim(dims, "outer_diameter", "flange")
+    bore = _dim(dims, "bore_diameter", "flange")
+    thickness = _dim(dims, "plate_thickness", "flange")
+    hub_d = _dim(dims, "hub_diameter", "flange")
+    hub_h = _dim(dims, "hub_height", "flange")
+
+    if not bore < hub_d < od:
+        raise SpecError(
+            f"a flange needs bore ({bore}) < hub_diameter ({hub_d}) < outer_diameter ({od}).")
+
+    bolt_holes = _one_feature(features, "bolt_holes", required=False)
+    fillet = _one_feature(features, "fillet", required=False)
+    chamfer = _one_feature(features, "chamfer", required=False)
+    _reject_unsupported_features(features, "flange", allowed={"bolt_holes", "fillet", "chamfer"})
+
+    lines = [
+        f"result = cq.Workplane('XY').circle({od / 2}).extrude({thickness})",
+        f"result = result.faces('>Z').workplane().circle({hub_d / 2}).extrude({hub_h})",
+    ]
+
+    # The fillet goes in BEFORE the bore and the bolt holes. Filleting a face that has already been
+    # drilled asks the kernel to roll a radius across the hole breakouts, which is how this fails.
+    if fillet is not None:
+        radius = _positive(fillet, "radius_mm", "fillet")
+        if radius >= min(thickness, hub_h):
+            raise SpecError(
+                f"fillet radius {radius}mm must be smaller than both plate_thickness ({thickness}) and "
+                f"hub_height ({hub_h}).")
+        if radius >= (hub_d - bore) / 2:
+            raise SpecError(
+                f"fillet radius {radius}mm does not fit in the {(hub_d - bore) / 2}mm hub wall.")
+        # Selected by geometry rather than by a direction selector: the junction circle and the plate's
+        # outer rim share a centre, so '>Z'-style selection cannot tell them apart and the kernel
+        # refuses with "no suitable edges".
+        lines += [
+            f"junction = [e for e in result.edges().vals() if e.geomType() == 'CIRCLE'"
+            f" and abs(e.Center().z - {thickness}) < 0.001 and abs(e.radius() - {hub_d / 2}) < 0.001]",
+            f"result = result.newObject(junction).fillet({radius})",
+        ]
+
+    lines.append(f"result = result.faces('>Z').workplane().circle({bore / 2}).cutThruAll()")
+
+    if bolt_holes is not None:
+        bcd = _dim(dims, "bolt_circle_diameter", "flange with bolt_holes")
+        count = bolt_holes.get("count", 4)
+        if not isinstance(count, int) or isinstance(count, bool) or count < 2:
+            raise SpecError(f"bolt_holes count must be a whole number of at least 2, got {count!r}.")
+        hole_d = _positive(bolt_holes, "diameter_mm", "bolt_holes")
+
+        if not hub_d < bcd < od:
+            raise SpecError(
+                f"bolt_circle_diameter ({bcd}) must sit between the hub ({hub_d}) and the rim ({od}).")
+        if bcd / 2 + hole_d / 2 > od / 2:
+            raise SpecError(f"d{hole_d}mm bolt holes on a {bcd}mm circle break through the {od}mm rim.")
+        if bcd / 2 - hole_d / 2 < hub_d / 2:
+            raise SpecError(f"d{hole_d}mm bolt holes on a {bcd}mm circle cut into the {hub_d}mm hub.")
+
+        lines.append(
+            f"result = result.faces('<Z').workplane().polarArray({bcd / 2}, 0, 360, {count})"
+            f".circle({hole_d / 2}).cutThruAll()")
+
+    if chamfer is not None:
+        size = _positive(chamfer, "size_mm", "chamfer")
+        if size >= bore / 2:
+            raise SpecError(f"chamfer {size}mm is too large for a {bore}mm bore.")
+        lines += [
+            f"mouth = [e for e in result.edges().vals() if e.geomType() == 'CIRCLE'"
+            f" and abs(e.Center().z - {thickness + hub_h}) < 0.001 and abs(e.radius() - {bore / 2}) < 0.001]",
+            f"result = result.newObject(mouth).chamfer({size})",
+        ]
+
+    return "\n".join(lines)
+
+
+def _one_feature(features: list, kind: str, required: bool) -> dict | None:
+    matches = [f for f in features if isinstance(f, dict) and str(f.get("type", "")).lower() == kind]
+    if len(matches) > 1:
+        raise SpecError(f"a flange takes at most one '{kind}' feature, got {len(matches)}.")
+    if not matches and required:
+        raise SpecError(f"a flange needs a '{kind}' feature.")
+    return matches[0] if matches else None
 
 
 # ── features ─────────────────────────────────────────────────────────────────────────────────────

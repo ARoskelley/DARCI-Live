@@ -144,3 +144,82 @@ def test_every_generated_script_obeys_the_sandbox_contract():
         assert "result" in script
         assert "import" not in script
         assert shape in spec_to_script.SHAPES
+
+
+# ── the flange: the shape that exercises the kernel rather than boxes with holes ─────────────────
+
+FLANGE = {
+    "shape": "flange",
+    "dimensions_mm": {"outer_diameter": 160, "bolt_circle_diameter": 125, "bore_diameter": 50,
+                      "plate_thickness": 12, "hub_diameter": 80, "hub_height": 30},
+    "features": [{"type": "bolt_holes", "count": 8, "diameter_mm": 14},
+                 {"type": "fillet", "radius_mm": 4},
+                 {"type": "chamfer", "size_mm": 2}],
+}
+
+
+def test_the_flange_builds_a_single_valid_solid():
+    solid = run(build_script(FLANGE)).val()
+
+    assert solid.isValid()
+    bb = solid.BoundingBox()
+    assert (round(bb.xlen, 3), round(bb.ylen, 3), round(bb.zlen, 3)) == (160.0, 160.0, 42.0)
+
+
+def test_the_flange_volume_matches_the_analytic_figure():
+    volume = run(build_script(FLANGE)).val().Volume()
+
+    plate = math.pi * 80**2 * 12
+    hub = math.pi * 40**2 * 30
+    bore = math.pi * 25**2 * 42          # through plate and hub
+    bolts = 8 * math.pi * 7**2 * 12
+    fillet_add = (1 - math.pi / 4) * 4**2 * (2 * math.pi * 40)
+    chamfer_cut = 0.5 * 2**2 * (2 * math.pi * 25)
+
+    assert volume == pytest.approx(plate + hub - bore - bolts + fillet_add - chamfer_cut, rel=0.002)
+
+
+def test_the_bolt_pattern_is_actually_a_pattern():
+    # Eight holes, not one: a polar array that silently produced a single feature would still build.
+    # Only the hole count differs between the two; the fillet and chamfer stay, or their faces would
+    # show up in the difference and the count would mean nothing.
+    eight = run(build_script(FLANGE)).faces().vals()
+    four = run(build_script({**FLANGE, "features": [
+        {"type": "bolt_holes", "count": 4, "diameter_mm": 14},
+        {"type": "fillet", "radius_mm": 4},
+        {"type": "chamfer", "size_mm": 2}]})).faces().vals()
+
+    assert len(eight) - len(four) == 4      # one cylindrical face per extra hole
+
+
+@pytest.mark.parametrize("dims,expected", [
+    ({"bore_diameter": 90}, "bore"),                      # bore wider than the hub
+    ({"bolt_circle_diameter": 70}, "between the hub"),    # bolt circle inside the hub
+    ({"bolt_circle_diameter": 158}, "break through"),     # bolt holes off the rim
+])
+def test_an_impossible_flange_is_refused_before_the_kernel_sees_it(dims, expected):
+    spec = {**FLANGE, "dimensions_mm": {**FLANGE["dimensions_mm"], **dims}}
+
+    with pytest.raises(SpecError, match=expected):
+        build_script(spec)
+
+
+@pytest.mark.parametrize("feature,expected", [
+    ({"type": "fillet", "radius_mm": 20}, "smaller than both"),
+    ({"type": "chamfer", "size_mm": 30}, "too large for"),
+    ({"type": "bolt_holes", "count": 1, "diameter_mm": 14}, "at least 2"),
+])
+def test_a_feature_that_cannot_be_cut_is_refused(feature, expected):
+    spec = {**FLANGE, "features": [feature]}
+
+    with pytest.raises(SpecError, match=expected):
+        build_script(spec)
+
+
+def test_the_flange_is_fine_without_any_features():
+    # Plate, hub and bore alone — the optional features must really be optional.
+    solid = run(build_script({**FLANGE, "features": []})).val()
+
+    assert solid.isValid()
+    assert solid.Volume() == pytest.approx(
+        math.pi * 80**2 * 12 + math.pi * 40**2 * 30 - math.pi * 25**2 * 42, rel=1e-3)

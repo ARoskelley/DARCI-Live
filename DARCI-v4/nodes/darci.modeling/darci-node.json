@@ -17,7 +17,7 @@
         "properties": {
           "spec": {
             "type": "string",
-            "description": "JSON object encoded as a string: {\"shape\": \"box|cylinder|plate|bracket\", \"dimensions_mm\": {...}, \"features\": [{\"type\": \"hole\", \"diameter_mm\": 8, \"at_mm\": [20, 0]}]}. All lengths are millimetres."
+            "description": "JSON object encoded as a string: {\"shape\": \"box|cylinder|plate|bracket|flange\", \"dimensions_mm\": {...}, \"features\": [...]}. All lengths are millimetres. Features by shape: box/plate/bracket take {\"type\":\"hole\",\"diameter_mm\":8,\"at_mm\":[20,0]}; cylinder takes {\"type\":\"bore\",\"diameter_mm\":20}; flange takes {\"type\":\"bolt_holes\",\"count\":8,\"diameter_mm\":14}, {\"type\":\"fillet\",\"radius_mm\":4} and {\"type\":\"chamfer\",\"size_mm\":2}."
           },
           "formats": {
             "type": "string",
