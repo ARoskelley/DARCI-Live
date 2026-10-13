@@ -165,8 +165,13 @@ public sealed class CodingAgentLoop : ICodingAgentLoop
             return;
         }
 
-        // Create a pre-run checkpoint.
-        await _checkpoints.CreateCheckpointAsync(workspace.Id, taskId, $"Pre-run checkpoint for task: {task.Prompt}", ct);
+        // Create a pre-run checkpoint: a rollback ANCHOR, not a snapshot. The agent has not edited
+        // anything yet, so anything dirty in the tree right now belongs to whoever is working in this
+        // repo — committing it under this task's message is how a developer's in-progress work ended up
+        // in a "[DARCI checkpoint]" commit.
+        await _checkpoints.CreateCheckpointAsync(
+            workspace.Id, taskId, $"Pre-run checkpoint for task: {task.Prompt}",
+            CheckpointMode.AnchorHeadOnly, ct);
 
         var buildCommand = PickBuildCommand(workspace.DetectedCommands);
         var testCommand = PickTestCommand(workspace.DetectedCommands);

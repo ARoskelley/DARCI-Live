@@ -52,11 +52,41 @@ public interface ICodingTaskService
     Task<CodingTaskRecord> CreateTaskAsync(CreateCodingTaskRequest request, CancellationToken ct = default);
 }
 
+/// <summary>
+/// What a checkpoint is allowed to do to the repository.
+///
+/// <para>The distinction exists because the two callers mean genuinely different things, and conflating
+/// them was a bug: the agent loop's PRE-RUN checkpoint committed the entire working tree with
+/// <c>git add -A</c> before the agent had edited anything, so everything it captured was by definition
+/// somebody else's in-progress work — committed under a "[DARCI checkpoint]" message describing a task it
+/// had nothing to do with.</para>
+/// </summary>
+public enum CheckpointMode
+{
+    /// <summary>
+    /// Record where HEAD is and commit NOTHING. The correct meaning of a checkpoint taken before any
+    /// edits: it is a rollback target, not a snapshot of work in progress.
+    /// </summary>
+    AnchorHeadOnly = 0,
+
+    /// <summary>
+    /// Commit the workspace's own changes — for a checkpoint taken AFTER edits, where committing is the
+    /// point. Still scoped to the workspace path; never the whole repository.
+    /// </summary>
+    CommitWorkspaceChanges = 1,
+}
+
 /// <summary>Creates and restores git checkpoints around edits.</summary>
 public interface IGitCheckpointService
 {
-    /// <summary>Creates a checkpoint commit. Returns null if git is not initialised or fails.</summary>
-    Task<CodingCheckpoint?> CreateCheckpointAsync(string workspaceId, string taskId, string message, CancellationToken ct = default);
+    /// <summary>Creates a checkpoint. Returns null if git is not initialised or fails.</summary>
+    Task<CodingCheckpoint?> CreateCheckpointAsync(
+        string workspaceId,
+        string taskId,
+        string message,
+        CheckpointMode mode = CheckpointMode.AnchorHeadOnly,
+        CancellationToken ct = default);
+
     /// <summary>Restores the workspace to the given checkpoint commit.</summary>
     Task<bool> RollbackToCheckpointAsync(string workspaceId, string taskId, string checkpointId, CancellationToken ct = default);
 }

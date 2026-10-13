@@ -1679,8 +1679,11 @@ app.MapPost("/coding/workspaces/{id}/checkpoint", async Task<IResult> (
 {
     try
     {
+        // An operator asking for a checkpoint means "commit what is here", so this one does commit —
+        // still scoped to the workspace's own paths rather than the whole repository.
         var checkpoint = await checkpoints.CreateCheckpointAsync(
-            id, request.TaskId ?? "", request.Message ?? "Manual checkpoint", ct);
+            id, request.TaskId ?? "", request.Message ?? "Manual checkpoint",
+            CheckpointMode.CommitWorkspaceChanges, ct);
         return checkpoint is null
             ? Results.UnprocessableEntity(new { error = "Could not create checkpoint (git may not be initialised)." })
             : Results.Created($"/coding/workspaces/{id}/checkpoints/{checkpoint.Id}", checkpoint);
