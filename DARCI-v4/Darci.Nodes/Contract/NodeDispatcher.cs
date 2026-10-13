@@ -176,9 +176,23 @@ public sealed class NodeDispatcher
         {
             case NodeOutcome.Blocked:
                 var detail = result.Dependency?.Detail ?? "awaiting an external dependency";
-                return packet.State == NodeState.AwaitingDependency
-                    ? packet
-                    : packet.ParkAwaitingDependency(nodeId, detail, result.Confidence);
+                if (packet.State == NodeState.AwaitingDependency) return packet;
+
+                // Walk the packet up the same way the success path does. AwaitingDependency is only
+                // reachable from Working, and an OUT-OF-PROCESS node cannot move the packet itself —
+                // it returns a NodeResult and the dispatcher owns the state machine. Parking straight
+                // from Routed threw InvalidNodeTransitionException, which the router then recorded as
+                // Failed: a node that honestly reported `blocked` was being written down as a failure,
+                // which is precisely the phantom negative evidence Fork 1 exists to prevent.
+                //
+                // In-process nodes hid this, because they transition themselves to Working before
+                // returning. It became reachable the moment a node ran over HTTP.
+                if (packet.State == NodeState.Routed)
+                    packet = packet.Transition(nodeId, NodeState.Accepted, "accepted");
+                if (packet.State == NodeState.Accepted)
+                    packet = packet.Transition(nodeId, NodeState.Working, "working");
+
+                return packet.ParkAwaitingDependency(nodeId, detail, result.Confidence);
 
             case NodeOutcome.Error:
                 return packet.Transition(nodeId, NodeState.Failed,
