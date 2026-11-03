@@ -1,0 +1,216 @@
+#nullable enable
+
+using System.Diagnostics;
+using Microsoft.Extensions.Logging;
+
+namespace Darci.Nodes;
+
+/// <summary>
+/// THE ONE DISPATCH POINT (doc §9 Phase 1). Every node-capability invocation goes through here: it projects
+/// the durable work record into a <see cref="NodeInvocation"/>, calls the node's
+/// <see cref="INodeAdapter"/>, emits telemetry, and folds the <see cref="NodeResult"/> back onto the record.
+///
+/// <para><b>Scope note:</b> "one dispatch point" means one point for NODE-CAPABILITY invocations. Model calls
+/// (ModelRouter/Ollama) are the MODEL BROKER's job and are deliberately out of scope until Phase 2.</para>
+///
+/// <para><b>What the dispatcher must never do</b> (the C3 firewall, pinned by tests in SU4): it does not park,
+/// unpark, or abort a work record, and an invocation's <see cref="NodeInvocation.DeadlineAt"/> has no
+/// relationship to the record's lease. Long-lived waits belong to the core's goal/task lifecycle (doc §3) —
+/// the human gate legitimately waits for days, which no per-invocation deadline may cut short.</para>
+/// </summary>
+public sealed class NodeDispatcher
+{
+    private readonly INodeTelemetrySink _telemetry;
+    private readonly string? _hostProfileId;
+    private readonly ILogger<NodeDispatcher> _logger;
+
+    /// <param name="hostProfile">Optional: which model profile is active, recorded on every invocation so
+    /// telemetry stays comparable across hosts with different hardware.</param>
+    public NodeDispatcher(
+        ILogger<NodeDispatcher> logger,
+        INodeTelemetrySink? telemetry = null,
+        HostProfile? hostProfile = null)
+    {
+        _logger = logger;
+        _telemetry = telemetry ?? NullNodeTelemetrySink.Instance;
+        _hostProfileId = hostProfile?.ProfileId;
+    }
+
+    /// <summary>
+    /// Invoke <paramref name="registration"/> for <paramref name="packet"/> and return the resulting work
+    /// record. <paramref name="capability"/> is the resolved routing key (may be empty when the packet was
+    /// routed by explicit address without declaring one).
+    /// </summary>
+    public async Task<NodePacket> DispatchAsync(
+        NodeRegistration registration,
+        NodePacket packet,
+        string capability,
+        CancellationToken ct = default)
+    {
+        var invocation = Project(packet, registration, capability);
+        var startedAt = DateTime.UtcNow;
+        var sw = Stopwatch.StartNew();
+
+        // Open the ambient scope so any model call the node makes — however many frames down — is attributed
+        // to THIS invocation without threading a context object through every call site (fork F1a).
+        using var scope = ModelCallScope.Begin(invocation.TraceId, invocation.GoalId);
+
+        NodeResult result;
+        try
+        {
+            result = await registration.Adapter.InvokeAsync(invocation, ct);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            sw.Stop();
+            // The adapter threw. Report it as an INTERNAL error result; the CALLER decides the record's fate,
+            // preserving the router's existing exception handling exactly.
+            _telemetry.Record(WithModelRollUp(new NodeTelemetryRecord(
+                invocation.TraceId, invocation.GoalId, registration.NodeId, capability,
+                startedAt, sw.ElapsedMilliseconds, NodeOutcome.Error, Confidence.Unassessed,
+                ErrorCode: NodeErrorCode.Internal.ToString())));
+            throw;
+        }
+
+        sw.Stop();
+
+        // MUST echo the trace id unchanged (doc §5.3). A mismatch is a node bug; log and carry on with ours.
+        if (!string.Equals(result.TraceId, invocation.TraceId, StringComparison.Ordinal))
+            _logger.LogWarning(
+                "Node {NodeId} did not echo trace_id ({Expected} → {Actual}); telemetry correlation for this " +
+                "invocation is unreliable.", registration.NodeId, invocation.TraceId, result.TraceId);
+
+        _telemetry.Record(WithModelRollUp(new NodeTelemetryRecord(
+            invocation.TraceId, invocation.GoalId, registration.NodeId, capability,
+            startedAt, sw.ElapsedMilliseconds, result.Outcome, result.Confidence,
+            ErrorCode: result.Error?.WireCode,
+            BlockedOn: result.Dependency?.Kind,
+            TaintLevel: result.Taint.Level)));
+
+        return Fold(packet, registration, result);
+    }
+
+    /// <summary>
+    /// Attach the invocation's model roll-up: summed tokens, call count, and the DOMINANT class/model
+    /// (the one that consumed the most tokens — the honest single answer to "what ran this", given §6.3's
+    /// schema has room for only one). An invocation that called no model gets null model facts, which is a
+    /// different statement from "zero tokens".
+    /// </summary>
+    private NodeTelemetryRecord WithModelRollUp(NodeTelemetryRecord record)
+    {
+        var calls = ModelCallScope.CurrentCalls;
+        if (calls.Count == 0) return record;
+
+        var dominant = calls
+            .GroupBy(c => (c.ModelClass, c.ResolvedModel))
+            .OrderByDescending(g => g.Sum(c => c.TokensIn + c.TokensOut))
+            .ThenByDescending(g => g.Count())
+            .First().Key;
+
+        return record with
+        {
+            ModelClass = dominant.ModelClass,
+            ModelResolved = dominant.ResolvedModel,
+            TokensIn = calls.Sum(c => c.TokensIn),
+            TokensOut = calls.Sum(c => c.TokensOut),
+            ModelCallCount = calls.Count,
+            HostProfileId = _hostProfileId,
+        };
+    }
+
+    /// <summary>
+    /// Project the work record into an invocation envelope.
+    ///
+    /// <para><b>ADD-2:</b> <see cref="NodeInvocation.GoalId"/> is the packet's <see cref="NodePacket.CorrelationId"/>
+    /// — the correlation root the whole evidence loop keys on. <see cref="NodeInvocation.TraceId"/> is FRESH per
+    /// invocation and is telemetry-only; it must never be used as a correlation key.</para>
+    /// </summary>
+    internal static NodeInvocation Project(NodePacket packet, NodeRegistration registration, string capability)
+    {
+        var descriptor = registration.Manifest.Capabilities.FirstOrDefault(c => c.Name == capability);
+        // Validation guarantees every declared capability has a deadline, so the fallback only applies
+        // when the packet was routed by explicit node ADDRESS and its capability string matches nothing
+        // this node declares. There is no declared budget to use, so it gets the ceiling rather than the
+        // old 300000 — which was both arbitrary and above the maximum an HTTP node can be given.
+        var deadlineMs = descriptor?.DeadlineMs ?? NodeDeadline.MaxMs;
+
+        return new NodeInvocation
+        {
+            EnvelopeVersion = NodeContractVersion.Current,
+            TraceId = Guid.NewGuid().ToString("N"),     // per-invocation, telemetry ONLY
+            GoalId = packet.CorrelationId,              // the correlation root — the durable key
+            Capability = capability,
+            IssuedAt = DateTime.UtcNow,
+            // Per-invocation budget only. Deliberately NOT derived from, and never able to shorten, the
+            // record's lease — see the C3 firewall note on this class.
+            DeadlineAt = DateTime.UtcNow.AddMilliseconds(deadlineMs),
+            Principal = PrincipalRef.Operator,
+            Taint = TaintRef.Clean,                     // carried, not enforced in Phase 1
+            Broker = BrokerRef.None,                    // reserved no-op until Phase 2
+            Intent = packet.Payload.Intent,
+            SuccessCriteria = packet.Payload.SuccessCriteria,
+            Payload = packet.Payload.Slots,
+            PacketRef = packet,                         // F1a transitional in-process side-channel
+        };
+    }
+
+    /// <summary>
+    /// Fold a result back onto the work record.
+    ///
+    /// <para>Legacy in-process nodes already transitioned and logged the record themselves, so their returned
+    /// packet IS the authoritative result and passes through unchanged — that is what makes this sub-unit
+    /// behavior-preserving. The payload-only branch below is the future (Phase 3+) path for nodes that no
+    /// longer touch the packet.</para>
+    /// </summary>
+    private NodePacket Fold(NodePacket original, NodeRegistration registration, NodeResult result)
+    {
+        if (result.PacketRef is not null) return result.PacketRef;
+
+        var nodeId = CapabilityKey.ToLegacyNode(registration.NodeId) ?? NodeId.Orchestrator;
+        var packet = original;
+
+        foreach (var (key, value) in result.Payload)
+            packet = packet.WithSlot(key, value);
+
+        switch (result.Outcome)
+        {
+            case NodeOutcome.Blocked:
+                var detail = result.Dependency?.Detail ?? "awaiting an external dependency";
+                if (packet.State == NodeState.AwaitingDependency) return packet;
+
+                // Walk the packet up the same way the success path does. AwaitingDependency is only
+                // reachable from Working, and an OUT-OF-PROCESS node cannot move the packet itself —
+                // it returns a NodeResult and the dispatcher owns the state machine. Parking straight
+                // from Routed threw InvalidNodeTransitionException, which the router then recorded as
+                // Failed: a node that honestly reported `blocked` was being written down as a failure,
+                // which is precisely the phantom negative evidence Fork 1 exists to prevent.
+                //
+                // In-process nodes hid this, because they transition themselves to Working before
+                // returning. It became reachable the moment a node ran over HTTP.
+                if (packet.State == NodeState.Routed)
+                    packet = packet.Transition(nodeId, NodeState.Accepted, "accepted");
+                if (packet.State == NodeState.Accepted)
+                    packet = packet.Transition(nodeId, NodeState.Working, "working");
+
+                return packet.ParkAwaitingDependency(nodeId, detail, result.Confidence);
+
+            case NodeOutcome.Error:
+                return packet.Transition(nodeId, NodeState.Failed,
+                    result.Error?.Message ?? "node reported an error",
+                    confidence: result.Confidence, success: false,
+                    error: $"{result.Error?.WireCode}: {result.Error?.Message}");
+
+            default:
+                if (packet.State == NodeState.Routed)
+                    packet = packet.Transition(nodeId, NodeState.Accepted, "accepted");
+                if (packet.State == NodeState.Accepted)
+                    packet = packet.Transition(nodeId, NodeState.Working, "working");
+                return packet.Transition(nodeId, NodeState.Succeeded, "completed",
+                    confidence: result.Confidence, success: true);
+        }
+    }
+}

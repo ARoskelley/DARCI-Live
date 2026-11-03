@@ -28,6 +28,7 @@ public class Decision
     private readonly ExperienceBuffer _buffer;
     private readonly IDecisionNetwork _network;
     private readonly EngineeringGoalDetector? _engineeringDetector;
+    private readonly CodingGoalDetector? _codingDetector;
     private readonly IConfidenceTracker? _confidence;
     private readonly GoalDecomposer? _goalDecomposer;
 
@@ -40,7 +41,8 @@ public class Decision
         IDecisionNetwork network,
         EngineeringGoalDetector? engineeringDetector = null,
         IConfidenceTracker? confidence = null,
-        GoalDecomposer? goalDecomposer = null)
+        GoalDecomposer? goalDecomposer = null,
+        CodingGoalDetector? codingDetector = null)
     {
         _logger               = logger;
         _tools                = tools;
@@ -51,6 +53,7 @@ public class Decision
         _engineeringDetector  = engineeringDetector;
         _confidence           = confidence;
         _goalDecomposer       = goalDecomposer;
+        _codingDetector       = codingDetector;
     }
 
     /// <summary>
@@ -213,6 +216,23 @@ public class Decision
                             GoalId                 = goal.Id,
                             EngineeringSpec        = engineeringSpec,
                             Reasoning              = "Goal detected as engineering task by keyword detector",
+                        };
+                    }
+                }
+
+                // Check if this is a coding goal — route to the coding node via the packet protocol.
+                if (_codingDetector != null)
+                {
+                    var codingIntent = _codingDetector.Detect(goal.Title, goal.Description);
+                    if (codingIntent != null)
+                    {
+                        state.StartActivity($"Coding: {goal.Title}", goal.Id);
+                        return new DarciAction
+                        {
+                            Type         = ActionType.Code,
+                            CodingIntent = codingIntent,
+                            GoalId       = goal.Id,
+                            Reasoning    = "Goal detected as coding task by keyword detector",
                         };
                     }
                 }
@@ -418,9 +438,11 @@ public class Decision
         ActionType.WorkOnGoal  => (int)BrainAction.WorkOnGoal,
         ActionType.CreateGoal
             or ActionType.ReviewGoals => (int)BrainAction.CreateGoal,
-        // CAD/Engineering both map to WorkOnGoal — they're goal execution actions
+        // CAD/Engineering/Coding all map to WorkOnGoal — they're goal execution actions
         ActionType.GenerateCAD
             or ActionType.Engineer
+            or ActionType.Engineering
+            or ActionType.Code
             or ActionType.ReadFile
             or ActionType.WriteFile => (int)BrainAction.WorkOnGoal,
         _                      => (int)BrainAction.Think

@@ -34,6 +34,13 @@ public sealed class CodingNodeTracker
 
     public bool Enabled => _store is not null;
 
+    /// <summary>
+    /// The correlation id of this task's current packet (for grouping child packets like knowledge
+    /// handoffs), falling back to the task id if no packet is tracked.
+    /// </summary>
+    public string CurrentCorrelationId(string taskId) =>
+        _byTask.TryGetValue(taskId, out var p) ? p.CorrelationId : taskId;
+
     /// <summary>Mint a packet for a task and drive it Created → Routed → Accepted → Working.</summary>
     public async Task BeginAsync(string taskId, string workspaceId, string intent, string? successCriteria, CancellationToken ct)
     {
@@ -64,12 +71,36 @@ public sealed class CodingNodeTracker
         }
     }
 
+    /// <summary>
+    /// Adopt an existing packet that was already routed to the coding node (e.g. by <c>CodingNode</c> via
+    /// the router) so this run's audit log continues on that packet instead of minting a new one. The
+    /// packet is expected to already be in <see cref="NodeState.Working"/>.
+    /// </summary>
+    public async Task AdoptAsync(string taskId, NodePacket packet, CancellationToken ct = default)
+    {
+        if (_store is null) return;
+        _byTask[taskId] = packet;
+        try
+        {
+            // Record adoption so the log shows the loop took over, and refresh the lease.
+            var next = packet.State.IsTerminal()
+                ? packet
+                : packet.Transition(NodeId.Coding, NodeState.Working, "Coding loop adopted routed packet",
+                    leaseFor: LeaseDuration);
+            await _store.SavePacketAsync(next, ct);
+            _byTask[taskId] = next;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Node packet adopt failed for task {TaskId} (non-fatal).", taskId);
+        }
+    }
+
     /// <summary>Append a Working-state log entry and renew the lease (heartbeat + audit).</summary>
     public async Task RecordAsync(
         string taskId,
         string decision,
-        double confidenceScore = -1.0,
-        string? confidenceNote = null,
+        Confidence? confidence = null,
         bool? success = null,
         string? error = null,
         IReadOnlyList<string>? artifacts = null,
@@ -84,7 +115,7 @@ public sealed class CodingNodeTracker
                 node: NodeId.Coding,
                 to: NodeState.Working,
                 decision: decision,
-                confidence: Confidence.Of(confidenceScore, confidenceNote),
+                confidence: confidence ?? Confidence.Unassessed,
                 success: success,
                 error: error,
                 artifacts: artifacts,

@@ -2,6 +2,7 @@
 
 using System.Globalization;
 using System.Text.Json;
+using Darci.Nodes;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
 
@@ -542,8 +543,8 @@ public sealed class CodingWorkspaceStore : ICodingWorkspaceStore
         cmd.Parameters.AddWithValue("$last_step_result", task.LastStepResult);
         cmd.Parameters.AddWithValue("$roadblock_research", task.RoadblockResearch);
         cmd.Parameters.AddWithValue("$verification_result", task.VerificationResult);
-        cmd.Parameters.AddWithValue("$confidence_score", task.ConfidenceScore);
-        cmd.Parameters.AddWithValue("$confidence_note", task.ConfidenceNote);
+        cmd.Parameters.AddWithValue("$confidence_score", task.Confidence.Score);
+        cmd.Parameters.AddWithValue("$confidence_note", task.Confidence.Note ?? "");
         cmd.Parameters.AddWithValue("$created_at", ToIso(task.CreatedAt));
         cmd.Parameters.AddWithValue("$updated_at", ToIso(task.UpdatedAt));
     }
@@ -627,11 +628,19 @@ public sealed class CodingWorkspaceStore : ICodingWorkspaceStore
             LastStepResult = reader.IsDBNull(lsrOrd) ? "" : reader.GetString(lsrOrd),
             RoadblockResearch = reader.IsDBNull(rrOrd) ? "" : reader.GetString(rrOrd),
             VerificationResult = vrOrd >= 0 && !reader.IsDBNull(vrOrd) ? reader.GetString(vrOrd) : "",
-            ConfidenceScore = csOrd >= 0 && !reader.IsDBNull(csOrd) ? reader.GetDouble(csOrd) : -1.0,
-            ConfidenceNote = cnOrd >= 0 && !reader.IsDBNull(cnOrd) ? reader.GetString(cnOrd) : "",
+            // Two DB columns (score, note) map to the unified Confidence value type.
+            Confidence = MapConfidence(reader, csOrd, cnOrd),
             CreatedAt = FromIso(reader.GetString(reader.GetOrdinal("created_at"))),
             UpdatedAt = FromIso(reader.GetString(reader.GetOrdinal("updated_at")))
         };
+    }
+
+    /// <summary>Reconstruct the unified Confidence from the two persisted columns (score, note).</summary>
+    private static Confidence MapConfidence(SqliteDataReader reader, int scoreOrd, int noteOrd)
+    {
+        var score = scoreOrd >= 0 && !reader.IsDBNull(scoreOrd) ? reader.GetDouble(scoreOrd) : -1.0;
+        var note = noteOrd >= 0 && !reader.IsDBNull(noteOrd) ? reader.GetString(noteOrd) : "";
+        return Confidence.Of(score, string.IsNullOrEmpty(note) ? null : note);
     }
 
     private static string ToJson(string[] value) => JsonSerializer.Serialize(value);

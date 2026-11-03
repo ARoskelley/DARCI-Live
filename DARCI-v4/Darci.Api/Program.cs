@@ -58,16 +58,39 @@ builder.Services.AddSwaggerGen(c =>
     c.SwaggerDoc("v1", new() { Title = "DARCI API", Version = "v4.0" });
 });
 
-// Model focus gate — serialises local model use between DARCI's living loop and the coding
-// agent loop. Both target the same Ollama instance with different models; without this they
-// force repeated multi-GB model reloads (see DARCI_CODING_ENVIRONMENT_LOG.md, sixth pass).
-// DARCI_FOCUS_MODE = narrow (default: background work yields, user replies pass through)
-//                  | broad (everything yields — for VRAM-constrained hosts)
-//                  | off   (transparent — for hosts with room for both models resident)
-builder.Services.AddSingleton<IModelFocus, ModelFocus>();
+// === Phase 2: the MODEL BROKER (doc §6.2) ===
+// The single place inference happens and the single place a model CLASS becomes a concrete model. Callers
+// ask for a class (chat.balanced, code.generate, embed.text, …); host-profile.json decides what that means
+// on this machine. An unsatisfiable class fails HERE, at startup, with a named error — not mid-task with a
+// 404 on every generation (which is exactly how the gemma4:e4b typo behaved).
+var hostProfilePath = Environment.GetEnvironmentVariable("DARCI_HOST_PROFILE")
+    ?? Path.Combine(builder.Environment.ContentRootPath, "..", HostProfileLoader.FileName);
+var (hostProfile, hostProfileFromFile) = HostProfileLoader.LoadOrDefault(Path.GetFullPath(hostProfilePath));
 
-// HTTP client for Ollama
-builder.Services.AddHttpClient<IOllamaClient, OllamaClient>();
+builder.Services.AddSingleton(hostProfile);
+builder.Services.AddHttpClient<OllamaModelProvider>();
+builder.Services.AddSingleton<IModelProvider>(sp => sp.GetRequiredService<OllamaModelProvider>());
+
+// The OpenAI-compatible provider (LiteLLM proxy, or anything else speaking /chat/completions). Registered
+// unconditionally: it is the PROTOCOL implementation, and whether any class actually uses it is the host
+// profile's decision. A profile that binds a class here without its api_key_env set fails at startup with a
+// named error rather than mid-task (doc §6.2).
+//
+// The per-provider HttpClient timeout is left at the framework default on purpose — the provider applies
+// the profile's own bound via a linked CancellationTokenSource, so the budget lives in one place.
+builder.Services.AddHttpClient<OpenAiCompatibleModelProvider>();
+builder.Services.AddSingleton<IModelProvider>(sp => sp.GetRequiredService<OpenAiCompatibleModelProvider>());
+builder.Services.AddSingleton<ModelCallStoreSink>();
+builder.Services.AddSingleton<IModelCallSink>(sp => sp.GetRequiredService<ModelCallStoreSink>());
+builder.Services.AddSingleton<IModelBroker>(sp => new ModelBroker(
+    hostProfile,
+    sp.GetServices<IModelProvider>(),
+    sp.GetRequiredService<ILogger<ModelBroker>>(),
+    sp.GetRequiredService<IModelCallSink>()));
+
+// Both legacy model interfaces are now thin ADAPTERS over the broker (Phase 2 fork F4): keeping them means
+// ~57 existing call sites are untouched, while the hardcoded-model bypass inside OllamaClient is gone.
+builder.Services.AddSingleton<IOllamaClient, OllamaClient>();
 
 // HTTP clients for external research APIs
 builder.Services.AddHttpClient("tavily");
@@ -232,6 +255,10 @@ builder.Services.AddSingleton<IDecisionNetwork>(sp =>
 
 // Core DARCI components (singletons - one consciousness)
 builder.Services.AddSingleton<Awareness>();
+
+// One sequence for BOTH ingress paths (REST and the hub), so ids are unique across a session no matter
+// which client sent the message.
+builder.Services.AddSingleton<MessageIdSequence>();
 builder.Services.AddSingleton<State>();
 // Constructor: (ILogger, IToolkit, IGoalManager, IStateEncoder, ExperienceBuffer, IDecisionNetwork, EngineeringGoalDetector?, IConfidenceTracker?, GoalDecomposer?)
 // The last three parameters are nullable — use GetService<> so they resolve to null
@@ -246,7 +273,8 @@ builder.Services.AddSingleton<Decision>(sp =>
         sp.GetRequiredService<IDecisionNetwork>(),
         sp.GetService<EngineeringGoalDetector>(),
         sp.GetService<IConfidenceTracker>(),
-        sp.GetService<GoalDecomposer>()));
+        sp.GetService<GoalDecomposer>(),
+        sp.GetService<CodingGoalDetector>()));
 
 // DARCI herself - the background service
 // BomGenerator + AutonomousBundler (autonomous engineering path)
@@ -274,7 +302,8 @@ builder.Services.AddSingleton<Darci.Core.Darci>(sp =>
         sp.GetRequiredService<ConstraintExtractor>(),
         sp.GetRequiredService<IAutonomousBundler>(),
         sp.GetRequiredService<BomGenerator>(),
-        sp.GetRequiredService<IGoalManager>()));
+        sp.GetRequiredService<IGoalManager>(),
+        sp.GetService<INodeRouter>()));
 builder.Services.AddHostedService(sp => sp.GetRequiredService<Darci.Core.Darci>());
 
 // Controllers
@@ -286,10 +315,61 @@ builder.Services.AddSingleton<IResearchStore>(sp =>
         connectionString,
         sp.GetRequiredService<ILogger<ResearchStore>>()));
 
-builder.Services.AddSingleton<IKnowledgeGraph>(sp =>
-    new KnowledgeGraph(
-        connectionString,
-        sp.GetRequiredService<ILogger<KnowledgeGraph>>()));
+// === Knowledge graph backing store (Phase 2 P2d) ===
+// ONLY the knowledge graph moves to Neo4j. telemetry.db and every core store — research, confidence,
+// packets, proposals, campaigns, gaps — stay on SQLite. The swap is invisible above IKnowledgeGraph, so
+// IMemoryBroker and every node keep working untouched.
+//
+// Neo4j is opt-in: with no DARCI_NEO4J_PASSWORD configured the host stays on SQLite, which keeps a fresh
+// clone working with no external server to install.
+//
+// CONFIGURED IS NOT THE SAME AS REACHABLE. Credentials in .env.local say this host WANTS Neo4j; they say
+// nothing about whether it is running. Selecting the backing store on configuration alone meant a host with
+// creds and a stopped Neo4j died on boot with an unhandled ServiceUnavailableException — the worst failure
+// shape for a packaged/standalone core, because the whole system is gone rather than degraded. So the
+// choice is made on a bounded reachability probe, and an unreachable Neo4j falls back to SQLite loudly.
+var neo4jOptions = Neo4jOptions.FromEnvironment() with { ClaimsConnectionString = connectionString };
+var neo4jFallbackReason = (string?)null;
+var useNeo4j = false;
+
+if (neo4jOptions.IsConfigured)
+{
+    var (reachable, reason) = await Neo4jKnowledgeGraph.ProbeAsync(neo4jOptions, TimeSpan.FromSeconds(5));
+    neo4jFallbackReason = reachable ? null : reason;
+
+    if (reachable)
+    {
+        // Prove it can actually be initialized, not merely dialed, BEFORE committing the registration —
+        // once the container hands this singleton out there is no honest way to swap it, so the decision
+        // has to be final here. Initialization is idempotent (CREATE ... IF NOT EXISTS), so the real
+        // instance repeating it after Build() costs nothing.
+        try
+        {
+            await using var probe = new Neo4jKnowledgeGraph(neo4jOptions);
+            await probe.InitializeAsync();
+            useNeo4j = true;
+        }
+        catch (Exception ex)
+        {
+            neo4jFallbackReason = ex.GetBaseException().Message;
+        }
+    }
+}
+
+if (useNeo4j)
+{
+    builder.Services.AddSingleton<IKnowledgeGraph>(sp =>
+        new Neo4jKnowledgeGraph(
+            neo4jOptions,
+            sp.GetRequiredService<ILogger<Neo4jKnowledgeGraph>>()));
+}
+else
+{
+    builder.Services.AddSingleton<IKnowledgeGraph>(sp =>
+        new KnowledgeGraph(
+            connectionString,
+            sp.GetRequiredService<ILogger<KnowledgeGraph>>()));
+}
 
 builder.Services.AddSingleton<IConfidenceTracker>(sp =>
     new ConfidenceTracker(
@@ -307,13 +387,32 @@ builder.Services.AddSingleton<ConstraintExtractor>();
 builder.Services.AddSingleton<DeepResearchOrchestrator>(sp => new DeepResearchOrchestrator(
     sp.GetRequiredService<IResearchStore>(),
     sp.GetRequiredService<IResearchAgentFactory>(),
-    sp.GetRequiredService<IKnowledgeGraph>(),
+    sp.GetRequiredService<IMemoryBroker>(),
     sp.GetRequiredService<IConfidenceTracker>(),
     sp.GetRequiredService<IResearchToolbox>(),
     sp.GetRequiredService<KnowledgeAssessor>(),
     sp.GetRequiredService<ILogger<DeepResearchOrchestrator>>()));
 builder.Services.AddSingleton<IDeepResearchOrchestrator>(sp =>
     sp.GetRequiredService<DeepResearchOrchestrator>());
+
+// Phase 2: rigid KG/DR pipeline — admin/KG (assessor) + review agent + compiler agent, behind the
+// KnowledgeNode, producing a structured KnowledgeResponse.
+builder.Services.AddSingleton<IKnowledgeAssessor>(sp => sp.GetRequiredService<KnowledgeAssessor>());
+builder.Services.AddSingleton<IKnowledgeReviewAgent, OllamaKnowledgeReviewAgent>();
+builder.Services.AddSingleton<IKnowledgeCompilerAgent, OllamaKnowledgeCompilerAgent>();
+builder.Services.AddSingleton(new KnowledgePipelineOptions());
+builder.Services.AddSingleton<IKnowledgePipeline, KnowledgePipeline>();
+
+// Innovation node — escalated to by KGMA when KG + deep research are exhausted. Persists capped Innovated
+// hypotheses (never promoted). Phase B generator + Phase D loop:
+//   Phase B: the synthesizer (generator) and the SEPARATE plausibility reviewer (IKnowledgeReviewAgent).
+//   Phase D: the diverse-candidate loop governor — N=3 diverse candidates → ONE comparative screen (critic)
+//            → falsify the top survivors (reviewer). Progress-driven with a HARD budget backstop; N is
+//            adaptive so it degrades gracefully on a single local-Ollama build.
+builder.Services.AddSingleton<IInnovationSynthesizer, OllamaInnovationSynthesizer>();
+builder.Services.AddSingleton<IInnovationCritic, OllamaInnovationCritic>();
+builder.Services.AddSingleton(new InnovationLoopOptions());
+builder.Services.AddSingleton<IInnovationLoop, InnovationLoopGovernor>();
 
 // === Node Packet Protocol (Phase 0) ===
 // Shared envelope + state machine + watchdog. Currently only the coding node emits packets, but the
@@ -325,21 +424,208 @@ builder.Services.AddSingleton<INodePacketStore>(sp =>
 builder.Services.AddSingleton<NodeWatchdog>();
 builder.Services.AddHostedService<NodeWatchdogService>();
 
+// Nodes registered with the router (Step B). CodingNode takes a Lazy<ICodingAgentLoop> to break the
+// DI cycle (router → CodingNode → loop → router). New nodes (engineering, biomed) register here.
+builder.Services.AddSingleton(sp => new Lazy<ICodingAgentLoop>(sp.GetRequiredService<ICodingAgentLoop>));
+builder.Services.AddSingleton<INode, CodingNode>();
+builder.Services.AddSingleton<INode, KnowledgeNode>();
+builder.Services.AddSingleton<INode, InnovationNode>();
+
+// === Phase 1 core carve: string-keyed node registry + ONE dispatch point ===
+// Routing resolves a STRING capability verb from a manifest (not the compiled-in Capability enum), so an
+// external node can declare a capability this core was never built with. Every node-capability invocation
+// flows through NodeDispatcher, which emits the per-invocation telemetry record. (Model calls are NOT in
+// scope here — those belong to the Phase 2 model broker.)
+var nodesDirectory = Path.GetFullPath(
+    Environment.GetEnvironmentVariable("DARCI_NODES_PATH")
+    ?? Path.Combine(builder.Environment.ContentRootPath, "..", "nodes"));
+
+// Telemetry lands in its OWN database (decision D6): different access pattern, different retention, and
+// telemetry volume has no business in the knowledge graph or the trust ledger. Records reach it through a
+// non-blocking queue, so a disk write can never slow down — or take down — the dispatch path.
+var telemetryDbPath = Environment.GetEnvironmentVariable("DARCI_TELEMETRY_DB_PATH")
+    ?? Path.Combine(Path.GetDirectoryName(dbPath)!, "telemetry.db");
+telemetryDbPath = Path.GetFullPath(telemetryDbPath);
+Directory.CreateDirectory(Path.GetDirectoryName(telemetryDbPath)!);
+var telemetryConnectionString = $"Data Source={telemetryDbPath}";
+
+builder.Services.AddSingleton<ITelemetryStore>(sp =>
+    new SqliteTelemetryStore(telemetryConnectionString, sp.GetRequiredService<ILogger<SqliteTelemetryStore>>()));
+builder.Services.AddSingleton<TelemetryStoreSink>();
+builder.Services.AddSingleton<INodeTelemetrySink>(sp => new CompositeNodeTelemetrySink(new INodeTelemetrySink[]
+{
+    new LoggingNodeTelemetrySink(sp.GetRequiredService<ILogger<LoggingNodeTelemetrySink>>()),
+    sp.GetRequiredService<TelemetryStoreSink>(),
+}));
+builder.Services.AddSingleton(sp => new NodeDispatcher(
+    sp.GetRequiredService<ILogger<NodeDispatcher>>(),
+    sp.GetRequiredService<INodeTelemetrySink>(),
+    hostProfile));
+builder.Services.AddSingleton<NodeManifestLoader>();
+builder.Services.AddSingleton<INodeRegistrationStore>(sp =>
+    new SqliteNodeRegistrationStore(connectionString, sp.GetRequiredService<ILogger<SqliteNodeRegistrationStore>>()));
+
+// The loopback secret sent to out-of-process nodes as X-Darci-Token (D4, minimal).
+//
+// Configurable on purpose. Per decision D3 the core does not launch nodes — it connects to ones already
+// running — so a secret minted here at startup is one the node could never have learned, and the header
+// becomes decoration: the node can see that SOME token arrived, never that it is the right one. Setting
+// DARCI_NODE_SHARED_SECRET in both processes makes the check real.
+//
+// Unset keeps the old behaviour (a fresh random value per boot), which is the right default: it costs
+// nothing, and a node that verifies the token will refuse to serve rather than quietly accept anyone —
+// an honest failure that says the two sides were not configured together.
+var nodeSharedSecret = Environment.GetEnvironmentVariable("DARCI_NODE_SHARED_SECRET");
+var nodeSecretIsShared = !string.IsNullOrWhiteSpace(nodeSharedSecret);
+if (!nodeSecretIsShared)
+    nodeSharedSecret = Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(16));
+
+builder.Services.AddSingleton(new NodeDiscoveryOptions
+{
+    HandshakeTimeout = TimeSpan.FromSeconds(3),
+    SharedSecret = nodeSharedSecret,
+});
+builder.Services.AddSingleton<NodeDiscoveryReportHolder>();
+// The ABSOLUTE ceiling for any out-of-process invocation, set explicitly rather than inherited.
+//
+// Left unset this took the .NET default of 100s, which silently capped every manifest's deadline_ms:
+// darci.modeling declares 120000 and its last 20 seconds were unreachable, with the overrun reported as
+// DEADLINE_EXCEEDED and therefore indistinguishable from a slow node. The same constant now bounds the
+// client AND is enforced by manifest validation, so a longer deadline is refused at load with a named
+// error instead of being clipped at runtime. Per-invocation budgets live in each manifest's deadline_ms
+// underneath this, and HttpNodeAdapter's CancelAfter(remaining) stays the authority for each call.
+builder.Services.AddHttpClient("darci-node")
+    .ConfigureHttpClient(client => client.Timeout = NodeDeadline.Max);
+
+builder.Services.AddSingleton<INodeRegistry>(sp =>
+{
+    var registry = new NodeRegistry(sp.GetRequiredService<ILogger<NodeRegistry>>());
+    var options = sp.GetRequiredService<NodeDiscoveryOptions>();
+
+    // Manifests are the source of truth for the capability surface. A manifest reviewed and merged into the
+    // repo IS the human-authored capability grant (Phase E §14c); there is no runtime self-registration.
+    //
+    // Tolerant load (Phase 3 Fork 2): a stranger's malformed manifest must not brick this core. Discovery
+    // decides which failures are fatal — only a first-party one, i.e. a manifest naming a node compiled in
+    // here, is a repo bug worth refusing to start over.
+    var (manifests, failures) = sp.GetRequiredService<NodeManifestLoader>().LoadAllTolerant(nodesDirectory);
+
+    var discovery = new NodeDiscovery(
+        registry,
+        options,
+        manifest => new HttpNodeAdapter(
+            manifest,
+            sp.GetRequiredService<IHttpClientFactory>().CreateClient("darci-node"),
+            sp.GetRequiredService<ILogger<HttpNodeAdapter>>(),
+            options.SharedSecret),
+        sp.GetRequiredService<ILogger<NodeDiscovery>>());
+
+    // Startup-only (Fork 4): a periodic re-health-check is a flagged follow-on, not this phase. Blocking
+    // here is deliberate and BOUNDED — the per-node handshake timeout means a slow or absent node costs a
+    // known amount ONCE, and the core starts regardless. Inheriting an unbounded retry window at startup is
+    // exactly how the Neo4j boot hang happened.
+    var report = discovery
+        .DiscoverAsync(manifests, failures, sp.GetServices<INode>())
+        .GetAwaiter().GetResult();
+
+    sp.GetRequiredService<NodeDiscoveryReportHolder>().Report = report;
+    return registry;
+});
+
+// Explicit factory, not AddSingleton<INodeRouter, NodeRouter>(): NodeRouter has a second (convenience)
+// constructor for packet-native nodes, and letting the container pick is how the host ends up failing at
+// start with "the following constructors are ambiguous".
+builder.Services.AddSingleton<INodeRouter>(sp => new NodeRouter(
+    sp.GetRequiredService<INodeRegistry>(),
+    sp.GetRequiredService<NodeDispatcher>(),
+    sp.GetRequiredService<INodePacketStore>(),
+    sp.GetRequiredService<ILogger<NodeRouter>>(),
+    // A capability nobody serves terminates the packet as Blocked; the standing need ("no node serves
+    // coding.write") goes here, where it outlives the packet and survives a restart.
+    sp.GetRequiredService<IGapStore>()));
+
+// Gap-driven action: persist gaps, decide immediate-fill vs deferred auto-goal. The handler routes via
+// a Lazy<INodeRouter> to break the cycle (KnowledgeNode → GapHandler → router → KnowledgeNode).
+builder.Services.AddSingleton<IGapStore>(sp =>
+    new SqliteGapStore(connectionString, sp.GetRequiredService<ILogger<SqliteGapStore>>()));
+builder.Services.AddSingleton(new GapHandlerOptions());
+builder.Services.AddSingleton<IGapGoalSink, GoalManagerGapSink>();
+builder.Services.AddSingleton(sp => new Lazy<INodeRouter>(sp.GetRequiredService<INodeRouter>));
+builder.Services.AddSingleton<IGapHandler, GapHandler>();
+
+// Innovation Phase A: provenance-tagged innovated-knowledge store + the empirical outcome-feedback
+// loop (coding terminal → automatic staged promotion / retraction, all bounded by the ≤0.4 cap).
+builder.Services.AddSingleton<IInnovatedKnowledgeStore>(sp =>
+    new SqliteInnovatedKnowledgeStore(connectionString, sp.GetRequiredService<ILogger<SqliteInnovatedKnowledgeStore>>()));
+builder.Services.AddSingleton(new OutcomeFeedbackOptions());
+builder.Services.AddSingleton<IOutcomeFeedbackSink, InnovatedKnowledgeOutcomeSink>();
+
+// Phase C: the human gate — durable ProposalStore + decision service. Approval is the one path that
+// writes a human-authored ledger event (the only way to lift innovated knowledge above the cap).
+builder.Services.AddSingleton<IProposalStore>(sp =>
+    new SqliteProposalStore(connectionString, sp.GetRequiredService<ILogger<SqliteProposalStore>>()));
+builder.Services.AddSingleton<IHumanGate, HumanGateService>();
+
+// === Phase 2 (P2c.1): the MEMORY BROKER (doc §6.1) ===
+// Nodes reach the knowledge graph through this, with their manifest-declared scopes enforced per request and
+// denials logged. Registered now; node call sites move onto it in P2c.3.
+// NOT brokered, deliberately: the core's own lifecycle and trust state (InnovatedKnowledgeStore,
+// ProposalStore, ValidationCampaignStore, GapStore, NodePacketStore) and core-internal KG consumers
+// (MemoryStore, ConfidenceTracker, the /knowledge endpoints) — doc §3 makes the core the graph's owner, so
+// the broker mediates NODE access rather than walling the core off from itself.
+builder.Services.AddSingleton<IMemoryBroker, MemoryBroker>();
+
+// Phase E (sub-unit 1): validation-campaign store — pre-registered protocols + per-step evidence; the
+// verdict is a pure function over (criteria × evidence). Rides the human gate for authorization/promotion.
+builder.Services.AddSingleton<IValidationCampaignStore>(sp =>
+    new SqliteValidationCampaignStore(connectionString, sp.GetRequiredService<ILogger<SqliteValidationCampaignStore>>()));
+
+// Phase E (sub-unit 2): the campaign lifecycle — protocol critic (falsify the DESIGN) + the coordinator
+// that drafts, authorizes, runs steps as child packets, computes the mechanical verdict, and files the
+// promotion touch. The human gate resolves ICampaignCoordinator optionally, so it is registered here.
+builder.Services.AddSingleton<IProtocolCritic, OllamaProtocolCritic>();
+builder.Services.AddSingleton(new CampaignEligibilityOptions());
+
+// Phase E (sub-unit 3): the objective/sandbox PoC gate — routes a candidate to the coding node for a
+// sandboxed dry-run and attaches WEIGHT-CAPPED self-generated evidence before the human sees a proposal.
+builder.Services.AddSingleton(new SandboxPoCOptions());
+builder.Services.AddSingleton<ISandboxPoCGate, SandboxPoCGate>();
+
+// Phase E (sub-unit 4): data-only tooling proposals — demand-driven, rate-limited, critic-reviewed. Never
+// self-modifies, never registers a node at runtime (compile-time only); the capability boundary is the
+// trust boundary (§0a). A blocked campaign step emits one; a human builds the node, then the campaign resumes.
+builder.Services.AddSingleton<IToolingCritic, OllamaToolingCritic>();
+builder.Services.AddSingleton(new ToolingProposalOptions());
+builder.Services.AddSingleton<IToolingProposalEmitter, ToolingProposalEmitter>();
+
+// Priority-ordered work scheduler (seam for a future resource-allocation scheduler). Human-initiated work
+// outranks auto-drafted. Today a simple in-memory priority queue; the interface is what callers depend on.
+builder.Services.AddSingleton<IWorkScheduler, PriorityWorkQueue>();
+
+builder.Services.AddSingleton<ICampaignCoordinator, CampaignCoordinator>();
+
+// Auto-draft eligibility sweep — a standalone hosted service (like the node watchdog), NOT called from the
+// innovation node. It only auto-DRAFTS campaigns (low priority); every one still parks for human
+// authorization. Disabled by default; opt in via CampaignSweepOptions.Enabled.
+builder.Services.AddSingleton(new CampaignSweepOptions());
+builder.Services.AddSingleton<CampaignEligibilitySweep>();
+builder.Services.AddHostedService<CampaignEligibilitySweepService>();
+
 // === Coding Workspace Services ===
 builder.Services.AddSingleton<ICodingWorkspaceStore>(sp =>
     new CodingWorkspaceStore(
         connectionString,
         sp.GetRequiredService<ILogger<CodingWorkspaceStore>>()));
 
-// Model router — typed HttpClient, reads Ollama model names from env vars.
-builder.Services.AddHttpClient<ModelRouter>();
+// Model router — now a thin adapter over the model broker (maps ModelTaskType → model class).
+builder.Services.AddSingleton<ModelRouter>();
 builder.Services.AddSingleton<IModelRouter>(sp => sp.GetRequiredService<ModelRouter>());
 
 builder.Services.AddSingleton<ICodingContextBuilder>(sp =>
     new CodingContextBuilder(
         sp.GetRequiredService<ICodingWorkspaceStore>(),
         sp.GetRequiredService<IModelRouter>(),
-        sp.GetRequiredService<IKnowledgeGraph>(),
+        sp.GetRequiredService<IMemoryBroker>(),
         sp.GetRequiredService<ILogger<CodingContextBuilder>>()));
 
 builder.Services.AddSingleton<IWorkspaceEmbeddingService, WorkspaceEmbeddingService>();
@@ -351,6 +637,18 @@ builder.Services.AddSingleton<IWorkspaceScanner>(sp =>
         sp.GetRequiredService<IWorkspaceEmbeddingService>(),
         sp.GetRequiredService<IKgEnrichmentService>(),
         sp.GetRequiredService<ILogger<WorkspaceScanner>>()));
+
+// Workspace-selection seam: lets the coding node pick or create a workspace for an autonomous
+// coding goal. Auto-created workspaces land under the gitignored DARCI-v4/Workspaces directory.
+var codingWorkspacesRoot = Environment.GetEnvironmentVariable("DARCI_CODING_WORKSPACES_ROOT")
+    ?? Path.GetFullPath(Path.Combine(builder.Environment.ContentRootPath, "..", "Workspaces"));
+builder.Services.AddSingleton<IWorkContextResolver>(sp =>
+    new CodingWorkspaceResolver(
+        sp.GetRequiredService<ICodingWorkspaceStore>(),
+        sp.GetRequiredService<IModelRouter>(),
+        sp.GetRequiredService<IWorkspaceScanner>(),
+        codingWorkspacesRoot,
+        sp.GetRequiredService<ILogger<CodingWorkspaceResolver>>()));
 
 builder.Services.AddSingleton<ISafeCommandRunner, SafeCommandRunner>();
 builder.Services.AddSingleton<IGitCheckpointService, GitCheckpointService>();
@@ -388,6 +686,9 @@ builder.Services.AddSingleton<IEngineeringNetwork>(sp =>
 
 // Engineering goal detector (keyword-based)
 builder.Services.AddSingleton<EngineeringGoalDetector>();
+
+// Coding goal detector (keyword-based) — lets the living loop route coding goals to the coding node
+builder.Services.AddSingleton<CodingGoalDetector>();
 
 // Engineering orchestrator — wires workbench + network together
 builder.Services.AddSingleton<EngineeringOrchestrator>(sp =>
@@ -433,6 +734,14 @@ await experienceBuffer.InitializeAsync();
 var researchStore = app.Services.GetRequiredService<IResearchStore>();
 await researchStore.InitializeAsync();
 
+if (neo4jFallbackReason is not null)
+{
+    app.Services.GetRequiredService<ILogger<Program>>().LogWarning(
+        "Neo4j configured but unreachable — falling back to SQLite for the knowledge graph. Reason: {Reason}. "
+        + "The graph will be served from {Db}; anything written only to Neo4j is not visible in this session.",
+        neo4jFallbackReason, dbPath);
+}
+
 var knowledgeGraph = app.Services.GetRequiredService<IKnowledgeGraph>();
 await knowledgeGraph.InitializeAsync();
 
@@ -445,6 +754,60 @@ await codingStore.InitializeAsync();
 // === Initialize Node Packet store + reap any packets orphaned by a previous run ===
 var nodePacketStore = app.Services.GetRequiredService<INodePacketStore>();
 await nodePacketStore.InitializeAsync();
+var gapStore = app.Services.GetRequiredService<IGapStore>();
+await gapStore.InitializeAsync();
+var innovatedStore = app.Services.GetRequiredService<IInnovatedKnowledgeStore>();
+await innovatedStore.InitializeAsync();
+var proposalStore = app.Services.GetRequiredService<IProposalStore>();
+await proposalStore.InitializeAsync();
+var validationCampaignStore = app.Services.GetRequiredService<IValidationCampaignStore>();
+await validationCampaignStore.InitializeAsync();
+
+// Phase 1: resolve the node registry (this is where manifest validation failures surface — loudly, at
+// startup) and record the registered capability surface for audit (Phase E §14c). A changed manifest hash
+// is flagged, so widening what DARCI can do leaves a durable trace.
+var nodeRegistrationStore = app.Services.GetRequiredService<INodeRegistrationStore>();
+await nodeRegistrationStore.InitializeAsync();
+var telemetryStore = app.Services.GetRequiredService<ITelemetryStore>();
+await telemetryStore.InitializeAsync();
+app.Logger.LogInformation("Telemetry database: {Path}", telemetryDbPath);
+var nodeRegistry = app.Services.GetRequiredService<INodeRegistry>();
+foreach (var registration in nodeRegistry.Registrations)
+{
+    await nodeRegistrationStore.RecordAsync(new NodeRegistrationRecord
+    {
+        NodeId = registration.NodeId,
+        NodeVersion = registration.Manifest.NodeVersion,
+        ContractVersion = registration.Manifest.ContractVersion,
+        ManifestSha256 = registration.ManifestSha256,
+        Capabilities = registration.Manifest.Capabilities.Select(c => c.Name).ToList(),
+        RegisteredAt = registration.RegisteredAt,
+    });
+}
+app.Logger.LogInformation("Node registry ready: {Count} node(s) serving [{Capabilities}].",
+    nodeRegistry.Registrations.Count, string.Join(", ", nodeRegistry.RoutableCapabilities));
+
+// Says which of the two postures is live, because they differ in what a node can actually prove about a
+// request, and a reader of this log should not have to guess which one they are in. The secret itself is
+// never logged.
+app.Logger.LogInformation(
+    nodeSecretIsShared
+        ? "Out-of-process node auth: DARCI_NODE_SHARED_SECRET is set, so nodes configured with the same value can VERIFY X-Darci-Token."
+        : "Out-of-process node auth: no DARCI_NODE_SHARED_SECRET, so X-Darci-Token is a per-boot random value no pre-started node can verify. Set it in both processes to make the check real.");
+
+// Which model profile is live, and what each class actually resolves to. Worth logging plainly: silent
+// model-name drift is the failure mode this whole broker exists to prevent.
+var activeProfile = app.Services.GetRequiredService<IModelBroker>().Profile;
+app.Logger.LogInformation("Model profile '{Profile}' active ({Source}): {Bindings}",
+    activeProfile.ProfileId,
+    hostProfileFromFile ? Path.GetFullPath(hostProfilePath) : "synthesized from DARCI_OLLAMA_* env vars",
+    string.Join(", ", ModelClasses.All.Select(c =>
+    {
+        var b = activeProfile.Resolve(c)!;
+        return $"{c}→{b.Provider}/{activeProfile.Provider(b.Provider)!.Kind}/{b.Model}";
+    })));
+// The startup sweep must run AFTER the proposal store is initialized so its carve-out can recognise
+// packets legitimately parked pending a human decision (and not reap them as orphans).
 var nodeWatchdog = app.Services.GetRequiredService<NodeWatchdog>();
 await nodeWatchdog.SweepStartupOrphansAsync();
 
@@ -472,34 +835,22 @@ app.MapGet("/", () => "DARCI v4.0 - Neural Autonomous Consciousness");
 // Get DARCI's status
 app.MapGet("/status", (Darci.Core.Darci darci) => darci.GetStatus());
 
-// Model focus: who currently owns the local model, and how often the living loop has yielded.
-// Useful when a coding run appears slow — if soft-skips are climbing, the core is correctly
-// standing down rather than competing.
-app.MapGet("/model-focus/status", (IModelFocus focus) =>
-{
-    var status = focus.GetStatus();
-    return Results.Ok(new
-    {
-        mode = status.Mode.ToString().ToLowerInvariant(),   // narrow | broad | off
-        enabled = ModelFocus.Enabled,
-        coreWaitSeconds = ModelFocus.DefaultCoreWait.TotalSeconds,
-        isHeld = status.IsHeld,
-        holder = status.Holder,
-        heldSinceUtc = status.HeldSinceUtc,
-        heldForSeconds = status.HeldForSeconds,
-        totalAcquisitions = status.TotalAcquisitions,
-        totalSoftSkips = status.TotalSoftSkips,
-        // Foreground replies that passed through mid-run. Non-zero here on a low-VRAM host is the
-        // signal to switch DARCI_FOCUS_MODE=broad, since each one may have forced a model swap.
-        totalForegroundBypasses = status.TotalForegroundBypasses
-    });
-});
-
 // Send a message to DARCI
-app.MapPost("/message", async (MessageRequest request, Awareness awareness) =>
+app.MapPost("/message", async (MessageRequest request, Awareness awareness, MessageIdSequence ids) =>
 {
+    // A malformed request is the caller's bug, and it should say so. Without this the null Content reached
+    // Awareness.NotifyMessage, which dereferences it to log a preview — turning a bad payload into a 500.
+    // The SignalR hub has always guarded this; this is the REST path catching up.
+    if (!IncomingMessageRules.IsValidContent(request?.Message))
+    {
+        return Results.BadRequest(new { error = IncomingMessageRules.MissingContentError });
+    }
+
     var message = new IncomingMessage
     {
+        // Without an id the reply cannot point back at anything, and a client watching a broadcast hub
+        // cannot tell its own answer from one meant for another device.
+        Id = ids.Next(),
         Content = request.Message,
         UserId = request.UserId ?? "Tinman",
         Source = "api",
@@ -1306,6 +1657,28 @@ app.MapGet("/nodes/correlations/{correlationId}", async Task<IResult> (
     return Results.Ok(packets);
 });
 
+// === Human gate (Phase C) — the interface a UI/FRIDAY channel calls ===
+// List proposals awaiting a human decision.
+app.MapGet("/human/proposals", async Task<IResult> (
+    IHumanGate gate,
+    int? limit,
+    CancellationToken ct) =>
+{
+    var pending = await gate.ListPendingAsync(limit ?? 100, ct);
+    return Results.Ok(pending);
+});
+
+// Submit a human decision. Approval of a promotion is the ONE path that raises trust above the cap.
+app.MapPost("/human/proposals/{id}/decision", async Task<IResult> (
+    IHumanGate gate,
+    string id,
+    HumanDecisionRequest request,
+    CancellationToken ct) =>
+{
+    var result = await gate.DecideAsync(id, request.Approve, request.Note, request.DecidedBy, ct);
+    return result.Applied ? Results.Ok(result) : Results.BadRequest(result);
+});
+
 // Create a git checkpoint for a workspace.
 app.MapPost("/coding/workspaces/{id}/checkpoint", async Task<IResult> (
     IGitCheckpointService checkpoints,
@@ -1315,8 +1688,11 @@ app.MapPost("/coding/workspaces/{id}/checkpoint", async Task<IResult> (
 {
     try
     {
+        // An operator asking for a checkpoint means "commit what is here", so this one does commit —
+        // still scoped to the workspace's own paths rather than the whole repository.
         var checkpoint = await checkpoints.CreateCheckpointAsync(
-            id, request.TaskId ?? "", request.Message ?? "Manual checkpoint", ct);
+            id, request.TaskId ?? "", request.Message ?? "Manual checkpoint",
+            CheckpointMode.CommitWorkspaceChanges, ct);
         return checkpoint is null
             ? Results.UnprocessableEntity(new { error = "Could not create checkpoint (git may not be initialised)." })
             : Results.Created($"/coding/workspaces/{id}/checkpoints/{checkpoint.Id}", checkpoint);
@@ -1342,6 +1718,93 @@ app.MapPost("/coding/workspaces/{id}/rollback", async Task<IResult> (
 });
 
 // Knowledge graph search
+// === Node diagnostics (Phase 3 SU 3.5) ===
+// What this core can actually do right now, and — just as importantly — what it CANNOT and why. A node
+// that failed its handshake is invisible without this: the capability simply isn't there, and "why" would
+// otherwise live only in a startup log line that has already scrolled past.
+app.MapGet("/nodes", (INodeRegistry registry, NodeDiscoveryReportHolder holder) =>
+{
+    var report = holder.Report;
+    return Results.Ok(new
+    {
+        registered = registry.Registrations.Select(r => new
+        {
+            nodeId = r.NodeId,
+            version = r.Manifest.NodeVersion,
+            kind = r.Manifest.Kind.ToString(),
+            transport = r.Manifest.IsInProcess ? "in-process" : "http",
+            endpoint = r.Manifest.Endpoint,
+            capabilities = r.Manifest.Capabilities.Select(c => c.Name),
+            manifestSha256 = r.ManifestSha256,
+        }),
+        capabilities = registry.RoutableCapabilities,
+        // The honest half: declared but not serving, with the reason.
+        skipped = report.Skipped,
+        summary = new { inProcess = report.InProcess, remote = report.Remote, registered = report.RegisteredCount },
+    });
+});
+
+// Ask a node to do something (Phase 3 fork F4). Until now a capability could only be reached from inside
+// a goal or campaign flow, which meant a freshly registered node was observable but not USABLE — nothing
+// a person or the Control Centre could actually call.
+//
+// A thin pass-through to INodeRouter ON PURPOSE. The router is the one dispatch point: it persists the
+// packet before anything is attempted, resolves the capability, emits the telemetry record, and turns
+// "no node serves this" into a BLOCKED packet plus a durable gap rather than a failure. Re-implementing
+// any of that here would produce a second, divergent dispatch path — exactly what the contract work
+// spent Phase 3 removing.
+//
+// No deadline parameter. The binding deadline is the one the capability's manifest declares, which is
+// the reviewed figure; letting an HTTP caller pass their own would quietly move a limit that exists to
+// be reviewed. Same loopback-only, unauthenticated posture as the rest of the local surface.
+app.MapPost("/nodes/invoke", async Task<IResult> (
+    NodeInvokeRequest request,
+    INodeRouter router,
+    CancellationToken ct) =>
+{
+    if (string.IsNullOrWhiteSpace(request.Capability))
+        return Results.BadRequest(new { error = "capability is required (e.g. 'model.build')." });
+
+    if (!CapabilityKey.IsValidName(request.Capability))
+        return Results.BadRequest(new { error = $"'{request.Capability}' is not a valid 'domain.action' capability name." });
+
+    var packet = new NodePacket
+    {
+        // ADD-2: the correlation root, the durable key the evidence loop counts by. A caller that wants
+        // several invocations treated as one piece of work passes the same one.
+        CorrelationId = string.IsNullOrWhiteSpace(request.CorrelationId)
+            ? Guid.NewGuid().ToString("N")
+            : request.CorrelationId!,
+        RequestedCapabilityKey = request.Capability,
+        Payload = new PacketPayload
+        {
+            Intent = request.Intent ?? $"Direct invocation of {request.Capability}.",
+            SuccessCriteria = request.SuccessCriteria,
+            Slots = request.Payload ?? new Dictionary<string, string>(),
+        },
+    };
+
+    var result = await router.DispatchAsync(packet, ct);
+
+    return Results.Ok(new
+    {
+        packetId = result.Id,
+        correlationId = result.CorrelationId,
+        state = result.State.ToString(),
+        terminal = result.State.IsTerminal(),
+        // Null rather than the -1.0 sentinel when nothing assessed it, so a reader is not invited to
+        // treat "unassessed" as a very low score.
+        confidence = result.Log.Count > 0 && result.Log[^1].Confidence.IsAssessed
+            ? result.Log[^1].Confidence.Score
+            : (double?)null,
+        payload = result.Payload.Slots,
+        // The last log entry carries the node's own account of what happened, including the error text
+        // on a failure and the reason on a blocked packet.
+        lastDecision = result.Log.Count > 0 ? result.Log[^1].Decision : "",
+        error = result.Log.Count > 0 ? result.Log[^1].Error : null,
+    });
+});
+
 app.MapGet("/knowledge/entities/search", async (
     IKnowledgeGraph graph,
     string q,
@@ -1504,6 +1967,7 @@ app.Run();
 
 // === Request/Response Models ===
 
+public record HumanDecisionRequest(bool Approve, string? Note = null, string? DecidedBy = null);
 public record MessageRequest(string Message, string? UserId = null, bool Urgent = false);
 public record GoalRequest(string Title, string? Description, string? UserId, GoalType? Type, GoalPriority? Priority);
 public record RegisterFileRequest(string Filename, string ContentType, string FilePath, long SizeBytes);
@@ -1577,3 +2041,12 @@ public record EngineeringConnectionMotionRequest(
 
 public record CheckpointRequest(string? TaskId = null, string? Message = null);
 public record RollbackRequest(string? TaskId = null, string? CheckpointId = null);
+
+/// <summary>Body of POST /nodes/invoke. Payload slots are flat string→string, matching the node contract's
+/// wire shape exactly — a structured argument travels as a JSON-encoded string in one slot.</summary>
+public record NodeInvokeRequest(
+    string Capability,
+    Dictionary<string, string>? Payload = null,
+    string? Intent = null,
+    string? SuccessCriteria = null,
+    string? CorrelationId = null);

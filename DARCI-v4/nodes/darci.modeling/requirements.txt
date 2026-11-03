@@ -1,0 +1,21 @@
+# The 3D-modeling node's own dependencies. Installed into ./.venv (gitignored), NOT shared with
+# DARCI-v4/Darci.Python — this node runs as its own process and is meant to be deletable without
+# touching the legacy CAD service or CadBridge.
+#
+#   py -3.11 -m venv .venv
+#   .venv/Scripts/python -m pip install -r requirements.txt
+#
+# Pinned because cadquery's kernel (cadquery-ocp) is a large native wheel and a surprise major
+# version is not something to discover at boot. ~1GB installed; vtk and numba come along with it.
+cadquery==2.8.0
+
+# The node's HTTP surface: the three contract endpoints and nothing else (doc §5.2).
+fastapi
+uvicorn
+
+# Mesh validation (watertight, bbox, volume) — used from M2, via the existing cad_engine.
+trimesh
+
+# Tests.
+pytest
+httpx

@@ -16,6 +16,7 @@ public enum NodeId
     Engineering = 3,
     Knowledge = 4,   // the KG / deep-research node
     Cad = 5,
+    Innovation = 6,  // the ideation node — synthesizes hypotheses when known knowledge is exhausted
 }
 
 /// <summary>
@@ -31,6 +32,7 @@ public enum Capability
     GenerateCad = 3,
     AnswerKnowledge = 4,
     FillKnowledgeGap = 5,
+    Innovate = 6,   // synthesize a candidate hypothesis from existing knowledge when it is exhausted
 }
 
 /// <summary>
@@ -49,31 +51,61 @@ public enum NodeState
     Succeeded = 5,           // terminal — work completed and verified
     Failed = 6,              // terminal — work completed but did not succeed
     Aborted = 7,             // terminal — killed by watchdog / crash recovery / cancellation
+
+    /// <summary>
+    /// Terminal — nothing here can do this work (doc §5.4 <c>missing-environment</c>). Distinct from
+    /// <see cref="Failed"/> on purpose: nothing was attempted, so this is neither a success nor a failure
+    /// and must never be counted as either. The ACTIONABLE half lives in a durable GapRecord, not in this
+    /// packet, because a packet parked waiting for a node that will never appear at runtime is a leak —
+    /// the watchdog's orphan sweep would abort it at the next restart.
+    /// <para>APPENDED at 8 deliberately. The ordinal order is load-bearing: SqliteNodePacketStore's
+    /// "active" query is <c>state &lt;= AwaitingDependency</c> (4), so anything above 4 is excluded from
+    /// the orphan sweep. Inserting mid-enum would silently reclassify every stored packet.</para>
+    /// </summary>
+    Blocked = 8,
 }
 
 /// <summary>State-machine helpers. Terminal states have no outgoing transitions.</summary>
 public static class NodeStateMachine
 {
     public static bool IsTerminal(this NodeState s) =>
-        s is NodeState.Succeeded or NodeState.Failed or NodeState.Aborted;
+        s is NodeState.Succeeded or NodeState.Failed or NodeState.Aborted or NodeState.Blocked;
 
     /// <summary>Active = non-terminal. An active packet must be covered by a lease or the watchdog.</summary>
     public static bool IsActive(this NodeState s) => !s.IsTerminal();
+
+    /// <summary>
+    /// Did the work actually fail? <see cref="NodeState.Blocked"/> is terminal but is NOT a failure —
+    /// nothing was attempted — so anything asking "did this go wrong" must ask THIS, not
+    /// <c>!IsSuccess</c>. Counting Blocked as failure would feed phantom negative evidence into the
+    /// confidence and campaign paths.
+    /// </summary>
+    public static bool IsFailure(this NodeState s) =>
+        s is NodeState.Failed or NodeState.Aborted;
+
+    /// <summary>Did the work actually succeed? Blocked is neither success nor failure.</summary>
+    public static bool IsSuccess(this NodeState s) => s is NodeState.Succeeded;
 
     /// <summary>Whether <paramref name="to"/> is a legal next state from <paramref name="from"/>.</summary>
     public static bool CanTransition(NodeState from, NodeState to)
     {
         if (from.IsTerminal()) return false;          // terminal is forever
         if (from == to) return true;                  // idempotent re-write of same state is allowed
-        if (to == NodeState.Aborted) return true;     // anything active can always be aborted
 
+        // Anything active can always fail or be aborted — a node may reject at routing/acceptance, the
+        // watchdog may reap at any active point, and resolution can fail before work starts.
+        // Blocked joins them: routing can discover that nothing serves the capability, and a node can
+        // return `blocked`/missing-environment mid-work, both without the packet having failed.
+        if (to is NodeState.Aborted or NodeState.Failed or NodeState.Blocked) return true;
+
+        // Succeeded requires having actually worked.
         return from switch
         {
             NodeState.Created => to is NodeState.Routed,
             NodeState.Routed => to is NodeState.Accepted,
             NodeState.Accepted => to is NodeState.Working,
-            NodeState.Working => to is NodeState.AwaitingDependency or NodeState.Succeeded or NodeState.Failed,
-            NodeState.AwaitingDependency => to is NodeState.Working or NodeState.Succeeded or NodeState.Failed,
+            NodeState.Working => to is NodeState.AwaitingDependency or NodeState.Succeeded,
+            NodeState.AwaitingDependency => to is NodeState.Working or NodeState.Succeeded,
             _ => false,
         };
     }

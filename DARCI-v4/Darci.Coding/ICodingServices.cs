@@ -52,11 +52,41 @@ public interface ICodingTaskService
     Task<CodingTaskRecord> CreateTaskAsync(CreateCodingTaskRequest request, CancellationToken ct = default);
 }
 
+/// <summary>
+/// What a checkpoint is allowed to do to the repository.
+///
+/// <para>The distinction exists because the two callers mean genuinely different things, and conflating
+/// them was a bug: the agent loop's PRE-RUN checkpoint committed the entire working tree with
+/// <c>git add -A</c> before the agent had edited anything, so everything it captured was by definition
+/// somebody else's in-progress work — committed under a "[DARCI checkpoint]" message describing a task it
+/// had nothing to do with.</para>
+/// </summary>
+public enum CheckpointMode
+{
+    /// <summary>
+    /// Record where HEAD is and commit NOTHING. The correct meaning of a checkpoint taken before any
+    /// edits: it is a rollback target, not a snapshot of work in progress.
+    /// </summary>
+    AnchorHeadOnly = 0,
+
+    /// <summary>
+    /// Commit the workspace's own changes — for a checkpoint taken AFTER edits, where committing is the
+    /// point. Still scoped to the workspace path; never the whole repository.
+    /// </summary>
+    CommitWorkspaceChanges = 1,
+}
+
 /// <summary>Creates and restores git checkpoints around edits.</summary>
 public interface IGitCheckpointService
 {
-    /// <summary>Creates a checkpoint commit. Returns null if git is not initialised or fails.</summary>
-    Task<CodingCheckpoint?> CreateCheckpointAsync(string workspaceId, string taskId, string message, CancellationToken ct = default);
+    /// <summary>Creates a checkpoint. Returns null if git is not initialised or fails.</summary>
+    Task<CodingCheckpoint?> CreateCheckpointAsync(
+        string workspaceId,
+        string taskId,
+        string message,
+        CheckpointMode mode = CheckpointMode.AnchorHeadOnly,
+        CancellationToken ct = default);
+
     /// <summary>Restores the workspace to the given checkpoint commit.</summary>
     Task<bool> RollbackToCheckpointAsync(string workspaceId, string taskId, string checkpointId, CancellationToken ct = default);
 }
@@ -76,8 +106,12 @@ public interface IKgEnrichmentService
 /// <summary>Drives the autonomous edit–test–debug loop for a coding task.</summary>
 public interface ICodingAgentLoop
 {
-    /// <summary>Starts the loop for the given task in the background. Returns false if already running.</summary>
-    bool StartLoop(string taskId, RunCodingTaskRequest? options = null);
+    /// <summary>
+    /// Starts the loop for the given task in the background. Returns false if already running.
+    /// When <paramref name="rootPacket"/> is supplied (the loop was reached via the node router), the
+    /// run's audit log continues on that packet; otherwise a fresh packet is minted (direct REST path).
+    /// </summary>
+    bool StartLoop(string taskId, RunCodingTaskRequest? options = null, Darci.Nodes.NodePacket? rootPacket = null);
     /// <summary>Returns true if a loop is currently running for the given task.</summary>
     bool IsRunning(string taskId);
     Task<CodingTaskStatusResponse?> GetStatusAsync(string taskId, CancellationToken ct = default);

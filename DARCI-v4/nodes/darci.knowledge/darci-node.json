@@ -1,0 +1,30 @@
+{
+  "contract_version": "0.1.1",
+  "node_id": "darci.knowledge",
+  "display_name": "Knowledge (KGMA + deep research)",
+  "node_version": "1.0.0",
+  "kind": "capability",
+  "capabilities": [
+    {
+      "name": "knowledge.answer",
+      "description": "Answer a question from the knowledge graph, escalating to deep research when the graph is insufficient.",
+      "typical_latency_ms": 60000,
+      "deadline_ms": 900000
+    },
+    {
+      "name": "knowledge.gapfill",
+      "description": "Resolve a specific named knowledge gap; returns residual gaps when it cannot.",
+      "typical_latency_ms": 60000,
+      "deadline_ms": 900000
+    }
+  ],
+  "requires": {
+    "model_classes": ["chat.balanced", "chat.deep", "embed.text"],
+    "memory_scopes": ["read:knowledge", "write:knowledge", "write:gaps"],
+    "permissions": ["network:research-providers"],
+    "emits_untrusted": true
+  },
+  "health": "/health",
+  "author": "ARoskelley",
+  "repository": "https://github.com/ARoskelley/DARCI-Live"
+}

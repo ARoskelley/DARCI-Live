@@ -3,12 +3,13 @@
 using Darci.Memory.Confidence;
 using Darci.Memory.Graph;
 using Darci.Memory.Graph.Models;
+using Darci.Nodes;
 using Darci.Research.Agents.Models;
 using Microsoft.Extensions.Logging;
 
 namespace Darci.Research.Agents;
 
-public sealed class KnowledgeAssessor
+public sealed class KnowledgeAssessor : IKnowledgeAssessor
 {
     /// <summary>Graph confidence at or above this = skip agents entirely.</summary>
     public const float HighConfidenceThreshold = 0.65f;
@@ -21,18 +22,22 @@ public sealed class KnowledgeAssessor
     /// LLM gap classifier fires to decide whether RunGapFill or SkipAgents.
     /// </summary>
 
-    private readonly IKnowledgeGraph _graph;
+    /// <summary>This node's memory access: its id plus the scopes its manifest declares.</summary>
+    private static readonly MemoryAccess Access =
+        MemoryAccess.ForNode("darci.knowledge", new[] { MemoryScopes.ReadKnowledge });
+
+    private readonly IMemoryBroker _memory;
     private readonly IConfidenceTracker _confidence;
     private readonly IResearchToolbox _toolbox;
     private readonly ILogger<KnowledgeAssessor> _logger;
 
     public KnowledgeAssessor(
-        IKnowledgeGraph graph,
+        IMemoryBroker memory,
         IConfidenceTracker confidence,
         IResearchToolbox toolbox,
         ILogger<KnowledgeAssessor> logger)
     {
-        _graph = graph;
+        _memory = memory;
         _confidence = confidence;
         _toolbox = toolbox;
         _logger = logger;
@@ -43,7 +48,7 @@ public sealed class KnowledgeAssessor
         CancellationToken ct = default)
     {
         // ── Step 1: Query knowledge graph ──
-        var entities = await _graph.SearchEntitiesAsync(topic, limit: 5, ct: ct);
+        var entities = await _memory.SearchEntitiesAsync(Access, topic, limit: 5, ct: ct);
 
         // ── Step 2: Query confidence tracker ──
         List<float>? embedding = null;
@@ -70,7 +75,7 @@ public sealed class KnowledgeAssessor
             return new KnowledgeAssessment
             {
                 Topic = topic,
-                GraphConfidence = graphConfidence,
+                Confidence = Confidence.Of(graphConfidence),
                 SupportingClaims = synthesis.SupportingClaims,
                 RelevantEntities = entities,
                 Decision = DispatchDecision.SkipAgents,
@@ -86,7 +91,7 @@ public sealed class KnowledgeAssessor
             return new KnowledgeAssessment
             {
                 Topic = topic,
-                GraphConfidence = graphConfidence,
+                Confidence = Confidence.Of(graphConfidence),
                 SupportingClaims = synthesis.SupportingClaims,
                 RelevantEntities = entities,
                 Decision = DispatchDecision.RunAgents,
@@ -128,7 +133,7 @@ Answer YES if external research is needed. Answer NO if existing knowledge is su
         return new KnowledgeAssessment
         {
             Topic = topic,
-            GraphConfidence = graphConfidence,
+            Confidence = Confidence.Of(graphConfidence),
             SupportingClaims = synthesis.SupportingClaims,
             RelevantEntities = entities,
             LlmClassifiedAsGap = llmClassified,

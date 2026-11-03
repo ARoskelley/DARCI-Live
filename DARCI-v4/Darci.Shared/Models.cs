@@ -36,6 +36,9 @@ public enum ActionType
     // Neural Engineering (geometry workbench + ONNX network)
     Engineering,
 
+    // Coding (routed to the coding node via the node packet protocol)
+    Code,
+
     // Meta
     Rest,
     Observe,
@@ -68,6 +71,22 @@ public enum Mood
 // ============================================================
 // MESSAGE TYPES
 // ============================================================
+
+/// <summary>
+/// The one rule about inbound message content, in one place.
+///
+/// <para>Every consumer of <see cref="IncomingMessage.Content"/> assumes it is non-null — the awareness
+/// loop dereferences it immediately to log a preview. The SignalR hub always guarded this; the REST
+/// endpoint did not, so a body missing <c>message</c> bound to a null Content and surfaced as a 500 on
+/// what is plainly a malformed request. Callers get to find out they sent something invalid.</para>
+/// </summary>
+public static class IncomingMessageRules
+{
+    public const string MissingContentError = "message is required and cannot be empty";
+
+    /// <summary>True when <paramref name="content"/> is usable as message content.</summary>
+    public static bool IsValidContent(string? content) => !string.IsNullOrWhiteSpace(content);
+}
 
 public class IncomingMessage
 {
@@ -307,6 +326,12 @@ public class DarciAction
 
     // Neural Engineering fields (v4 workbench + ONNX path)
     public EngineeringGoalSpec? EngineeringSpec { get; init; }
+
+    // Coding fields (routed to the coding node). CodingIntent = what to build/fix;
+    // CodingWorkspaceId = which workspace the coding node operates on.
+    public string? CodingIntent { get; init; }
+    public string? CodingWorkspaceId { get; init; }
+    public string? CodingSuccessCriteria { get; init; }
 
     public static DarciAction Rest(TimeSpan? duration = null, string? reason = null) => new()
     {

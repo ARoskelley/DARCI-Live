@@ -1,0 +1,45 @@
+{
+  "profile_id": "darci-local-default",
+  "description": "THE COMMITTED DEFAULT, and deliberately ALL-LOCAL AND KEYLESS. Every class resolves to an installed Ollama model and no provider needs an API key, so a fresh clone, a bare core, and a distributed zip all boot with zero external credentials - that property is load-bearing for the collaborator story, so this file must stay keyless. To use a remote tier instead, point DARCI_HOST_PROFILE at another profile (e.g. host-profile.hybrid.json) rather than editing this one; a profile selected that way fails fast by name if its key is unset.",
+  "providers": {
+    "ollama": {
+      "kind": "ollama",
+      "base_url": "http://localhost:11434",
+      "timeout_minutes": 12
+    }
+  },
+  "classes": {
+    "chat.fast": {
+      "provider": "ollama",
+      "model": "gemma2:9b",
+      "note": "ASPIRATIONAL: no genuinely small model is installed, so this is the same 9B as chat.balanced. Pull llama3.2:3b (~2GB) to make this tier real."
+    },
+    "chat.balanced": {
+      "provider": "ollama",
+      "model": "gemma2:9b"
+    },
+    "chat.deep": {
+      "provider": "ollama",
+      "model": "gemma2:9b",
+      "note": "ASPIRATIONAL: mapped to the balanced model on purpose. llama3.3 (42GB) is installed but impractical on an 8GB card - heavy CPU offload makes it minutes-per-call. Point this at a larger local model or the Claude profile when one is available."
+    },
+    "classify.intent": {
+      "provider": "ollama",
+      "model": "gemma2:9b",
+      "note": "The doc suggests a dedicated classifier (Lizzy/ONNX); none is wired in this repo yet."
+    },
+    "embed.text": {
+      "provider": "ollama",
+      "model": "nomic-embed-text"
+    },
+    "code.generate": {
+      "provider": "ollama",
+      "model": "qwen2.5-coder:7b"
+    },
+    "code.fast": {
+      "provider": "ollama",
+      "model": "qwen2.5-coder:7b",
+      "note": "Same model as code.generate today; kept as a distinct class so the fast/full distinction the code already makes is preserved."
+    }
+  }
+}

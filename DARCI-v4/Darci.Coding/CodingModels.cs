@@ -1,5 +1,7 @@
 #nullable enable
 
+using Darci.Nodes;
+
 namespace Darci.Coding;
 
 public sealed record CodingWorkspaceImportRequest(
@@ -113,10 +115,11 @@ public sealed record CodingTaskRecord
     public string RoadblockResearch { get; init; } = "";
     /// <summary>Output of the last behavioral verification run (dotnet test or equivalent).</summary>
     public string VerificationResult { get; init; } = "";
-    /// <summary>Self-assessed confidence score (0–1) from the last LLM response. -1 = not yet assessed.</summary>
-    public double ConfidenceScore { get; init; } = -1.0;
-    /// <summary>What the model said it was uncertain about in its last response.</summary>
-    public string ConfidenceNote { get; init; } = "";
+    /// <summary>
+    /// Self-assessed confidence from the last LLM response (unified <see cref="Darci.Nodes.Confidence"/>;
+    /// <see cref="Darci.Nodes.Confidence.Unassessed"/> = not yet evaluated). Gap/low detection via IsGap/IsLow.
+    /// </summary>
+    public Confidence Confidence { get; init; } = Confidence.Unassessed;
     public DateTime CreatedAt { get; init; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; init; } = DateTime.UtcNow;
 }
@@ -128,10 +131,11 @@ public sealed record CodingPlanStep
     public string Description { get; init; } = "";
     public string Status { get; init; } = "pending"; // pending | in_progress | completed | failed | roadblocked
     public string? Result { get; init; }
-    /// <summary>Self-assessed confidence (0–1) from the last LLM response for this step. -1 = not yet assessed.</summary>
-    public double ConfidenceScore { get; init; } = -1.0;
-    /// <summary>What the model reported it was most uncertain about for this step.</summary>
-    public string ConfidenceNote { get; init; } = "";
+    /// <summary>
+    /// Self-assessed confidence from the last LLM response for this step (unified type;
+    /// <see cref="Darci.Nodes.Confidence.Unassessed"/> = not yet evaluated).
+    /// </summary>
+    public Confidence Confidence { get; init; } = Confidence.Unassessed;
 }
 
 /// <summary>A git checkpoint created before edits are applied.</summary>
@@ -167,8 +171,8 @@ public sealed record CodingTaskStatusResponse
     public string LastStepResult { get; init; } = "";
     public string RoadblockResearch { get; init; } = "";
     public string VerificationResult { get; init; } = "";
-    public double ConfidenceScore { get; init; } = -1.0;
-    public string ConfidenceNote { get; init; } = "";
+    /// <summary>Unified confidence projection for the last LLM response (replaces flat score/note).</summary>
+    public Confidence Confidence { get; init; } = Confidence.Unassessed;
     public bool IsRunning { get; init; }
     public DateTime UpdatedAt { get; init; }
 }

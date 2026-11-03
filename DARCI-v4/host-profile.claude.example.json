@@ -1,0 +1,51 @@
+{
+  "profile_id": "claude-hybrid-EXAMPLE",
+  "description": "EXAMPLE ONLY - not active. Shows how to route the heavy tiers to the Claude API while keeping cheap/high-volume work local. To use it: set ANTHROPIC_API_KEY, then point DARCI_HOST_PROFILE at a copy of this file. Note there is currently NO Anthropic provider implementation in this repo - the model broker ships with an Ollama provider only, so adopting this profile also requires implementing the 'anthropic' provider kind.",
+  "providers": {
+    "ollama": {
+      "kind": "ollama",
+      "base_url": "http://localhost:11434",
+      "timeout_minutes": 12
+    },
+    "anthropic": {
+      "kind": "anthropic",
+      "base_url": "https://api.anthropic.com",
+      "timeout_minutes": 10,
+      "api_key_env": "ANTHROPIC_API_KEY"
+    }
+  },
+  "classes": {
+    "chat.fast": {
+      "provider": "ollama",
+      "model": "llama3.2:3b",
+      "note": "Local and cheap - high-volume, latency-sensitive calls stay off the paid API."
+    },
+    "chat.balanced": {
+      "provider": "ollama",
+      "model": "gemma2:9b"
+    },
+    "chat.deep": {
+      "provider": "anthropic",
+      "model": "claude-sonnet-5",
+      "note": "The tier that most benefits from a frontier model: innovation synthesis and falsification critique."
+    },
+    "classify.intent": {
+      "provider": "ollama",
+      "model": "gemma2:9b"
+    },
+    "embed.text": {
+      "provider": "ollama",
+      "model": "nomic-embed-text",
+      "note": "Embeddings stay local - high volume, and the vectors must stay consistent with what is already stored."
+    },
+    "code.generate": {
+      "provider": "anthropic",
+      "model": "claude-sonnet-5"
+    },
+    "code.fast": {
+      "provider": "ollama",
+      "model": "qwen2.5-coder:7b",
+      "note": "Fast iteration stays local; only full synthesis pays for the API."
+    }
+  }
+}
