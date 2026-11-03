@@ -50,6 +50,9 @@ public sealed class LegacyPacketNodeAdapter : INodeAdapter
             {
                 Name = CapabilityKey.From(c),
                 Description = $"legacy in-process capability {c}",
+                // Explicit, because deadline_ms is required and nothing has an implicit default any more.
+                // A synthesized manifest has no authored figure to use, so it takes the ceiling.
+                DeadlineMs = NodeDeadline.MaxMs,
             })
             .OrderBy(c => c.Name, StringComparer.Ordinal)
             .ToList(),

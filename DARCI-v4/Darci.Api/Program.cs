@@ -486,7 +486,16 @@ builder.Services.AddSingleton(new NodeDiscoveryOptions
     SharedSecret = nodeSharedSecret,
 });
 builder.Services.AddSingleton<NodeDiscoveryReportHolder>();
-builder.Services.AddHttpClient("darci-node");
+// The ABSOLUTE ceiling for any out-of-process invocation, set explicitly rather than inherited.
+//
+// Left unset this took the .NET default of 100s, which silently capped every manifest's deadline_ms:
+// darci.modeling declares 120000 and its last 20 seconds were unreachable, with the overrun reported as
+// DEADLINE_EXCEEDED and therefore indistinguishable from a slow node. The same constant now bounds the
+// client AND is enforced by manifest validation, so a longer deadline is refused at load with a named
+// error instead of being clipped at runtime. Per-invocation budgets live in each manifest's deadline_ms
+// underneath this, and HttpNodeAdapter's CancelAfter(remaining) stays the authority for each call.
+builder.Services.AddHttpClient("darci-node")
+    .ConfigureHttpClient(client => client.Timeout = NodeDeadline.Max);
 
 builder.Services.AddSingleton<INodeRegistry>(sp =>
 {

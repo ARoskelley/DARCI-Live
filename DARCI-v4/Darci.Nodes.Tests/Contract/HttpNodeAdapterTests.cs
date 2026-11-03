@@ -35,7 +35,7 @@ public sealed class HttpNodeAdapterTests : IDisposable
         Health = "/health",
         Capabilities = new[]
         {
-            new NodeCapabilityDescriptor { Name = "summarize.text", Description = "Summarize text." },
+            new NodeCapabilityDescriptor { Name = "summarize.text", Description = "Summarize text.", DeadlineMs = 30_000 },
         },
     };
 

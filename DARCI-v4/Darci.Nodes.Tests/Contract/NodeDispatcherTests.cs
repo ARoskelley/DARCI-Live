@@ -205,7 +205,7 @@ public sealed class NodeDispatcherTests : IDisposable
         var node = new LegacyNode(NodeId.Engineering, NodeState.Succeeded);
         var manifest = LegacyPacketNodeAdapter.SynthesizeManifest(node) with
         {
-            Capabilities = new[] { new NodeCapabilityDescriptor { Name = "acme.simulate_thermal" } },
+            Capabilities = new[] { new NodeCapabilityDescriptor { Name = "acme.simulate_thermal", DeadlineMs = 30_000 } },
         };
         var registry = new NodeRegistry(NullLogger<NodeRegistry>.Instance);
         registry.Register(new LegacyPacketNodeAdapter(node, manifest));

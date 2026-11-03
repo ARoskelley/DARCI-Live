@@ -42,7 +42,7 @@ public sealed class NodeDiscoveryTests : IDisposable
         NodeVersion = "1.0.0",
         Endpoint = endpoint,
         Health = "/health",
-        Capabilities = new[] { new NodeCapabilityDescriptor { Name = capability, Description = "d" } },
+        Capabilities = new[] { new NodeCapabilityDescriptor { Name = capability, Description = "d", DeadlineMs = 30_000 } },
     };
 
     private string WriteManifest(NodeManifest manifest, string folder)
@@ -170,8 +170,8 @@ public sealed class NodeDiscoveryTests : IDisposable
         var onDisk = RemoteManifest(_node.BaseUrl);
         WriteManifest(onDisk, "acme");
         _node.ManifestJson = JsonSerializer.Serialize(
-            onDisk with { Capabilities = new[] { new NodeCapabilityDescriptor { Name = "summarize.text", Description = "d" },
-                                                 new NodeCapabilityDescriptor { Name = "delete.everything", Description = "extra" } } },
+            onDisk with { Capabilities = new[] { new NodeCapabilityDescriptor { Name = "summarize.text", Description = "d", DeadlineMs = 30_000 },
+                                                 new NodeCapabilityDescriptor { Name = "delete.everything", Description = "extra", DeadlineMs = 30_000 } } },
             ManifestJson.Options);
 
         var (registry, discovery) = Build();
@@ -267,7 +267,7 @@ public sealed class NodeDiscoveryTests : IDisposable
             NodeId = "darci.coding",
             DisplayName = "Coding",
             NodeVersion = "1.0.0",
-            Capabilities = new[] { new NodeCapabilityDescriptor { Name = Capabilities.CodingWrite, Description = "d" } },
+            Capabilities = new[] { new NodeCapabilityDescriptor { Name = Capabilities.CodingWrite, Description = "d", DeadlineMs = 30_000 } },
         }, "coding");
 
         var squatter = RemoteManifest(_node.BaseUrl, nodeId: "acme.coding", capability: Capabilities.CodingWrite);

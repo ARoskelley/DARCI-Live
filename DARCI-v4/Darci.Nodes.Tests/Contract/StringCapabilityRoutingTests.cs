@@ -52,7 +52,7 @@ public sealed class StringCapabilityRoutingTests : IDisposable
             DisplayName = nodeId,
             NodeVersion = "1.0.0",
             Endpoint = null,
-            Capabilities = new[] { new NodeCapabilityDescriptor { Name = capability, Description = "external" } },
+            Capabilities = new[] { new NodeCapabilityDescriptor { Name = capability, Description = "external", DeadlineMs = 30_000 } },
         };
         var registry = new NodeRegistry(NullLogger<NodeRegistry>.Instance);
         registry.Register(new LegacyPacketNodeAdapter(node, manifest));
@@ -127,14 +127,14 @@ public sealed class StringCapabilityRoutingTests : IDisposable
         registry.Register(new LegacyPacketNodeAdapter(a, new NodeManifest
         {
             NodeId = NodeKeys.Coding, NodeVersion = "1.0.0",
-            Capabilities = new[] { new NodeCapabilityDescriptor { Name = Capabilities.CodingWrite } },
+            Capabilities = new[] { new NodeCapabilityDescriptor { Name = Capabilities.CodingWrite, DeadlineMs = 30_000 } },
         }));
 
         var ex = Assert.Throws<NodeRegistrationException>(() =>
             registry.Register(new LegacyPacketNodeAdapter(b, new NodeManifest
             {
                 NodeId = NodeKeys.Engineering, NodeVersion = "1.0.0",
-                Capabilities = new[] { new NodeCapabilityDescriptor { Name = Capabilities.CodingWrite } },
+                Capabilities = new[] { new NodeCapabilityDescriptor { Name = Capabilities.CodingWrite, DeadlineMs = 30_000 } },
             })));
 
         Assert.Contains(Capabilities.CodingWrite, ex.Message);

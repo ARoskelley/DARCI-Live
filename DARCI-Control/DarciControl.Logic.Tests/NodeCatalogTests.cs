@@ -37,7 +37,7 @@ public sealed class NodeCatalogTests : IDisposable
         WriteNode("acme", """
             {"contract_version":"0.1.1","node_id":"acme.summarize","display_name":"Acme Summarizer",
              "node_version":"2.1.0","kind":"capability",
-             "capabilities":[{"name":"summarize.text","description":"d"}]}
+             "capabilities":[{"name":"summarize.text","description":"d","deadline_ms":30000}]}
             """);
 
         var entry = Assert.Single(NodeCatalog.Scan(_dir));
@@ -56,7 +56,7 @@ public sealed class NodeCatalogTests : IDisposable
         WriteNode("remote", """
             {"contract_version":"0.1.1","node_id":"acme.remote","display_name":"Remote","node_version":"1.0.0",
              "kind":"capability","endpoint":"http://localhost:7901",
-             "capabilities":[{"name":"remote.do","description":"d"}]}
+             "capabilities":[{"name":"remote.do","description":"d","deadline_ms":30000}]}
             """);
 
         Assert.True(Assert.Single(NodeCatalog.Scan(_dir)).IsOutOfProcess);
@@ -80,7 +80,7 @@ public sealed class NodeCatalogTests : IDisposable
         // The tolerant load matters here: an exception would have emptied the whole picker.
         WriteNode("good", """
             {"contract_version":"0.1.1","node_id":"acme.good","display_name":"Good","node_version":"1.0.0",
-             "kind":"capability","capabilities":[{"name":"good.do","description":"d"}]}
+             "kind":"capability","capabilities":[{"name":"good.do","description":"d","deadline_ms":30000}]}
             """);
         WriteNode("bad", "{ not json");
 

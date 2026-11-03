@@ -68,8 +68,12 @@ What the fields actually control:
 
 - **`endpoint`** must be loopback (`127.0.0.1` or `localhost`). Remote endpoints are refused until the
   broker-token work lands. Pick a port nothing else uses; `darci.modeling` took 7801.
-- **`deadline_ms`** is **binding**. The core abandons the call at that point whatever you are doing. It is
-  also not overridable by the caller, by design — this number is the reviewed one.
+- **`deadline_ms`** is **REQUIRED** — there is no default — and must be **1 … 180 000** (180 s is the
+  system ceiling, enforced at load for out-of-process nodes). It is **binding**: the core abandons the
+  call at that point whatever you are doing, and it is not overridable by the caller, by design — this
+  number is the reviewed one. Declare a real worst case, not the ceiling; a padded deadline just means a
+  hung node ties up a caller for three minutes. Absent or over the ceiling is refused at load with the
+  capability and the bound named, so nothing is ever silently clipped.
 - **`kind: "environment"`** additionally requires `workspace_root`. Use `"capability"` unless you own
   durable workspace state.
 - **`emits_untrusted: true`** if your output contains anything you fetched from outside — scraped text, a
@@ -244,9 +248,9 @@ want a template.
 5. **Assuming the core will start your process** — it will not. It health-checks an address.
 6. **Treating an optional sub-feature as fatal** — `darci.modeling` cannot render previews headlessly, so
    it reports `renders: 0/3` and still returns the model. A missing extra must not fail the work.
-7. **Declaring a `deadline_ms` above 100 000** — the core's HTTP client caps every invocation at 100
-   seconds whatever your manifest says, and reports the overrun as `DEADLINE_EXCEEDED`, so the excess is
-   unreachable and the failure looks like slowness. Keep it at or below 100 000.
+7. **Omitting `deadline_ms`, or declaring one above 180 000** — it is **required** and the ceiling is
+   **180 000 ms (180 s)**. Both are refused at load with the capability and the bound named, so you lose a
+   registration rather than silently losing time.
 8. **Assuming `/invoke` is called one at a time** — nothing serializes it. A fixed output path, a
    module-level cache, or a non-reentrant library corrupts results under concurrent calls. Be stateless,
    or lock it yourself.

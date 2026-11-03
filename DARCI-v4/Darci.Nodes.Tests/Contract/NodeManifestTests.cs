@@ -44,7 +44,7 @@ public class NodeManifestTests
     [Fact]
     public void BadlyNamedCapability_IsRejected()
     {
-        var m = Valid() with { Capabilities = new[] { new NodeCapabilityDescriptor { Name = "WriteCode" } } };
+        var m = Valid() with { Capabilities = new[] { new NodeCapabilityDescriptor { Name = "WriteCode", DeadlineMs = 30_000 } } };
         Assert.Contains(m.Validate(), e => e.Contains("not a valid namespaced"));
     }
 
@@ -55,8 +55,8 @@ public class NodeManifestTests
         {
             Capabilities = new[]
             {
-                new NodeCapabilityDescriptor { Name = Capabilities.CodingWrite },
-                new NodeCapabilityDescriptor { Name = Capabilities.CodingWrite },
+                new NodeCapabilityDescriptor { Name = Capabilities.CodingWrite, DeadlineMs = 30_000 },
+                new NodeCapabilityDescriptor { Name = Capabilities.CodingWrite, DeadlineMs = 30_000 },
             },
         };
         Assert.Contains(m.Validate(), e => e.Contains("declared more than once"));
@@ -93,7 +93,7 @@ public class NodeManifestTests
         // Adding a capability changes the hash — that is the §14c audit signal.
         var widened = a with
         {
-            Capabilities = a.Capabilities.Append(new NodeCapabilityDescriptor { Name = Capabilities.CodingTest }).ToList(),
+            Capabilities = a.Capabilities.Append(new NodeCapabilityDescriptor { Name = Capabilities.CodingTest, DeadlineMs = 30_000 }).ToList(),
         };
         Assert.NotEqual(a.ComputeSha256(), widened.ComputeSha256());
     }

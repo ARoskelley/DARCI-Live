@@ -174,7 +174,7 @@ public sealed class ParkingFirewallTests : IDisposable
         var parking = new ParkingNode();
         var manifest = LegacyPacketNodeAdapter.SynthesizeManifest(parking) with
         {
-            Capabilities = new[] { new NodeCapabilityDescriptor { Name = Capabilities.InnovationSynthesize } },
+            Capabilities = new[] { new NodeCapabilityDescriptor { Name = Capabilities.InnovationSynthesize, DeadlineMs = 30_000 } },
         };
         var registry = new NodeRegistry(NullLogger<NodeRegistry>.Instance);
         var reg = registry.Register(new LegacyPacketNodeAdapter(parking, manifest));

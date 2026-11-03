@@ -46,12 +46,14 @@ public sealed class OperationalLimitsTests : IDisposable
     // ── what actually bounds an invocation ───────────────────────────────────────────────────────
 
     [Fact]
-    public async Task TheHttpClientsOwnTimeout_CapsTheManifestDeadline_WhicheverIsShorter()
+    public async Task AClientTimeoutBelowTheDeadline_StillWins_WhichIsWhyTheyMustMatch()
     {
-        // The effective budget is min(deadline_ms, HttpClient.Timeout). The core's "darci-node" client is
-        // registered with AddHttpClient and no timeout, so in production that cap is the .NET default of
-        // 100s — see TheDarciNodeHttpClientDefault_Is100Seconds below. Proven here with a short timeout so
-        // the test takes milliseconds rather than two minutes.
+        // The effective budget is min(deadline_ms, HttpClient.Timeout). In production those are now the
+        // SAME ceiling (NodeDeadline.Max, 180s) and validation refuses any manifest above it, so this
+        // path should be unreachable for a registered node. It is still worth pinning: it is the
+        // mechanism that silently clipped deadlines before, and a test that fails if someone lowers the
+        // client's timeout below the validated maximum is what keeps the two numbers together. Proven
+        // with a short timeout so the test takes milliseconds rather than three minutes.
         using var http = new HttpClient { Timeout = TimeSpan.FromMilliseconds(250) };
         var adapter = new HttpNodeAdapter(
             Manifest(_node.BaseUrl, 60_000), http, NullLogger<HttpNodeAdapter>.Instance);
@@ -69,14 +71,16 @@ public sealed class OperationalLimitsTests : IDisposable
     }
 
     [Fact]
-    public void TheDarciNodeHttpClientDefault_Is100Seconds()
+    public void TheCeilingIsOneConstant_SharedByTheClientAndTheValidator()
     {
-        // Pins the value the document quotes. Program.cs calls AddHttpClient("darci-node") with no
-        // configuration, so a node whose capability declares a deadline longer than this cannot ever use
-        // the excess — darci.modeling declares 120000.
-        using var asRegistered = new HttpClient();
-
-        Assert.Equal(TimeSpan.FromSeconds(100), asRegistered.Timeout);
+        // The whole point of NodeDeadline: the HttpClient's timeout and the manifest validator's maximum
+        // are the SAME value. The bug this replaced was those two numbers living apart — the client took
+        // the .NET default of 100s while manifests could declare more, so the excess was clipped at
+        // runtime and reported as DEADLINE_EXCEEDED. Program.cs now sets the client's timeout from
+        // NodeDeadline.Max, and NodeManifest.Validate refuses anything above NodeDeadline.MaxMs.
+        Assert.Equal(180_000, NodeDeadline.MaxMs);
+        Assert.Equal(TimeSpan.FromSeconds(180), NodeDeadline.Max);
+        Assert.Equal(NodeDeadline.MaxMs, (int)NodeDeadline.Max.TotalMilliseconds);
     }
 
     [Fact]

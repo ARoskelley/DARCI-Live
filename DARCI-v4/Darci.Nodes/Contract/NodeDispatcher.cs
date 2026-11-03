@@ -132,7 +132,11 @@ public sealed class NodeDispatcher
     internal static NodeInvocation Project(NodePacket packet, NodeRegistration registration, string capability)
     {
         var descriptor = registration.Manifest.Capabilities.FirstOrDefault(c => c.Name == capability);
-        var deadlineMs = descriptor?.DeadlineMs ?? 300_000;
+        // Validation guarantees every declared capability has a deadline, so the fallback only applies
+        // when the packet was routed by explicit node ADDRESS and its capability string matches nothing
+        // this node declares. There is no declared budget to use, so it gets the ceiling rather than the
+        // old 300000 — which was both arbitrary and above the maximum an HTTP node can be given.
+        var deadlineMs = descriptor?.DeadlineMs ?? NodeDeadline.MaxMs;
 
         return new NodeInvocation
         {

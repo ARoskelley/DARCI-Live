@@ -167,16 +167,18 @@ public sealed class DocumentedExampleManifestTests : IDisposable
     }
 
     [Fact]
-    public void TheRunnableNodesDeadline_StaysUnderTheHttpClientCap()
+    public void TheRunnableNodesDeadline_IsWithinTheEnforcedCeiling()
     {
-        // Section 2.3: the effective budget is min(deadline_ms, 100s), and the cap is invisible from the
-        // manifest. The documented example must not be an illustration of the trap it warns about.
+        // Section 2.3. The ceiling is now explicit and validated, so a documented example above it would
+        // not merely be unwise — it would be refused at load, and the document would be publishing a
+        // manifest that cannot register.
         var loaded = new NodeManifestLoader(NullLogger<NodeManifestLoader>.Instance)
             .Load(Path.Combine(_dir, "darci-node.json"));
 
+        Assert.Empty(loaded.Manifest.Validate());
         Assert.All(loaded.Manifest.Capabilities,
-            c => Assert.True(c.DeadlineMs <= 100_000,
-                $"capability '{c.Name}' declares {c.DeadlineMs}ms, above the 100s HttpClient cap"));
+            c => Assert.True(c.DeadlineMs is > 0 and <= NodeDeadline.MaxMs,
+                $"capability '{c.Name}' declares {c.DeadlineMs}ms, outside 1..{NodeDeadline.MaxMs}"));
     }
 
     [Fact]

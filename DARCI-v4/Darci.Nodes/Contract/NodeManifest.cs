@@ -24,9 +24,17 @@ public sealed record NodeCapabilityDescriptor
 
     [JsonPropertyName("typical_latency_ms")] public int TypicalLatencyMs { get; init; } = 1000;
 
-    /// <summary>Per-invocation budget. The dispatcher derives <see cref="NodeInvocation.DeadlineAt"/> from
-    /// this — and it can never lengthen or shorten the work record's lease.</summary>
-    [JsonPropertyName("deadline_ms")] public int DeadlineMs { get; init; } = 300_000;
+    /// <summary>
+    /// Per-invocation budget, in milliseconds. REQUIRED — there is no default, because a capability with
+    /// no stated deadline is a capability nobody has decided how long to wait for, and the old implicit
+    /// 300000 meant that decision was being made silently by whoever wrote this record.
+    ///
+    /// <para>Nullable so that ABSENT is distinguishable from a declared value and can be refused by name.
+    /// The dispatcher derives <see cref="NodeInvocation.DeadlineAt"/> from it, and it can never lengthen
+    /// or shorten the work record's lease. Capped at <see cref="NodeDeadline.MaxMs"/> for out-of-process
+    /// nodes — see <see cref="Validate"/>.</para>
+    /// </summary>
+    [JsonPropertyName("deadline_ms")] public int? DeadlineMs { get; init; }
 }
 
 /// <summary>
@@ -116,7 +124,34 @@ public sealed record NodeManifest
             else if (!seen.Add(c.Name))
                 errors.Add($"capability '{c.Name}' is declared more than once by node '{NodeId}'.");
 
-            if (c.DeadlineMs <= 0) errors.Add($"capability '{c.Name}' has a non-positive deadline_ms.");
+            // REQUIRED, and refused LOUDLY rather than clipped. The point of the ceiling is to stop
+            // silent truncation, so a value above it is a named validation failure at load — never a
+            // runtime surprise that looks like the node being slow.
+            if (c.DeadlineMs is null)
+            {
+                errors.Add(
+                    $"capability '{c.Name}' does not declare deadline_ms, which is required "
+                    + $"(a positive number of milliseconds, at most {NodeDeadline.MaxMs}).");
+            }
+            else if (c.DeadlineMs <= 0)
+            {
+                errors.Add($"capability '{c.Name}' has a non-positive deadline_ms ({c.DeadlineMs}).");
+            }
+            else if (!IsInProcess && c.DeadlineMs > NodeDeadline.MaxMs)
+            {
+                // Scoped to out-of-process on purpose: the ceiling exists because the core calls an HTTP
+                // node through an HttpClient whose timeout is NodeDeadline.Max, so a larger value could
+                // not be honoured. An IN-PROCESS node touches no HttpClient, and the first-party coding
+                // and knowledge nodes legitimately declare 10 to 60 minutes; refusing those would brick
+                // the core at boot (a first-party manifest failure is fatal by design) over a limit that
+                // does not apply to them.
+                errors.Add(
+                    $"capability '{c.Name}' declares deadline_ms {c.DeadlineMs}, above the maximum "
+                    + $"{NodeDeadline.MaxMs} for an out-of-process node. The core's node HTTP client "
+                    + $"times out at {NodeDeadline.MaxMs}ms, so a longer deadline could not be honoured. "
+                    + $"Lower deadline_ms to {NodeDeadline.MaxMs} or less, or make the work asynchronous "
+                    + "(return `blocked` with `pending-outcome` and let the caller collect the result).");
+            }
         }
 
         if (Kind == NodeKind.Environment && string.IsNullOrWhiteSpace(WorkspaceRoot))

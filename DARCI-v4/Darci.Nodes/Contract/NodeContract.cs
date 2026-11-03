@@ -16,6 +16,29 @@ public static class NodeContractVersion
 }
 
 /// <summary>
+/// The system-wide deadline ceiling.
+///
+/// <para>ONE constant, deliberately, because the bug this replaces was a number that existed in two
+/// places: the core's node HttpClient took the .NET default of 100s while manifests were free to declare
+/// more, so <c>darci.modeling</c>'s 120s was silently clipped and the overrun reported as
+/// <c>DEADLINE_EXCEEDED</c> — indistinguishable from a slow node. Now the client's timeout and the
+/// validator's maximum are the same value, and exceeding it is refused at load instead of clipped at
+/// runtime.</para>
+///
+/// <para>This is a CEILING, not a default. Real per-invocation budgets are declared capability by
+/// capability in each manifest's <c>deadline_ms</c>, and the adapter's own
+/// <c>CancelAfter(DeadlineAt - UtcNow)</c> remains the per-invocation authority underneath it.</para>
+/// </summary>
+public static class NodeDeadline
+{
+    /// <summary>Hard maximum for a capability's <c>deadline_ms</c>, in milliseconds.</summary>
+    public const int MaxMs = 180_000;
+
+    /// <summary>The same ceiling as a <see cref="TimeSpan"/>, for the HTTP client's timeout.</summary>
+    public static readonly TimeSpan Max = TimeSpan.FromMilliseconds(MaxMs);
+}
+
+/// <summary>
 /// Outcome of a node invocation (doc §5.4, extended in Rev 0.1.1).
 /// <para>
 /// <b>Rev 0.1.1 amendment:</b> Rev 0.1 had only ok|error, which forced a node with bounded work complete but

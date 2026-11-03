@@ -106,7 +106,7 @@ this"** — stated as such rather than replaced with a number that sounds author
 | Health-check interval | **There is none.** Checked exactly once, at core startup. | **[ENFORCED]** by absence |
 | Health-check timeout | No dedicated one. Shares the **3 s** handshake budget with the manifest fetch. | **[ENFORCED]** |
 | Manifest fetch timeout | Same shared **3 s** budget — health *and* manifest together. | **[ENFORCED]** |
-| `/invoke` timeout | `min(`capability's `deadline_ms`, **100 s**`)` — see §2.3, this surprises people | **[ENFORCED]** |
+| `/invoke` timeout | the capability's **`deadline_ms`**, which is **required** and must be **≤ 180 000 ms**. §2.3 | **[ENFORCED]** |
 | Retries on any endpoint | **None, anywhere.** No handshake retry, no invoke retry, no re-discovery. | **[ENFORCED]** by absence |
 | Payload size cap | **None in the node contract.** §2.5 | not enforced |
 | Max payload slots | **None.** | not enforced |
@@ -128,33 +128,69 @@ surface as invocation errors instead; `SetDegraded` (§4.6) is the only mechanis
 **[RECOMMENDED]** Answer both in single-digit milliseconds. Do not connect to a database, warm a model, or
 read a large file in a health check. The reference node checks only that its kernel imported.
 
-### 2.3 `/invoke`: the deadline is capped at 100 seconds, whatever your manifest says
+### 2.3 `/invoke`: `deadline_ms` is required, and 180 000 ms is the hard ceiling
 
-**[ENFORCED]** Two independent limits apply to every `/invoke`, and **the shorter one wins**:
+**[ENFORCED]** Every capability **must** declare `deadline_ms`, and for an out-of-process node it must be
+**1 … 180 000** milliseconds. There is no default and no implicit value.
 
-1. the capability's `deadline_ms`, which `HttpNodeAdapter` enforces with
-   `cts.CancelAfter(DeadlineAt - UtcNow)`;
-2. the **`HttpClient.Timeout`** of the core's HTTP client, which is **100 seconds**.
+| `deadline_ms` | Outcome |
+|---|---|
+| absent | **refused at load**, naming the capability and the maximum |
+| `0` or negative | **refused at load** |
+| 1 … 180 000 | **accepted — and it means exactly what it says** |
+| above 180 000 (out-of-process) | **refused at load**, loudly, with the fix in the message |
+| above 180 000 (in-process) | accepted — the ceiling is transport-scoped, see below |
 
-`Program.cs` registers the client with `AddHttpClient("darci-node")` and **configures no timeout**, so the
-.NET default of 100 s applies. The effective budget for any invocation is therefore:
+**180 000 ms / 180 s is the absolute system ceiling.** `Program.cs` sets the node HTTP client's timeout
+from the same constant that validation checks — `NodeDeadline.Max` / `NodeDeadline.MaxMs` in
+`Darci.Nodes/Contract/NodeContract.cs` — so the two numbers cannot drift apart. Within that ceiling, the
+real budget is **yours**, declared capability by capability, and `HttpNodeAdapter`'s
+`cts.CancelAfter(DeadlineAt - UtcNow)` remains the per-invocation authority.
+
+So, plainly: **the effective budget for an invocation is your `deadline_ms`.** There is no hidden cap
+underneath the ceiling, and nothing is silently clipped.
+
+What a refusal looks like, as it appears in the boot log and in `GET /nodes` → `skipped`:
 
 ```
-effective = min(deadline_ms, 100_000 ms)
+capability 'acme.work' declares deadline_ms 900000, above the maximum 180000 for an out-of-process
+node. The core's node HTTP client times out at 180000ms, so a longer deadline could not be honoured.
+Lower deadline_ms to 180000 or less, or make the work asynchronous (return `blocked` with
+`pending-outcome` and let the caller collect the result).
 ```
 
-> **This is a real trap.** A capability declaring `deadline_ms` above 100 000 cannot use the excess, and
-> the overrun is reported as `DEADLINE_EXCEEDED` with the same message as a genuine deadline breach — so
-> it is indistinguishable from your node simply being slow. The shipped `darci.modeling` node declares
-> `deadline_ms: 120000` and is subject to exactly this: its last 20 seconds are unreachable.
->
-> `OperationalLimitsTests.TheHttpClientsOwnTimeout_CapsTheManifestDeadline_WhicheverIsShorter` demonstrates
-> the mechanism, and `TheDarciNodeHttpClientDefault_Is100Seconds` pins the number.
+and for an absent one:
 
-**[RECOMMENDED]** Keep `deadline_ms` at **100 000 or below** so the number in your manifest is the number
-that applies. If your work genuinely needs longer, it needs to be asynchronous — accept the request,
-return `blocked` with `pending-outcome`, and let the caller collect the result later — rather than holding
-an HTTP connection open past a limit you cannot see.
+```
+capability 'acme.work' does not declare deadline_ms, which is required (a positive number of
+milliseconds, at most 180000).
+```
+
+> **Why it is refused rather than clipped.** This used to be a trap. The client inherited the .NET default
+> of 100 s while a manifest could declare any budget it liked, so the excess was truncated at runtime and
+> the overrun reported as `DEADLINE_EXCEEDED` — indistinguishable from the node simply being slow.
+> `darci.modeling` declared 120 000 and quietly lost its last 20 seconds. A limit you cannot see is worse
+> than a smaller limit you can, so the ceiling is now explicit, shared with the validator, and enforced
+> **at load**.
+
+**The ceiling is scoped to out-of-process nodes**, deliberately. It exists because an HTTP node is called
+through a client whose timeout is `NodeDeadline.Max`; an **in-process** node touches no HTTP client, and
+the first-party nodes legitimately declare far longer (`coding.write` 3 600 000, `knowledge.answer`
+900 000). Applying the ceiling to them would stop the core booting — a first-party manifest failing
+validation is fatal by design — over a bound that does not exist for that transport. As a node author
+writing an out-of-process node, **the ceiling applies to you**.
+
+**[RECOMMENDED]** Declare a real worst case, not the ceiling. `deadline_ms` is how long the core will wait
+before abandoning your call, so padding it to 180 000 "to be safe" just means a hung node ties up a
+caller for three minutes. The reference node asks for 120 000 to build a solid; the example in §15 asks
+for 15 000 to count words.
+
+**[RECOMMENDED]** If the work genuinely cannot finish inside 180 s, it is not a synchronous invocation.
+Accept the request, return `blocked` with `pending-outcome`, and let the caller collect the result —
+rather than trying to hold an HTTP connection open past the ceiling.
+
+Pinned by `DeadlineContractTests` (required, the ceiling, the transport scoping, and every real manifest
+in the repo) and `OperationalLimitsTests.TheCeilingIsOneConstant_SharedByTheClientAndTheValidator`.
 
 ### 2.4 Concurrency: `/invoke` is **not** serialized
 
@@ -208,10 +244,10 @@ hurt the core, and nothing will stop it.
 
 ### 2.6 What this means if you are tuning
 
-The only knob that is yours is `deadline_ms`, and it is capped at 100 s. The 3-second handshake budget and
-the 100-second client timeout are both **hardcoded in `Program.cs`** with no environment variable, so a
-node author cannot change either; both are noted in §14 as things a remote transport would have to
-revisit.
+The one knob that is yours is `deadline_ms`, anywhere in 1 … 180 000 ms, and it now means what it says.
+The 3-second handshake budget and the 180-second ceiling are **hardcoded** — the budget in `Program.cs`,
+the ceiling in `NodeDeadline` — with no environment variable for either, so a node author cannot change
+them; both are noted in §14 as things a remote transport would have to revisit.
 
 ---
 
@@ -440,15 +476,17 @@ Each entry in `capabilities[]` — `NodeCapabilityDescriptor`:
 | `input_schema` | JSON | **[REQUIRED]** | Carried as a raw document. **Schema enforcement is a later pass** — the source says so explicitly. Declaring it is what "lets a coding agent write against the contract". See §6.4 for its effect on hashing. |
 | `output_schema` | JSON | **[REQUIRED]** | Same. |
 | `typical_latency_ms` | int | **[RECOMMENDED]** | Defaults to `1000`. Read by nothing; documentation for callers. |
-| `deadline_ms` | int | **[ENFORCED]** | Must be **> 0**: `"capability 'x' has a non-positive deadline_ms."` Defaults to `300000`. §6.2 |
+| `deadline_ms` | int | **[ENFORCED]** | **REQUIRED — no default.** Must be **> 0**, and for an out-of-process node **≤ 180 000** (`NodeDeadline.MaxMs`). Absent, zero, negative, or above the ceiling is refused at load with the capability and the bound named. §2.3 |
 
 ### 6.2 `deadline_ms` — the binding deadline comes from the manifest
 
 This is the single most important number in your manifest.
 
 **[ENFORCED]** `NodeDispatcher.Project` reads the descriptor for the resolved capability and sets
-`DeadlineAt = DateTime.UtcNow.AddMilliseconds(descriptor.DeadlineMs)`. If no descriptor matches the
-resolved capability, it falls back to **300 000 ms**.
+`DeadlineAt = DateTime.UtcNow.AddMilliseconds(descriptor.DeadlineMs)`. Validation guarantees every
+declared capability has one (§2.3), so the fallback applies only when a packet was routed by explicit node
+**address** and its capability string matches nothing the node declares — in which case there is no
+declared budget and it takes the **ceiling**, 180 000 ms.
 
 **[ENFORCED]** `HttpNodeAdapter.InvokeAsync` then enforces it from the core's side:
 
@@ -466,8 +504,8 @@ figure; letting an HTTP caller pass their own would quietly move a limit that ex
 comment: it "does not park, unpark, or abort a work record, and an invocation's `DeadlineAt` has no
 relationship to the record's lease."
 
-**[RECOMMENDED]** Set it to a real worst case with headroom, and check it yourself (§8.3) so you do not
-start work you can never deliver.
+**[RECOMMENDED]** Set it to a real worst case — not the ceiling — and check it yourself (§8.3) so you do
+not start work you can never deliver.
 
 ### 6.3 `requires` — honest inventory, enforced by nothing
 
@@ -1741,8 +1779,8 @@ Manifest:
 - [ ] `node_id` is namespaced, unique, and will not change between versions
 - [ ] at least one capability, each a valid `domain.action` (§5.1), each unique in the manifest
 - [ ] capability names namespaced to **your** node so you cannot collide with a first-party verb
-- [ ] every `deadline_ms > 0`, set to a real worst case, and **≤ 100000** so the invisible
-      HttpClient cap of §2.3 cannot truncate it
+- [ ] **every capability declares `deadline_ms`** — it is required, there is no default
+- [ ] every `deadline_ms` is a real worst case in **1 … 180000**; above the ceiling is refused at load (§2.3)
 - [ ] `endpoint` is loopback; the port is free and nothing else claims it
 - [ ] `input_schema` declares every slot as a **string** and documents the encoding
 - [ ] `output_schema` declares what you return
@@ -1818,10 +1856,9 @@ Two more that are not from that list but have each cost a real boot or a real bu
 
 And two that nothing in the repo has hit yet only because no node has been written to provoke them:
 
-9. **Declaring a `deadline_ms` above 100 000.** The core's HTTP client caps every invocation at 100
-   seconds and reports the overrun as `DEADLINE_EXCEEDED`, so the excess is unreachable and the failure
-   looks like your node being slow. `darci.modeling` declares 120 000 and is already subject to it.
-   (§2.3)
+9. **Omitting `deadline_ms`, or declaring one above 180 000.** It is required and ceilinged, and both
+   are refused at load — so this costs you a registration, not a silent truncation. The error names the
+   capability and the bound. (§2.3)
 10. **Assuming `/invoke` is called one at a time.** Nothing serializes it. A fixed output path, a
     module-level cache, or a non-reentrant library will corrupt results under concurrent calls, and the
     corruption will look like a logic bug. (§2.4)
@@ -1843,7 +1880,7 @@ hardcoded and a node author cannot change any of them:
 | Number | Value | Where it is set |
 |---|---|---|
 | Handshake budget (health + manifest) | 3 s | `Program.cs`, `NodeDiscoveryOptions.HandshakeTimeout` |
-| Per-invocation HTTP cap | 100 s | not set at all — `AddHttpClient("darci-node")` takes the .NET default |
+| Deadline ceiling (HTTP cap **and** validated maximum) | 180 s | `NodeDeadline.MaxMs`; `Program.cs` sets the client's timeout from the same constant |
 | Loopback requirement | on | `NodeDiscoveryOptions.RequireLoopback` default, never overridden (§14.1) |
 
 ## 19. Appendix B — enforcement summary
@@ -1858,7 +1895,7 @@ What will actually stop you, in the order you will meet it:
 | 4 | `node_version` present | `Validate` | skipped |
 | 5 | ≥ 1 capability | `Validate` | skipped |
 | 6 | Capability names valid and unique in-manifest | `Validate` | skipped |
-| 7 | `deadline_ms > 0` | `Validate` | skipped |
+| 7 | `deadline_ms` present, `> 0`, and `<= 180000` out-of-process | `Validate` | skipped, with the capability and bound named (§2.3) |
 | 8 | `environment` ⇒ `workspace_root` | `Validate` | skipped |
 | 9 | Endpoint is loopback | `NodeDiscovery` | skipped |
 | 10 | `/health` ⇒ 2xx + `status == "ok"` | `HttpNodeAdapter.IsHealthyAsync` | skipped |
@@ -1870,7 +1907,7 @@ What will actually stop you, in the order you will meet it:
 | 16 | — *registered* — | | |
 | 17 | Capability name valid on the call | `POST /nodes/invoke` | `400` |
 | 18 | Deadline not already passed | `HttpNodeAdapter.InvokeAsync` | `DEADLINE_EXCEEDED`, node never called |
-| 18b | Response within `min(deadline_ms, 100s)` | `InvokeAsync` + `HttpClient.Timeout` | `DEADLINE_EXCEEDED` (§2.3) |
+| 18b | Response within the capability's `deadline_ms` (≤ the 180 s ceiling) | `InvokeAsync` + `HttpClient.Timeout`, both from `NodeDeadline` | `DEADLINE_EXCEEDED` (§2.3) |
 | 19 | Response is 2xx | `InvokeAsync` | `DEPENDENCY_UNAVAILABLE` |
 | 20 | Body parseable and non-empty | `InvokeAsync` | `INTERNAL` |
 | 21 | `outcome` recognized | `ParseOutcome` | unknown ⇒ `Error` |

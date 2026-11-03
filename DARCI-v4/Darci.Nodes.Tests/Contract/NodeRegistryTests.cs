@@ -20,7 +20,7 @@ public class NodeRegistryTests
         NodeId = nodeId,
         DisplayName = nodeId,
         NodeVersion = "1.0.0",
-        Capabilities = capabilities.Select(c => new NodeCapabilityDescriptor { Name = c, Description = c }).ToList(),
+        Capabilities = capabilities.Select(c => new NodeCapabilityDescriptor { Name = c, Description = c, DeadlineMs = 30_000 }).ToList(),
     };
 
     private static NodeRegistry Registry() => new(NullLogger<NodeRegistry>.Instance);
