@@ -7,6 +7,11 @@ manifest, and then calls it over HTTP. Any language works — the first external
 
 Nothing here is aspirational. It is written from building that node, including the parts that went wrong.
 
+> **This is the walkthrough.** For the full contract specification — every field, what is actually
+> enforced versus merely declared, the state machine, the local-versus-remote picture, and an author
+> checklist — see **[`docs/NODE_REQUIREMENTS.md`](../../docs/NODE_REQUIREMENTS.md)**. Where the two
+> disagree, that document is the one checked against the sources.
+
 ## The contract
 
 Your node serves three endpoints and nothing else:
@@ -14,7 +19,7 @@ Your node serves three endpoints and nothing else:
 | Endpoint | Purpose |
 |---|---|
 | `GET /health` | `200 {"status":"ok"}` when able to serve. A 200 saying anything else means *up but not ready*, and the core will not register you. |
-| `GET /manifest` | Your `darci-node.json`, **byte for byte**. |
+| `GET /manifest` | Your `darci-node.json` — serve the **bytes** you read at startup. |
 | `POST /invoke` | One invocation envelope in, one result envelope out. |
 
 The core calls nothing else, and **the core never dies because a node died**. If you are absent, slow,
@@ -85,10 +90,16 @@ def manifest():
     return Response(content=MANIFEST_BYTES, media_type="application/json")
 ```
 
-**Read the bytes. Do not rebuild the JSON.** The core hashes the on-disk file and the one you serve and
-refuses to register you if they differ — the on-disk manifest is the reviewed capability grant, and a node
-reporting something else is claiming a surface nobody approved. `input_schema` is kept as a raw document,
-so even re-emitting the same values in a different key order is a mismatch. The refusal looks like:
+**Read the bytes. Do not rebuild the JSON.** The core hashes the manifest on disk and the one you serve
+and refuses to register you if they differ — the on-disk manifest is the reviewed capability grant, and a
+node reporting something else is claiming a surface nobody approved.
+
+What is compared is the *parsed* manifest, re-serialized canonically, so indentation and the order of
+top-level keys do not matter. But `input_schema` and `output_schema` are carried as raw documents, so
+re-emitting the same values with one key inside them reordered **is** a mismatch — which is exactly what
+rebuilding the JSON tends to do. Serving the bytes sidesteps the whole question. (§5.4 of
+[`docs/NODE_REQUIREMENTS.md`](../../docs/NODE_REQUIREMENTS.md) has the precise rule and the test that
+proves it.) The refusal looks like:
 
 ```
 Node acme.summarize at http://127.0.0.1:7802 did not complete the handshake

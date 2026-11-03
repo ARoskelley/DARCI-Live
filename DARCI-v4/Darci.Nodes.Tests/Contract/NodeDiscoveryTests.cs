@@ -59,7 +59,13 @@ public sealed class NodeDiscoveryTests : IDisposable
         var registry = new NodeRegistry(NullLogger<NodeRegistry>.Instance);
         var discovery = new NodeDiscovery(
             registry,
-            options ?? new NodeDiscoveryOptions { HandshakeTimeout = TimeSpan.FromSeconds(3) },
+            // Deliberately generous, and NOT the 3s the API configures. Every test here except
+            // ASlowNode_IsBoundedByTheHandshakeTimeout supplies its own options, so this value is pure
+            // headroom for the stub HttpListener's two round trips — and when it was 3s, a busy machine
+            // running the full suite in parallel could miss it, fail the handshake, and surface as an
+            // unrelated assertion about degradation. A timing budget that decides unrelated outcomes
+            // under load is a flake generator, not a test.
+            options ?? new NodeDiscoveryOptions { HandshakeTimeout = TimeSpan.FromSeconds(30) },
             m => new HttpNodeAdapter(m, new HttpClient(), NullLogger<HttpNodeAdapter>.Instance),
             NullLogger<NodeDiscovery>.Instance);
         return (registry, discovery);
@@ -317,6 +323,10 @@ public sealed class NodeDiscoveryTests : IDisposable
         var (registry, discovery) = Build();
         var (loaded, failures) = Scan();
         await discovery.DiscoverAsync(loaded, failures, Array.Empty<INode>());
+
+        // Assert the PRECONDITION separately, so a handshake that did not happen reads as a handshake
+        // that did not happen rather than as a broken SetDegraded.
+        Assert.Contains(registry.Registrations, r => r.NodeId == "acme.summarize");
 
         Assert.True(registry.SetDegraded("acme.summarize", true));
 
