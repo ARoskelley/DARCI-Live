@@ -21,7 +21,7 @@ public sealed class DocumentedExampleManifestTests : IDisposable
 
     public DocumentedExampleManifestTests()
     {
-        _dir = Path.Combine(Path.GetTempPath(), $"darci-doc-{Guid.NewGuid():N}", "acme.summarize");
+        _dir = Path.Combine(Path.GetTempPath(), $"darci-doc-{Guid.NewGuid():N}", "acme.wordcount");
         Directory.CreateDirectory(_dir);
         File.WriteAllText(Path.Combine(_dir, "darci-node.json"), Manifest);
     }
@@ -31,40 +31,43 @@ public sealed class DocumentedExampleManifestTests : IDisposable
         try { Directory.Delete(Path.GetDirectoryName(_dir)!, recursive: true); } catch { }
     }
 
-    // Copied verbatim from docs/NODE_REQUIREMENTS.md section 14.2.
+    // Copied verbatim from the complete runnable node in docs/NODE_REQUIREMENTS.md section 15.1.
     private const string Manifest = """
 {
   "contract_version": "0.1.1",
-  "node_id": "acme.summarize",
-  "display_name": "Summariser",
-  "node_version": "0.1.0",
+  "node_id": "acme.wordcount",
+  "display_name": "Word Count",
+  "node_version": "1.0.0",
   "kind": "capability",
-  "endpoint": "http://127.0.0.1:7802",
+  "endpoint": "http://127.0.0.1:7899",
   "health": "/health",
   "capabilities": [
     {
-      "name": "acme.summarize",
-      "description": "Summarise a block of text. Deterministic: extractive, no model class consulted.",
+      "name": "acme.wordcount",
+      "description": "Count words, lines and characters in a block of text. Deterministic: the input fully determines the output, and no model class is consulted.",
       "input_schema": {
         "type": "object",
         "required": ["text"],
-        "description": "The node contract carries payloads as a flat map of string to string, so every slot below is a STRING.",
+        "description": "Payloads are a flat map of string to string, so every slot is a STRING.",
         "properties": {
-          "text": { "type": "string", "description": "The text to summarise." },
-          "max_sentences": { "type": "string", "description": "Decimal string. Defaults to '3'." }
+          "text": { "type": "string", "description": "The text to measure." },
+          "ignore_case": { "type": "string", "description": "'true' or 'false'. Affects unique_words only. Defaults to 'true'." }
         }
       },
       "output_schema": {
         "type": "object",
-        "description": "Also a flat map of string to string; numbers are decimal strings.",
+        "description": "Also flat string to string; counts are decimal strings.",
         "properties": {
-          "summary": { "type": "string" },
-          "sentence_count": { "type": "string" },
-          "input_sha256": { "type": "string", "description": "So a summary is reproducible from its input." }
+          "words": { "type": "string" },
+          "lines": { "type": "string" },
+          "characters": { "type": "string" },
+          "unique_words": { "type": "string" },
+          "longest_word": { "type": "string" },
+          "input_sha256": { "type": "string", "description": "So a result is reproducible from its input." }
         }
       },
-      "typical_latency_ms": 200,
-      "deadline_ms": 30000
+      "typical_latency_ms": 5,
+      "deadline_ms": 15000
     }
   ],
   "requires": {
@@ -73,8 +76,8 @@ public sealed class DocumentedExampleManifestTests : IDisposable
     "permissions": [],
     "emits_untrusted": false
   },
-  "author": "you",
-  "repository": "https://github.com/you/acme-summarize"
+  "author": "DARCI docs",
+  "repository": "https://github.com/ARoskelley/DARCI-Live"
 }
 """;
 
@@ -86,10 +89,10 @@ public sealed class DocumentedExampleManifestTests : IDisposable
         var loaded = loader.Load(Path.Combine(_dir, "darci-node.json"));
 
         Assert.Empty(loaded.Manifest.Validate());
-        Assert.Equal("acme.summarize", loaded.Manifest.NodeId);
+        Assert.Equal("acme.wordcount", loaded.Manifest.NodeId);
         Assert.Equal(NodeKind.Capability, loaded.Manifest.Kind);
         Assert.False(loaded.Manifest.IsInProcess);
-        Assert.Equal(30_000, loaded.Manifest.Capabilities[0].DeadlineMs);
+        Assert.Equal(15_000, loaded.Manifest.Capabilities[0].DeadlineMs);
         Assert.Equal(64, loaded.Sha256.Length);
     }
 
@@ -102,23 +105,23 @@ public sealed class DocumentedExampleManifestTests : IDisposable
 
         registry.Register(new HttpNodeAdapter(loaded.Manifest, new HttpClient(), NullLogger<HttpNodeAdapter>.Instance));
 
-        Assert.NotNull(registry.Resolve("acme.summarize"));
-        Assert.Contains("acme.summarize", registry.RoutableCapabilities);
+        Assert.NotNull(registry.Resolve("acme.wordcount"));
+        Assert.Contains("acme.wordcount", registry.RoutableCapabilities);
     }
 
     [Fact]
     public void TheDocumentedEndpointIsAcceptedAsLoopback()
     {
-        // Verifies the doc's claim in section 13.1 about which endpoints pass the gate.
-        Assert.True(NodeDiscovery.IsLoopback("http://127.0.0.1:7802"));
-        Assert.True(NodeDiscovery.IsLoopback("http://localhost:7802"));
-        Assert.True(NodeDiscovery.IsLoopback("http://[::1]:7802"));
+        // Verifies the doc's claim in section 14.1 about which endpoints pass the gate.
+        Assert.True(NodeDiscovery.IsLoopback("http://127.0.0.1:7899"));
+        Assert.True(NodeDiscovery.IsLoopback("http://localhost:7899"));
+        Assert.True(NodeDiscovery.IsLoopback("http://[::1]:7899"));
         Assert.False(NodeDiscovery.IsLoopback("https://nodes.example.com"));
-        Assert.False(NodeDiscovery.IsLoopback("http://192.168.1.50:7802"));
+        Assert.False(NodeDiscovery.IsLoopback("http://192.168.1.50:7899"));
     }
 
     [Theory]
-    // Section 4.1's table, checked against the real validator.
+    // Section 5.1's table, checked against the real validator.
     [InlineData("model.build", true)]
     [InlineData("acme.summarize_text", true)]
     [InlineData("a.b.c", true)]
@@ -144,7 +147,7 @@ public sealed class DocumentedExampleManifestTests : IDisposable
     [Fact]
     public void TheDocumentedHashSemantics_AreSemanticNotByteForByte()
     {
-        // Section 5.4: reformatting and reordering TOP-LEVEL keys does not change the hash, but reordering
+        // Section 6.4: reformatting and reordering TOP-LEVEL keys does not change the hash, but reordering
         // keys INSIDE input_schema does, because those are carried as raw JsonElements.
         var loader = new NodeManifestLoader(NullLogger<NodeManifestLoader>.Instance);
         var original = loader.Load(Path.Combine(_dir, "darci-node.json")).Sha256;
@@ -164,9 +167,22 @@ public sealed class DocumentedExampleManifestTests : IDisposable
     }
 
     [Fact]
+    public void TheRunnableNodesDeadline_StaysUnderTheHttpClientCap()
+    {
+        // Section 2.3: the effective budget is min(deadline_ms, 100s), and the cap is invisible from the
+        // manifest. The documented example must not be an illustration of the trap it warns about.
+        var loaded = new NodeManifestLoader(NullLogger<NodeManifestLoader>.Instance)
+            .Load(Path.Combine(_dir, "darci-node.json"));
+
+        Assert.All(loaded.Manifest.Capabilities,
+            c => Assert.True(c.DeadlineMs <= 100_000,
+                $"capability '{c.Name}' declares {c.DeadlineMs}ms, above the 100s HttpClient cap"));
+    }
+
+    [Fact]
     public void TheDocumentedStatePredicates_Behave()
     {
-        // Section 9.1's three predicates.
+        // Section 10.1's three predicates.
         Assert.True(NodeState.Blocked.IsTerminal());
         Assert.False(NodeState.Blocked.IsFailure());
         Assert.False(NodeState.Blocked.IsSuccess());

@@ -25,8 +25,8 @@ Every requirement carries a status marker. Treat them as load-bearing — the di
 | **[RESERVED]** | Present in the envelope, read by nothing. Populate it correctly; do not rely on it doing anything. |
 | **[DRIFT]** | A place where prose elsewhere in the repo and the code disagree. The code behaviour is given. |
 
-A note on scope: this contract is **local-first by decision**, and §13 explains precisely what that means
-for a node you want to run on another host. Read §13 before designing anything networked — the answer is
+A note on scope: this contract is **local-first by decision**, and §14 explains precisely what that means
+for a node you want to run on another host. Read §14 before designing anything networked — the answer is
 not "configure a URL".
 
 ---
@@ -81,7 +81,7 @@ Sources: `Darci.Nodes/NodeRouter.cs`, `Darci.Nodes/Contract/NodeDispatcher.cs`,
 
 From `NodeDiscovery`'s class comment: **"Nothing here may prevent the core from starting."**
 
-> §5.5 step 5: "the core never dies because a node died." An absent, slow, lying, or duplicate node is
+> §6.5 step 5: "the core never dies because a node died." An absent, slow, lying, or duplicate node is
 > skipped with a named reason and the core boots.
 
 The single exception **[ENFORCED]**: a **first-party** manifest that is invalid — one whose `node_id` names
@@ -89,13 +89,135 @@ a node compiled into this core — throws `NodeRegistrationException` and the co
 bug in this repository, not a stranger's problem. Your node, as a third party, can never brick the core.
 
 The corollary you must design for: **your absence is a normal, supported state.** Work that needs you is
-recorded as *blocked*, not *failed*, and a durable gap is written. See §9.
+recorded as *blocked*, not *failed*, and a durable gap is written. See §10.
 
 ---
 
-## 2. Node kinds and transports
+## 2. Operational numbers: timeouts, limits, concurrency
 
-### 2.1 Kinds — `NodeKind` (`Darci.Nodes/Contract/NodeManifest.cs`)
+Every figure here was read out of the code, and several of the honest answers are **"nothing enforces
+this"** — stated as such rather than replaced with a number that sounds authoritative. They are pinned by
+`Darci.Nodes.Tests/Contract/OperationalLimitsTests.cs`, so if a limit ever appears, a test fails.
+
+### 2.1 At a glance
+
+| Question | Answer | Status |
+|---|---|---|
+| Health-check interval | **There is none.** Checked exactly once, at core startup. | **[ENFORCED]** by absence |
+| Health-check timeout | No dedicated one. Shares the **3 s** handshake budget with the manifest fetch. | **[ENFORCED]** |
+| Manifest fetch timeout | Same shared **3 s** budget — health *and* manifest together. | **[ENFORCED]** |
+| `/invoke` timeout | `min(`capability's `deadline_ms`, **100 s**`)` — see §2.3, this surprises people | **[ENFORCED]** |
+| Retries on any endpoint | **None, anywhere.** No handshake retry, no invoke retry, no re-discovery. | **[ENFORCED]** by absence |
+| Payload size cap | **None in the node contract.** §2.5 | not enforced |
+| Max payload slots | **None.** | not enforced |
+| Response body size cap | **None** — `ReadAsStringAsync` with no `MaxResponseContentBufferSize`. | not enforced |
+| Concurrent `/invoke` calls | **Unbounded, and parallel.** Your node must be safe for concurrent calls. §2.4 | **[ENFORCED]** by absence |
+| Rate limit | **None.** | not enforced |
+
+### 2.2 Health and manifest: one 3-second budget, spent once
+
+**[ENFORCED]** `NodeDiscovery` wraps the *entire* handshake — `GET /health` **then** `GET /manifest` — in a
+single `CancellationTokenSource.CancelAfter(HandshakeTimeout)`, which `Program.cs` sets to **3 seconds**.
+There is no per-endpoint timeout. Both calls together must finish inside it, or you are skipped with
+`handshake exceeded 3s`.
+
+**[ENFORCED]** There is no health-check *interval*, because there is no polling loop. Health is read once,
+during discovery. A node that becomes unhealthy afterwards stays in the routing table and its failures
+surface as invocation errors instead; `SetDegraded` (§4.6) is the only mechanism for removing it.
+
+**[RECOMMENDED]** Answer both in single-digit milliseconds. Do not connect to a database, warm a model, or
+read a large file in a health check. The reference node checks only that its kernel imported.
+
+### 2.3 `/invoke`: the deadline is capped at 100 seconds, whatever your manifest says
+
+**[ENFORCED]** Two independent limits apply to every `/invoke`, and **the shorter one wins**:
+
+1. the capability's `deadline_ms`, which `HttpNodeAdapter` enforces with
+   `cts.CancelAfter(DeadlineAt - UtcNow)`;
+2. the **`HttpClient.Timeout`** of the core's HTTP client, which is **100 seconds**.
+
+`Program.cs` registers the client with `AddHttpClient("darci-node")` and **configures no timeout**, so the
+.NET default of 100 s applies. The effective budget for any invocation is therefore:
+
+```
+effective = min(deadline_ms, 100_000 ms)
+```
+
+> **This is a real trap.** A capability declaring `deadline_ms` above 100 000 cannot use the excess, and
+> the overrun is reported as `DEADLINE_EXCEEDED` with the same message as a genuine deadline breach — so
+> it is indistinguishable from your node simply being slow. The shipped `darci.modeling` node declares
+> `deadline_ms: 120000` and is subject to exactly this: its last 20 seconds are unreachable.
+>
+> `OperationalLimitsTests.TheHttpClientsOwnTimeout_CapsTheManifestDeadline_WhicheverIsShorter` demonstrates
+> the mechanism, and `TheDarciNodeHttpClientDefault_Is100Seconds` pins the number.
+
+**[RECOMMENDED]** Keep `deadline_ms` at **100 000 or below** so the number in your manifest is the number
+that applies. If your work genuinely needs longer, it needs to be asynchronous — accept the request,
+return `blocked` with `pending-outcome`, and let the caller collect the result later — rather than holding
+an HTTP connection open past a limit you cannot see.
+
+### 2.4 Concurrency: `/invoke` is **not** serialized
+
+**This is a correctness requirement, not a performance note.**
+
+**[ENFORCED]** by absence: there is no lock, semaphore, queue, or max-in-flight anywhere in the dispatch
+path. `NodeRouter`, `NodeDispatcher` and `HttpNodeAdapter` contain no synchronization primitives at all
+(`NodeRegistry` locks, but only around its own table). Several callers can therefore be inside
+`DispatchAsync` at once — concurrent `POST /nodes/invoke` requests, or internal flows dispatching in
+parallel — and each becomes a concurrent `POST /invoke` to **your** node.
+
+**Your node must be safe for concurrent `/invoke` calls.** Verified two ways: at the adapter level, eight
+invocations held open simultaneously by a stub that only releases once all eight have arrived
+(`InvocationsRunInParallel_SoANodeMustBeSafeForConcurrentCalls`); and end to end, eight parallel
+`POST /nodes/invoke` calls against a live core and node, all returning `Succeeded`.
+
+**[REQUIRED]** Concretely, this means:
+
+- **No per-request global state.** Module-level mutables shared across requests are a race.
+- **Do not assume one call finishes before the next starts.** They interleave.
+- **Writing to a fixed output path is a race** — two invocations with different inputs will clobber each
+  other. Derive the filename from the input (a hash is ideal), or accept a name slot and document that
+  reusing one overwrites.
+- **Guard any non-reentrant library.** Many CAD, ML and rendering libraries are not thread-safe. If yours
+  is not, serialize access yourself with a lock or a single-worker queue inside the node — the core will
+  not do it for you.
+- **Mind your own server's worker model.** `uvicorn` with one worker runs async handlers concurrently on
+  one thread, so a synchronous CPU-bound handler blocks every other request; `def` handlers in FastAPI run
+  in a threadpool instead, which makes them genuinely parallel and therefore genuinely exposed to races.
+
+**[RECOMMENDED]** The simplest safe design is a **stateless** node: everything it needs comes from the
+payload, nothing is cached between calls. The complete example in §15 is stateless for this reason.
+
+### 2.5 Sizes: nothing in the contract caps a payload
+
+**not enforced.** No code in `Darci.Nodes` checks payload size, slot count, or slot length, in either
+direction. A 4 MB slot round-trips intact (`NothingInTheNodeContract_CapsThePayloadSize`).
+
+The only real limits sit outside the contract:
+
+| Limit | Value | Where |
+|---|---|---|
+| Core's inbound body (`POST /nodes/invoke`) | Kestrel's default **~30 MB** | not configured anywhere, so the framework default stands |
+| Your node's inbound body | whatever **your** server imposes | FastAPI/Starlette does not cap it by default |
+| Core reading your response | **unbounded** | `ReadAsStringAsync`, no buffer limit set |
+
+**[RECOMMENDED]** Treat the payload as a control channel, not a data channel. Pass a **path or a handle**
+to anything large (§11.1) rather than the bytes, keep slots small, and remember that an unbounded response
+is read fully into memory by the core before it is parsed — a node returning hundreds of megabytes will
+hurt the core, and nothing will stop it.
+
+### 2.6 What this means if you are tuning
+
+The only knob that is yours is `deadline_ms`, and it is capped at 100 s. The 3-second handshake budget and
+the 100-second client timeout are both **hardcoded in `Program.cs`** with no environment variable, so a
+node author cannot change either; both are noted in §14 as things a remote transport would have to
+revisit.
+
+---
+
+## 3. Node kinds and transports
+
+### 3.1 Kinds — `NodeKind` (`Darci.Nodes/Contract/NodeManifest.cs`)
 
 Serialized as a camelCase string by `JsonStringEnumConverter`:
 
@@ -105,7 +227,7 @@ Serialized as a camelCase string by `JsonStringEnumConverter`:
 | `environment` | Owns durable workspace state. | **[ENFORCED]** must declare `workspace_root`, else validation fails |
 | `adapter` | Declared in the enum; no distinct handling in code today. | — |
 
-### 2.2 Transports
+### 3.2 Transports
 
 Determined by **`endpoint`** alone (`NodeManifest.IsInProcess => string.IsNullOrWhiteSpace(Endpoint)`):
 
@@ -123,18 +245,18 @@ Determined by **`endpoint`** alone (`NodeManifest.IsInProcess => string.IsNullOr
 **skipped**: `"manifest declares endpoint '…' but the node is compiled in"`. Ambiguity about which one
 serves is refused rather than guessed.
 
-Everything from §3 onward is written for the out-of-process case, because that is the one collaborators
+Everything from §4 onward is written for the out-of-process case, because that is the one collaborators
 write. The `PacketRef` side-channel is explicitly transitional and is documented in its own source as
 "REMOVE when nodes are de-legacied" — do not design against it.
 
 ---
 
-## 3. Discovery and registration
+## 4. Discovery and registration
 
 `Darci.Nodes/Contract/NodeDiscovery.cs`, `Darci.Nodes/Contract/NodeManifestLoader.cs`, wired in
 `Darci.Api/Program.cs`.
 
-### 3.1 Where the core looks
+### 4.1 Where the core looks
 
 **[ENFORCED]** `DARCI_NODES_PATH`, else `<ContentRoot>/../nodes` — resolved to a full path at startup.
 
@@ -147,14 +269,14 @@ ordered by ordinal path. So it is **fully recursive** at any depth, and the file
 
 **[RECOMMENDED]** One directory per node, named for the `node_id`: `nodes/acme.summarize/darci-node.json`.
 
-### 3.2 There is no runtime self-registration
+### 4.2 There is no runtime self-registration
 
 **[ENFORCED]** by absence. A node cannot talk its way into the routing table. The capability surface comes
 only from manifest files already on disk at startup. Per `NodeManifestLoader`'s class comment, the
-human-authored act required by §14c **is the reviewed manifest merged into the repo**. If you add a
+human-authored act required by §15c **is the reviewed manifest merged into the repo**. If you add a
 capability, somebody reviews a diff. There is no API for it.
 
-### 3.3 Registration order and capability ownership
+### 4.3 Registration order and capability ownership
 
 **[ENFORCED]** In-process nodes register **first**, deliberately — "first-party wins a capability collision,
 and 'first' is only meaningful if it actually goes first."
@@ -172,7 +294,7 @@ interface comment as the future mechanism for deliberate overrides; it is **not 
 
 **[ENFORCED]** `node_id` must also be unique: `"Node id 'x.y' is already registered."`
 
-### 3.4 The handshake — out-of-process only
+### 4.4 The handshake — out-of-process only
 
 `NodeDiscovery.HandshakeAsync`. Two steps, in order, inside **one** budget:
 
@@ -190,30 +312,48 @@ merely slow must cost this much and no more, and it must cost it ONCE."
 **combined**, from a cold start. Do not do expensive work in them. The reference node checks only that its
 kernel imports.
 
-**[ENFORCED]** There are **no retries** and no re-discovery. Discovery runs once, at core startup. A node
-that starts after the core is **not** picked up — restart the core. Order of operations: **start your node
-first, then the core.**
+**[ENFORCED]** There are **no retries** and no re-discovery. Discovery runs once, at core startup.
 
-### 3.5 Every possible skip reason
+#### Do I have to restart the core?
+
+The question every author hits within ten minutes, answered directly. **[ENFORCED]** in every row:
+
+| What changed | Restart the node? | Restart the core? | Why |
+|---|---|---|---|
+| You started a **new** node | — | **Yes** | Discovery runs once at boot. A node that appears later is never scanned for, health-checked, or registered. |
+| You added a **new `darci-node.json`** | — | **Yes** | The `nodes/` directory is scanned once, at startup. |
+| You **edited** your manifest | **Yes** | **Yes** | The node serves the bytes it read at *its* startup, so it must restart to pick up the file; the core must restart to re-read the file and re-hash. Restarting only one gives you a SHA mismatch and a refused registration. |
+| You changed your node's **code** but not its manifest | **Yes** | **No** | The core holds an address, not your code. Its registration is still valid, and the next `/invoke` reaches the new code. |
+| Your node **crashed and you restarted it** | (already done) | **No**, if the manifest is unchanged | The registration survives; the core will simply reach the new process at the same address. The invocations that landed while it was down failed, and nothing retries them. |
+| You want a node **removed** from routing | — | **No** | `SetDegraded` (§4.6) takes its capabilities out of the table while the core keeps running. |
+
+**The order that works:** node first, then core. **[RECOMMENDED]** for a manifest edit, do all three in
+sequence — edit the file, restart the node, restart the core — because any other order produces either a
+stale registration or a hash mismatch.
+
+There is no `/nodes/rediscover`, no file watcher, and no `SIGHUP` handler. The one dynamic lever that
+exists is `SetDegraded`, and it only ever *removes*.
+
+### 4.5 Every possible skip reason
 
 The exact strings that appear in the boot log and in `GET /nodes` → `skipped`:
 
 | Reason | Cause |
 |---|---|
 | `compiled in, but no manifest on disk` | in-process node with no `darci-node.json` |
-| `manifest declares endpoint '…' but the node is compiled in` | §2.2 |
-| `endpoint '…' is not loopback (remote nodes need the deferred broker-token work)` | §13 |
+| `manifest declares endpoint '…' but the node is compiled in` | §3.2 |
+| `endpoint '…' is not loopback (remote nodes need the deferred broker-token work)` | §14 |
 | `health check failed (node not running or not ready)` | not running, or not reporting `ok` |
 | `/manifest was unreachable or unparseable` | 404/500, empty body, bad JSON |
-| `/manifest does not match the on-disk file (disk …, node …)` | §5.4 |
+| `/manifest does not match the on-disk file (disk …, node …)` | §6.4 |
 | `handshake exceeded 3s` | too slow |
-| `Capability '…' is already served by node '…'` | §3.3 |
-| `Node id '…' is already registered.` | §3.3 |
+| `Capability '…' is already served by node '…'` | §4.3 |
+| `Node id '…' is already registered.` | §4.3 |
 | *(the loader's own message)* | malformed or invalid manifest, from a third party |
 
 **[ENFORCED]** Nothing is ever skipped silently. Each one is a `LogWarning` and appears in `GET /nodes`.
 
-### 3.6 Degradation after startup
+### 4.6 Degradation after startup
 
 **[ENFORCED]** `INodeRegistry.SetDegraded(nodeId, true)` removes a node's capabilities from the routing
 table while the core keeps running. `Resolve` and `ResolveNode` both return `null` for a degraded node, so
@@ -221,9 +361,9 @@ requests for its capabilities become *blocked* exactly as if it had never regist
 
 ---
 
-## 4. The capability surface
+## 5. The capability surface
 
-### 4.1 Capability names — **[ENFORCED]** `CapabilityKey.IsValidName`
+### 5.1 Capability names — **[ENFORCED]** `CapabilityKey.IsValidName`
 
 A capability name must be namespaced `domain.action`:
 
@@ -253,36 +393,36 @@ recompile."
 **[RECOMMENDED]** Namespace by your node, not by a generic domain, so you never collide with a first-party
 verb you do not control. `acme.summarize` is safer than `summary.write`.
 
-### 4.2 Node ids — **[ENFORCED]** `NodeManifest.Validate`
+### 5.2 Node ids — **[ENFORCED]** `NodeManifest.Validate`
 
 Weaker than capability names. Only two checks: non-empty, and **contains a `.`**. The error text suggests
 reverse-domain style (`'darci.coding'`). Case and character set are unchecked.
 
 **[REQUIRED]** `node_id` must be unique and **immutable across versions** (`NodeKeys`' own comment). The
-audit trail in §5.5 is keyed on it; changing it reads as a different node.
+audit trail in §6.5 is keyed on it; changing it reads as a different node.
 
 ---
 
-## 5. The manifest contract
+## 6. The manifest contract
 
 File: `darci-node.json`. Model: `NodeManifest` in `Darci.Nodes/Contract/NodeManifest.cs`.
 Deserialized with `ManifestJson.Options`: snake_case via explicit attributes, enums as camelCase strings,
 nulls omitted on write.
 
-### 5.1 Full field reference
+### 6.1 Full field reference
 
 Top level:
 
 | Field | Type | Status | Notes |
 |---|---|---|---|
 | `contract_version` | string | **[ENFORCED]** | Must be `"0.1"` or `"0.1.1"` (`NodeContractVersion.Supported`). Anything else fails validation with the supported list named. Defaults to `0.1.1` if absent. |
-| `node_id` | string | **[ENFORCED]** | Required, must contain `.`. §4.2 |
+| `node_id` | string | **[ENFORCED]** | Required, must contain `.`. §5.2 |
 | `display_name` | string | **[RECOMMENDED]** | Never validated. Shown in logs. |
 | `node_version` | string | **[ENFORCED]** | Required, non-empty. Format unchecked; **[RECOMMENDED]** semver. |
 | `kind` | enum string | **[ENFORCED]** | `capability` \| `environment` \| `adapter`. Defaults to `capability`. `environment` additionally requires `workspace_root`. |
-| `endpoint` | string \| null | **[ENFORCED]** | Absent ⇒ in-process. Present ⇒ must be **loopback** (§13). |
+| `endpoint` | string \| null | **[ENFORCED]** | Absent ⇒ in-process. Present ⇒ must be **loopback** (§14). |
 | `capabilities` | array | **[ENFORCED]** | **At least one.** `"node 'x' declares no capabilities."` |
-| `requires` | object | **[RESERVED]** | Real inventory, enforced by nothing. §5.3 |
+| `requires` | object | **[RESERVED]** | Real inventory, enforced by nothing. §6.3 |
 | `health` | string | **[ENFORCED]** | Health path. Defaults to `/health`. Empty/whitespace falls back to `/health` at call time. |
 | `author` | string \| null | **[RECOMMENDED]** | |
 | `repository` | string \| null | **[RECOMMENDED]** | |
@@ -295,14 +435,14 @@ Each entry in `capabilities[]` — `NodeCapabilityDescriptor`:
 
 | Field | Type | Status | Notes |
 |---|---|---|---|
-| `name` | string | **[ENFORCED]** | §4.1. Also **[ENFORCED]** unique within the manifest: `"capability 'x' is declared more than once by node 'y'."` |
+| `name` | string | **[ENFORCED]** | §5.1. Also **[ENFORCED]** unique within the manifest: `"capability 'x' is declared more than once by node 'y'."` |
 | `description` | string | **[REQUIRED]** | Not validated, but this is what a human or an agent reads to decide whether to call you. |
-| `input_schema` | JSON | **[REQUIRED]** | Carried as a raw document. **Schema enforcement is a later pass** — the source says so explicitly. Declaring it is what "lets a coding agent write against the contract". See §5.4 for its effect on hashing. |
+| `input_schema` | JSON | **[REQUIRED]** | Carried as a raw document. **Schema enforcement is a later pass** — the source says so explicitly. Declaring it is what "lets a coding agent write against the contract". See §6.4 for its effect on hashing. |
 | `output_schema` | JSON | **[REQUIRED]** | Same. |
 | `typical_latency_ms` | int | **[RECOMMENDED]** | Defaults to `1000`. Read by nothing; documentation for callers. |
-| `deadline_ms` | int | **[ENFORCED]** | Must be **> 0**: `"capability 'x' has a non-positive deadline_ms."` Defaults to `300000`. §5.2 |
+| `deadline_ms` | int | **[ENFORCED]** | Must be **> 0**: `"capability 'x' has a non-positive deadline_ms."` Defaults to `300000`. §6.2 |
 
-### 5.2 `deadline_ms` — the binding deadline comes from the manifest
+### 6.2 `deadline_ms` — the binding deadline comes from the manifest
 
 This is the single most important number in your manifest.
 
@@ -326,10 +466,10 @@ figure; letting an HTTP caller pass their own would quietly move a limit that ex
 comment: it "does not park, unpark, or abort a work record, and an invocation's `DeadlineAt` has no
 relationship to the record's lease."
 
-**[RECOMMENDED]** Set it to a real worst case with headroom, and check it yourself (§7.3) so you do not
+**[RECOMMENDED]** Set it to a real worst case with headroom, and check it yourself (§8.3) so you do not
 start work you can never deliver.
 
-### 5.3 `requires` — honest inventory, enforced by nothing
+### 6.3 `requires` — honest inventory, enforced by nothing
 
 **[RESERVED]** in its entirety. `NodeRequires`' own comment: "populated as REAL INVENTORY in Phase 1 even
 though nothing enforces it yet — this inventory is the design input for the memory/model brokers."
@@ -351,9 +491,17 @@ today**. Calling a model provider directly from your node bypasses the broker, w
 broker exists to prevent — so a node needing inference is a node that cannot be finished yet. Declare the
 class and return `blocked` / `missing-environment`, or be deterministic.
 
-### 5.4 The manifest hash — what is actually compared
+### 6.4 The manifest hash — what is actually compared
 
-This is the requirement most often described wrongly, including in `nodes/README.md`.
+**The rule, in one sentence.** **[ENFORCED]** The core parses both your `/manifest` body and the file on
+disk, re-serializes each canonically with `ManifestJson.Options`, and compares the SHA-256 of the two — so
+whitespace, the order of top-level keys and unknown extra fields are all irrelevant, but the key order
+*inside* `input_schema` and `output_schema` is **not**, because those are carried as raw JSON documents
+and round-trip verbatim.
+
+Everything below is the derivation and the consequences. If you only take one instruction from this
+section: **read the file's bytes at startup and serve them unmodified**, which makes the whole question
+moot.
 
 **What the code does.** Both sides compute `NodeManifest.ComputeSha256()`:
 
@@ -369,8 +517,8 @@ return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(json)));
 
 So the comparison is **semantic equality of the parsed manifest**, not of the file bytes.
 
-> **[DRIFT]** `nodes/README.md` says the manifest must match "byte for byte". That is the safe *practice*,
-> not the enforced *rule*.
+> **[DRIFT], now fixed.** `nodes/README.md` used to say the manifest must match "byte for byte", which is
+> the safe *practice* rather than the enforced *rule*. Both documents now lead with the rule above.
 
 What this means concretely:
 
@@ -410,7 +558,7 @@ envelope's options, and its comment records why — without the string-enum conv
 `"kind": "capability"` fails to parse and the node is silently skipped as unparseable. That cost a live
 boot once.
 
-### 5.5 §14c — the "capability surface CHANGED" audit
+### 6.5 §15c — the "capability surface CHANGED" audit
 
 `Darci.Nodes/Contract/SqliteNodeRegistrationStore.cs`, driven from `Program.cs` at startup.
 
@@ -423,7 +571,7 @@ registered node: `node_id`, `node_version`, `contract_version`, `manifest_sha256
 
 ```
 Capability surface CHANGED for node darci.modeling: manifest sha256 4996E778… → DA590805….
-This should correspond to a reviewed manifest change (Phase E §14c).
+This should correspond to a reviewed manifest change (Phase E §15c).
 ```
 
 It is an **audit signal, not a gate** — nothing is blocked, and nobody is asked to approve. The point is
@@ -432,7 +580,7 @@ legitimately change your manifest; it is informational.
 
 ---
 
-## 6. Endpoints your node must expose
+## 7. Endpoints your node must expose
 
 `Darci.Nodes/Contract/HttpNodeAdapter.cs`. **[ENFORCED]** These three are the entire surface. The core
 calls nothing else, ever.
@@ -446,7 +594,7 @@ calls nothing else, ever.
 Paths are joined as `endpoint.TrimEnd('/') + "/" + path.TrimStart('/')`, so `/manifest` and `/invoke` are
 always at the base URL's root. Only the health path is configurable.
 
-### 6.1 `GET /health`
+### 7.1 `GET /health`
 
 **[ENFORCED]** All of the following must hold for you to be considered healthy:
 
@@ -472,13 +620,15 @@ reference node does this:
 
 Extra fields are ignored; the reference node also returns `node_id` and `node_version`.
 
-### 6.2 `GET /manifest`
+### 7.2 `GET /manifest`
 
-**[ENFORCED]** 2xx with a body that parses as a `NodeManifest`. See §5.4 for the hash rule.
+**[ENFORCED]** 2xx with a body that parses as a `NodeManifest`, whose canonical hash equals the on-disk
+file's — see §6.4 for exactly what that compares, and note that **it is not a byte comparison**, though
+serving the bytes is the reliable way to satisfy it.
 
-### 6.3 `POST /invoke`
+### 7.3 `POST /invoke`
 
-**[ENFORCED]** Request body: the invocation envelope of §7. Response: §8.
+**[ENFORCED]** Request body: the invocation envelope of §8. Response: §9.
 
 **[ENFORCED]** Status handling, from the core's side:
 
@@ -495,7 +645,7 @@ non-2xx tells the core only that you are broken, and it collapses to `DEPENDENCY
 learns nothing about what to change. Reserve non-2xx for refusing to start at all; the reference node uses
 exactly one, a `401` for a bad token.
 
-### 6.4 Authentication — `X-Darci-Token`
+### 7.4 Authentication — `X-Darci-Token`
 
 **[ENFORCED]** `HttpNodeAdapter` sends `X-Darci-Token` on **every** `/invoke` when a secret is configured
 (it always is — see below). It is **not** sent on `/health` or `/manifest`.
@@ -526,12 +676,12 @@ result envelope — this is a refusal to start work, not an outcome of it.
 
 ---
 
-## 7. The invocation envelope (request)
+## 8. The invocation envelope (request)
 
 `NodeInvocation` → `HttpNodeAdapter.WireInvocation`. **[ENFORCED]** JSON naming is
 `JsonNamingPolicy.SnakeCaseLower` on write, and **case-insensitive** on read. Nulls are omitted.
 
-### 7.1 Exact shape
+### 8.1 Exact shape
 
 ```json
 {
@@ -551,7 +701,7 @@ result envelope — this is a refusal to start work, not an outcome of it.
 }
 ```
 
-### 7.2 Field semantics
+### 8.2 Field semantics
 
 | Field | Status | What you must know |
 |---|---|---|
@@ -560,19 +710,19 @@ result envelope — this is a refusal to start work, not an outcome of it.
 | `goal_id` | **[ENFORCED]** | **The correlation root** — the packet's `CorrelationId`. The key the entire evidence loop hangs on. Stable across invocations that belong to one piece of work. |
 | `capability` | **[ENFORCED]** | The resolved verb. May be **empty** when the packet was routed by explicit node address without declaring a capability — handle that. |
 | `issued_at` | informational | UTC, ISO 8601 with `Z`. |
-| `deadline_at` | **[ENFORCED]** | UTC. Binding. §5.2 |
+| `deadline_at` | **[ENFORCED]** | UTC. Binding. §6.2 |
 | `principal` | **[RESERVED]** | Always `{"trust":"operator","id":"tinman"}` today. `trust` ∈ `untrusted`, `collaborator`, `operator`, `system`. Carried, not enforced. |
 | `taint` | **[RESERVED]** inbound | Always `clean` today. `level` ∈ `clean`, `derived`, `untrusted`. |
-| `broker` | **[RESERVED]** | Always `{"url":null,"token":null}`. §5.3 |
+| `broker` | **[RESERVED]** | Always `{"url":null,"token":null}`. §6.3 |
 | `intent` | **[REQUIRED]** read-only | The originating goal, **never rewritten**. |
 | `success_criteria` | optional | May be null. |
 | `session_id` | optional | May be null. |
-| `payload` | **[ENFORCED]** | §7.4 |
+| `payload` | **[ENFORCED]** | §8.4 |
 
 `goal_id` vs `trace_id` is not stylistic. From `NodeInvocation`'s source: using `trace_id` as a correlation
 key "silently inerts the outcome-feedback loop (nothing would ever match)."
 
-### 7.3 Checking the deadline yourself
+### 8.3 Checking the deadline yourself
 
 **[RECOMMENDED]** The core enforces the deadline, so you cannot overrun it from the caller's point of view —
 but a node that starts a two-minute operation it can never deliver has burned the time for nothing.
@@ -593,7 +743,7 @@ def _deadline_passed(deadline_at) -> bool:
 **[RECOMMENDED]** Fail **open** on a missing or malformed `deadline_at`, as above. Treating absence as
 expiry would make your node refuse every call from a caller that omitted it.
 
-### 7.4 The payload is a flat map of string to string
+### 8.4 The payload is a flat map of string to string
 
 **[ENFORCED]** In both directions. `IReadOnlyDictionary<string, string>` on the invocation
 (`PacketPayload.Slots`) and on the result.
@@ -618,11 +768,11 @@ string (`"step,stl"`) or JSON-encoded. Keep slot names `snake_case`.
 
 ---
 
-## 8. The result envelope (response)
+## 9. The result envelope (response)
 
 `HttpNodeAdapter.WireResult` → `NodeResult`.
 
-### 8.1 Exact shapes
+### 9.1 Exact shapes
 
 Success:
 
@@ -665,21 +815,21 @@ Blocked:
 }
 ```
 
-### 8.2 Field semantics
+### 9.2 Field semantics
 
 | Field | Status | What you must know |
 |---|---|---|
 | `envelope_version` | **[RECOMMENDED]** | If empty/absent the core substitutes `0.1.1`. |
 | `trace_id` | **[REQUIRED]**, not trusted | Echo it unchanged. **The core ignores yours and keeps its own** — a mismatch produces only a `LogWarning` saying telemetry correlation for this invocation is unreliable. Echo it anyway; scrambling it means lying in telemetry. |
-| `outcome` | **[ENFORCED]** | `ok` \| `error` \| `blocked`, trimmed and lowercased. §8.3 |
-| `taint` | **[ENFORCED]** monotonic | `invocation.Taint.RaisedTo(yours)` — you can **raise** it, never lower it. Unrecognized levels fall back to `clean`. |
+| `outcome` | **[ENFORCED]** | `ok` \| `error` \| `blocked`, trimmed and lowercased. §9.3 |
+| `taint` | **[ENFORCED]** monotonic | `invocation.Taint.RaisedTo(yours)` — you can **raise** it, never lower it. Unrecognized levels fall back to `clean`. Sources: §9.6 |
 | `confidence` | optional | A **number** in `[0,1]`. **Omit rather than fabricate** — omission becomes `Confidence.Unassessed`, which is explicitly not zero. |
-| `payload` | **[ENFORCED]** | Flat string→string (§7.4). Merged onto the work record slot by slot; absent ⇒ empty. |
-| `error` | **[ENFORCED]** *(conditional)* | Read **only** when `outcome` is `error`. §8.4 |
-| `dependency` | **[ENFORCED]** *(conditional)* | Read **only** when `outcome` is `blocked`. §8.5 |
+| `payload` | **[ENFORCED]** | Flat string→string (§8.4). Merged onto the work record slot by slot; absent ⇒ empty. |
+| `error` | **[ENFORCED]** *(conditional)* | Read **only** when `outcome` is `error`. §9.4 |
+| `dependency` | **[ENFORCED]** *(conditional)* | Read **only** when `outcome` is `blocked`. §9.5 |
 | `telemetry_extra` | **[DRIFT]** | `NodeResult` declares it; **no wire DTO carries it and no code reads it.** Sending it is harmless and has no effect. |
 
-### 8.3 `outcome` — unknown words are errors
+### 9.3 `outcome` — unknown words are errors
 
 **[ENFORCED]** `HttpNodeAdapter.ParseOutcome`:
 
@@ -693,7 +843,7 @@ The comment states the reasoning: "A node speaking a dialect we do not understan
 success." A typo like `"OK "` is fine (trimmed, lowercased); `"success"`, `"done"`, or a missing `outcome`
 all become **errors**.
 
-### 8.4 Error codes — **[ENFORCED]** mapping and retry defaults
+### 9.4 Error codes — **[ENFORCED]** mapping and retry defaults
 
 Wire strings are uppercased and trimmed before matching. **Anything unrecognized becomes `INTERNAL`.**
 
@@ -710,7 +860,7 @@ Wire strings are uppercased and trimmed before matching. **Anything unrecognized
 `retryable` is **advisory to the core** — `NodeError`'s comment says "classify honestly". An omitted
 `error` object on an `error` outcome becomes `INTERNAL: "Node reported an error with no detail."`
 
-### 8.5 Dependency kinds — **[ENFORCED]** mapping
+### 9.5 Dependency kinds — **[ENFORCED]** mapping
 
 | `kind` on the wire | Parsed as |
 |---|---|
@@ -727,9 +877,73 @@ root). Read by nothing today; **[RECOMMENDED]** to populate when you have one.
 
 ---
 
-## 9. The state and result contract
+### 9.6 `taint` — levels, and what a `sources` entry actually is
 
-### 9.1 The state machine — `NodeState`, `NodeStateMachine`
+Security-adjacent, so here is exactly what the code does rather than what the field looks like it does.
+
+**Levels.** **[ENFORCED]** `clean` < `derived` < `untrusted`, parsed case-insensitively after trimming.
+**Anything unrecognized becomes `clean`** — including a typo, so `"Untainted"` silently reads as clean.
+
+**Monotonic, and the whole object is replaced.** **[ENFORCED]** `TaintRef.RaisedTo` is one line:
+
+```csharp
+public TaintRef RaisedTo(TaintRef other) => other.Level > Level ? other : this;
+```
+
+It returns whichever `TaintRef` has the higher level, **entire** — level *and* sources together. Sources
+are therefore **never merged**, and the consequence is easy to get wrong:
+
+| Your level vs the request's | Result level | Result sources |
+|---|---|---|
+| higher | yours | **yours** — the request's are not added |
+| equal or lower | the request's | **the request's — yours are discarded entirely** |
+
+Since the request is always `clean` with an empty source list today (§8.2), in practice: raise the level
+and your sources are kept; report `clean` and your sources are dropped on the floor. Pinned by
+`OperationalLimitsTests.RaisingTheTaintLevel_ReplacesTheSourceList_RatherThanMergingIt` and
+`NotRaisingTheLevel_DiscardsTheNodesSourceList_Entirely`.
+
+**What a `sources` entry is.** **not enforced, and not parsed.** The wire type is a plain list of strings
+(`WireTaint.Sources`), read as `t.Sources ?? Array.Empty<string>()` and stored. **Nothing in the codebase
+reads an individual entry** — not to validate it, not to classify it, not to display it. An empty string,
+`"not a url"`, and a padded `"  x  "` all survive verbatim
+(`ASourceEntry_IsNeverParsedOrValidated`).
+
+So the format is a **convention this document sets**, not a schema the core checks. Until enforcement
+lands, the useful convention is: *one entry per distinct origin of content you did not author*, each
+identifying that origin as specifically as you can.
+
+| Kind of origin | **[RECOMMENDED]** entry | Example |
+|---|---|---|
+| A web page or API you fetched | the **absolute URL**, no credentials or query secrets | `https://example.com/docs/spec.html` |
+| A model's output | `model:` + the **class**, never a model name | `model:chat.balanced` |
+| A file outside your own node | `file:` + an absolute path | `file:C:/incoming/vendor-drawing.step` |
+| Another node's output you passed through | that node's `node_id` | `acme.scraper` |
+| A human-supplied free-text blob | `user:` + the principal id | `user:tinman` |
+
+**[RECOMMENDED]** rules of thumb:
+
+- **One entry per origin**, not one per item fetched. Ten pages from one API is one entry if the API is
+  the origin; ten different sites is ten entries.
+- **Never put a secret in a source.** It is a free-text string that lands in a work record and will be
+  read by people and logs. Strip tokens and query credentials from URLs first.
+- **Carry forward what you were given.** If you raise the level, the request's sources are *not* merged
+  for you (see the table above), so include anything from the inbound `taint.sources` that is still
+  relevant to your output.
+- **An empty list with a raised level is legal but unhelpful** — it says "something in here is untrusted"
+  without saying what. Name the origin.
+- **Do not use it as a log channel.** Free-form notes belong in `payload`.
+
+**[REQUIRED]** The level is the part that will eventually be enforced, and it is the part to get right:
+`untrusted` for anything you fetched or a model wrote, `derived` for your own transformation of tainted
+input, `clean` only when every byte of your output derives from the caller's own payload. The complete
+example in §15 is `clean` and says why in a comment — that is the standard to copy.
+
+---
+
+## 10. The state and result contract
+
+### 10.1 The state machine — `NodeState`, `NodeStateMachine`
 
 `Darci.Nodes/NodePrimitives.cs`. Your node does not set these. The dispatcher does, from your `outcome`.
 You need to understand them because they determine what happens to the work afterwards.
@@ -770,7 +984,7 @@ failure would feed phantom negative evidence into the confidence and campaign pa
 > The ordinal of `Blocked` is load-bearing. It is appended at **8** because the store's "active" query is
 > `state <= AwaitingDependency` (4). Inserting mid-enum would silently reclassify every stored packet.
 
-### 9.2 How your `outcome` maps to a state — `NodeDispatcher.Fold`
+### 10.2 How your `outcome` maps to a state — `NodeDispatcher.Fold`
 
 | Your `outcome` | Resulting state | Path |
 |---|---|---|
@@ -781,7 +995,7 @@ failure would feed phantom negative evidence into the confidence and campaign pa
 **[ENFORCED]** Your `payload` slots are merged onto the record **before** the state transition, so they are
 readable whatever the outcome.
 
-### 9.3 The two meanings of "blocked" — read this twice
+### 10.3 The two meanings of "blocked" — read this twice
 
 The word collides, and the two are different states with different consequences.
 
@@ -807,7 +1021,7 @@ and it writes a durable `GapRecord` with `Question = "No node serves capability 
 correctly, it just has nowhere to write the note", and a failure to record one never turns a clean
 degradation into an exception.
 
-### 9.4 Why `blocked` must never be recorded as `Failed` — the Fork-1 invariant
+### 10.4 Why `blocked` must never be recorded as `Failed` — the Fork-1 invariant
 
 This is the single most important semantic rule in the contract.
 
@@ -826,7 +1040,7 @@ and `RemoteDispatchIntegrationTests` pins it.
 **What this means for you [REQUIRED]:** when you cannot do the work because of something outside the call,
 return `blocked` — not `error`. And never return `ok` with an empty payload to avoid looking broken.
 
-### 9.5 The durability caveat on `blocked` — **[ENFORCED]**, and easy to miss
+### 10.5 The durability caveat on `blocked` — **[ENFORCED]**, and easy to miss
 
 A packet parked at `AwaitingDependency` holds **no lease** (`NodePacket.ParkAwaitingDependency` sets
 `LeaseExpiresAt = null`). The watchdog's startup sweep aborts every **active** packet — and active is
@@ -848,7 +1062,7 @@ So:
 is really "this host can never do this", `missing-environment` is still the honest answer — just expect the
 packet to be reaped rather than resumed, and put the actionable half somewhere durable.
 
-### 9.6 Failing well — a decision table
+### 10.6 Failing well — a decision table
 
 | Situation | `outcome` | Detail |
 |---|---|---|
@@ -862,16 +1076,16 @@ packet to be reaped rather than resumed, and put the actionable half somewhere d
 | A person must approve | `blocked` | `human-decision` |
 | Waiting on a real-world result | `blocked` | `pending-outcome` |
 | Bad or missing token | **`401`** | the one legitimate non-2xx |
-| Work done, optional extras missing | **`ok`** | report the shortfall in the payload — §10 |
+| Work done, optional extras missing | **`ok`** | report the shortfall in the payload — §11 |
 
 **[RECOMMENDED]** Error messages name the slot and what would fix it: `"spec.shape is required"` beats
 `"bad input"`. That string is what reaches the caller in `lastDecision` / `error`.
 
 ---
 
-## 10. Outputs, artifacts, and graceful degradation
+## 11. Outputs, artifacts, and graceful degradation
 
-### 10.1 Where outputs go
+### 11.1 Where outputs go
 
 There is **no core-managed artifact store**. The payload is string→string, so a node that produces files
 returns **paths**, and owns the directory they live in.
@@ -908,7 +1122,7 @@ return cleaned or "model"
 **[REQUIRED]** Declare the write in `requires.permissions` (e.g. `write:workspace-files`). Nothing enforces
 it; it is how a reviewer sees what your node touches.
 
-### 10.2 Graceful degradation — **[REQUIRED]**
+### 11.2 Graceful degradation — **[REQUIRED]**
 
 **An optional sub-feature must never fail the whole result.**
 
@@ -932,7 +1146,7 @@ part."
 Guard every nice-to-have, and report its absence as data rather than as an exception. If the core can only
 see `ok` or `error`, a lost thumbnail must not look like a lost part.
 
-### 10.3 Reporting metadata — **[RECOMMENDED]**
+### 11.3 Reporting metadata — **[RECOMMENDED]**
 
 Report what you **measured**, not what you were asked for. The reference node returns measured extents,
 measured volume, triangle count, `watertight`, `validation_passed`, and a `script_sha256` of the generated
@@ -954,9 +1168,9 @@ Conventions that make a payload readable:
 
 ---
 
-## 11. Determinism, idempotency, telemetry, health
+## 12. Determinism, idempotency, telemetry, health
 
-### 11.1 Determinism — **[RECOMMENDED]**, and worth a lot
+### 12.1 Determinism — **[RECOMMENDED]**, and worth a lot
 
 Nothing enforces determinism. It is still the single property that makes a node trustworthy, because it is
 what lets a result be reproduced from its inputs.
@@ -969,7 +1183,7 @@ geometry, and no model class is consulted"* — backs it with `model_classes: []
 publish a hash of whatever intermediate you generated. If you are not, say that too — a caller that knows a
 node is stochastic can treat its output accordingly.
 
-### 11.2 Idempotency — **[REQUIRED]** awareness, no mechanism
+### 12.2 Idempotency — **[REQUIRED]** awareness, no mechanism
 
 There is **no** idempotency mechanism in the contract. No idempotency key, no de-duplication, no
 "already done" response.
@@ -984,7 +1198,7 @@ There is **no** idempotency mechanism in the contract. No idempotency key, no de
 the input rather than appending; if an operation genuinely cannot be repeated safely, say so in the
 capability description and consider keying your own side state on `goal_id`.
 
-### 11.3 Telemetry — the core's record cannot be suppressed
+### 12.3 Telemetry — the core's record cannot be suppressed
 
 **[ENFORCED]** `NodeDispatcher` emits exactly **one** `NodeTelemetryRecord` per invocation, whatever
 happens, including when the adapter throws. It carries `trace_id`, `goal_id`, `node_id`, `capability`,
@@ -998,7 +1212,7 @@ telemetry disk write can never slow down or take down the dispatch path.
 **[DRIFT]** `telemetry_extra` is declared on `NodeResult` and read by nothing; it is not on the wire DTO at
 all. For out-of-process nodes it is inert. Put anything you want a human to see in `payload`.
 
-### 11.4 Health expectations — summary
+### 12.4 Health expectations — summary
 
 | | |
 |---|---|
@@ -1015,11 +1229,11 @@ table and its failures surface as invocation errors instead. That is the current
 
 ---
 
-## 12. The core's own endpoints
+## 13. The core's own endpoints
 
 The core listens on **`http://127.0.0.1:5081`** by default.
 
-### 12.1 `GET /nodes` — what this core can and cannot do
+### 13.1 `GET /nodes` — what this core can and cannot do
 
 ```json
 {
@@ -1044,7 +1258,7 @@ The core listens on **`http://127.0.0.1:5081`** by default.
 simply invisible and the reason lives only in a startup log line that has scrolled away. **This is the
 first thing to check** when your node does not appear.
 
-### 12.2 `POST /nodes/invoke` — a thin pass-through
+### 13.2 `POST /nodes/invoke` — a thin pass-through
 
 **[ENFORCED]** Request body (`NodeInvokeRequest`):
 
@@ -1056,7 +1270,7 @@ first thing to check** when your node does not appear.
 | `successCriteria` | no | |
 | `correlationId` | no | defaults to a new GUID. **Pass the same one** to treat several invocations as one piece of work |
 
-There is deliberately **no deadline parameter** (§5.2).
+There is deliberately **no deadline parameter** (§6.2).
 
 **[ENFORCED]** Response:
 
@@ -1080,12 +1294,12 @@ is no caller authentication on the core's HTTP surface.
 
 ---
 
-## 13. Local versus online / remote nodes
+## 14. Local versus online / remote nodes
 
 **Read this before designing anything networked.** The honest summary: **the core will not register a
 non-loopback node today, and there is no configuration switch to allow it.**
 
-### 13.1 What is enforced
+### 14.1 What is enforced
 
 **[ENFORCED]** `NodeDiscoveryOptions.RequireLoopback` defaults to `true`. `Program.cs` constructs
 `NodeDiscoveryOptions` with only `HandshakeTimeout` and `SharedSecret`, so the default stands, and
@@ -1106,7 +1320,7 @@ host is literally `localhost` (case-insensitive). So `http://127.0.0.1:7801`, `h
 This is a decision, not an omission. From the source: "Phase 3 is local-only by decision; a remote endpoint
 needs the real broker-token work, which is deferred. Opt out deliberately, never by accident."
 
-### 13.2 What differs for a genuinely remote node, once it is allowed
+### 14.2 What differs for a genuinely remote node, once it is allowed
 
 Documented so you can design for it now, and so nobody mistakes the current gap for a small one.
 
@@ -1124,8 +1338,8 @@ Documented so you can design for it now, and so nobody mistakes the current gap 
 | Concern | Local today | What a remote node needs |
 |---|---|---|
 | **Transport security** | plain HTTP on loopback | TLS, and certificate validation |
-| **Authentication** | `X-Darci-Token`, a shared secret, **unverifiable in the default posture** (§6.4) | the real broker-token work: scoped, rotatable, per-node credentials — this is the blocker |
-| **Shared filesystem** | paths in the payload work because both processes see one disk | **breaks completely.** §10's `step_path` is meaningless to a caller on another host. Needs content transfer or a shared store the contract does not have |
+| **Authentication** | `X-Darci-Token`, a shared secret, **unverifiable in the default posture** (§7.4) | the real broker-token work: scoped, rotatable, per-node credentials — this is the blocker |
+| **Shared filesystem** | paths in the payload work because both processes see one disk | **breaks completely.** §11's `step_path` is meaningless to a caller on another host. Needs content transfer or a shared store the contract does not have |
 | **Health** | checked once at startup | a once-at-startup check over a WAN is much weaker; re-checking and `SetDegraded` driving would matter far more |
 | **Timeouts** | a 3s handshake is generous on loopback | 3s is tight across a network, and it is **hardcoded** in `Program.cs` |
 | **Retries** | none, and rarely needed | transient network faults make the absence of a retry policy a real gap; `retryable` is advisory only |
@@ -1133,21 +1347,21 @@ Documented so you can design for it now, and so nobody mistakes the current gap 
 | **Taint** | always `clean`, unenforced | a node reached over a network is a far stronger reason to set `emits_untrusted` honestly |
 | **Loopback gate** | the check that stops all of this | must become a deliberate opt-in, not a default flip |
 
-### 13.3 How to write a node today that is ready to go remote — **[RECOMMENDED]**
+### 14.3 How to write a node today that is ready to go remote — **[RECOMMENDED]**
 
 1. **Never assume a shared filesystem.** If your output is a file, also return something transport-safe —
    a size, a hash, a content type. Then "return the bytes instead" is a change in one place.
-2. **Keep the payload genuinely flat and small.** It is already the rule (§7.4); over a network it is also
+2. **Keep the payload genuinely flat and small.** It is already the rule (§8.4); over a network it is also
    a cost.
-3. **Treat the deadline as the core's to enforce.** Check it advisorily, fail open on absence (§7.3), and
+3. **Treat the deadline as the core's to enforce.** Check it advisorily, fail open on absence (§8.3), and
    never build logic that depends on your clock agreeing with the core's.
 4. **Make the secret configurable from the environment**, never compiled in, so swapping to a real
    credential is configuration.
 5. **Bind to loopback for now.** `--host 127.0.0.1`. Binding `0.0.0.0` does not make you registrable — the
    gate is on the manifest's `endpoint`, not on your bind address — it only widens your exposure.
-6. **Be idempotent** (§11.2). Retries are what a network adds first.
+6. **Be idempotent** (§12.2). Retries are what a network adds first.
 
-### 13.4 A note on "online" nodes that call the internet
+### 14.4 A note on "online" nodes that call the internet
 
 Distinct from a *remotely hosted* node: a node running **locally** that reaches out to the internet is
 fully supported today, and nothing stops it. Two requirements if you do:
@@ -1162,59 +1376,57 @@ not `INTERNAL`.
 
 ---
 
-## 14. Writing a node: the worked example
+## 15. A complete, runnable node
 
-Condensed from `DARCI-v4/nodes/darci.modeling`, which is a working node you can read in full.
+**This is a whole node, not an excerpt.** Two files, no placeholders, no `...`, nothing left as an
+exercise. It satisfies every rule in this document, and it was **verified by running it**: started under
+uvicorn, health-checked, manifest-compared byte-for-byte against its own file, registered by a live core,
+invoked through `POST /nodes/invoke`, and exercised on every negative path. The transcript is in §15.5.
 
-### 14.1 Layout
+Copy the two files into `nodes/acme.wordcount/`, run the two commands in §15.4, and you have a working
+node. `DocumentedRunnableNodeTests` keeps the manifest below honest against the real loader, validator and
+registry, so it cannot drift from the code it describes.
 
-```
-nodes/acme.summarize/
-├── darci-node.json        the reviewed capability grant
-├── node_server.py         the three endpoints
-├── requirements.txt
-├── .gitignore             output/ and the venv
-├── output/                artifacts (gitignored)
-└── tests/
-    ├── test_node_server.py        transport + contract
-    └── test_summarize.py          your actual logic
-```
+Only dependency: `fastapi` and `uvicorn`.
 
-### 14.2 `darci-node.json`
+### 15.1 `nodes/acme.wordcount/darci-node.json`
 
 ```json
 {
   "contract_version": "0.1.1",
-  "node_id": "acme.summarize",
-  "display_name": "Summariser",
-  "node_version": "0.1.0",
+  "node_id": "acme.wordcount",
+  "display_name": "Word Count",
+  "node_version": "1.0.0",
   "kind": "capability",
-  "endpoint": "http://127.0.0.1:7802",
+  "endpoint": "http://127.0.0.1:7899",
   "health": "/health",
   "capabilities": [
     {
-      "name": "acme.summarize",
-      "description": "Summarise a block of text. Deterministic: extractive, no model class consulted.",
+      "name": "acme.wordcount",
+      "description": "Count words, lines and characters in a block of text. Deterministic: the input fully determines the output, and no model class is consulted.",
       "input_schema": {
         "type": "object",
         "required": ["text"],
-        "description": "The node contract carries payloads as a flat map of string to string, so every slot below is a STRING.",
+        "description": "Payloads are a flat map of string to string, so every slot is a STRING.",
         "properties": {
-          "text": { "type": "string", "description": "The text to summarise." },
-          "max_sentences": { "type": "string", "description": "Decimal string. Defaults to '3'." }
+          "text": { "type": "string", "description": "The text to measure." },
+          "ignore_case": { "type": "string", "description": "'true' or 'false'. Affects unique_words only. Defaults to 'true'." }
         }
       },
       "output_schema": {
         "type": "object",
-        "description": "Also a flat map of string to string; numbers are decimal strings.",
+        "description": "Also flat string to string; counts are decimal strings.",
         "properties": {
-          "summary": { "type": "string" },
-          "sentence_count": { "type": "string" },
-          "input_sha256": { "type": "string", "description": "So a summary is reproducible from its input." }
+          "words": { "type": "string" },
+          "lines": { "type": "string" },
+          "characters": { "type": "string" },
+          "unique_words": { "type": "string" },
+          "longest_word": { "type": "string" },
+          "input_sha256": { "type": "string", "description": "So a result is reproducible from its input." }
         }
       },
-      "typical_latency_ms": 200,
-      "deadline_ms": 30000
+      "typical_latency_ms": 5,
+      "deadline_ms": 15000
     }
   ],
   "requires": {
@@ -1223,15 +1435,29 @@ nodes/acme.summarize/
     "permissions": [],
     "emits_untrusted": false
   },
-  "author": "you",
-  "repository": "https://github.com/you/acme-summarize"
+  "author": "DARCI docs",
+  "repository": "https://github.com/ARoskelley/DARCI-Live"
 }
 ```
 
-### 14.3 `node_server.py`
+Why it looks like this:
+
+- `deadline_ms` is **15 000**, comfortably under the 100-second cap of §2.3, so the number here is the
+  number that actually applies.
+- every slot in both schemas is `"type": "string"`, because the payload is flat string→string (§8.4), and
+  the schema `description` says so rather than describing an object the transport cannot carry.
+- `model_classes` is empty and the description says *deterministic*, which is a claim `input_sha256`
+  lets a caller check (§12.1).
+- `emits_untrusted` is `false` because every byte of output derives from the caller's own payload (§9.6).
+
+### 15.2 `nodes/acme.wordcount/node_server.py`
 
 ```python
-"""acme.summarize - a DARCI capability node (contract 0.1.1)."""
+"""acme.wordcount - a complete DARCI capability node (contract 0.1.1).
+
+Run:  python -m uvicorn node_server:app --host 127.0.0.1 --port 7899
+Then start the core. Nothing here is a sketch; every rule in NODE_REQUIREMENTS.md is satisfied.
+"""
 from __future__ import annotations
 
 import hashlib
@@ -1247,36 +1473,36 @@ from fastapi.responses import JSONResponse
 
 NODE_DIR = Path(__file__).resolve().parent
 
-# Read the BYTES once. Never rebuild this JSON - see NODE_REQUIREMENTS.md section 5.4.
+# Read the BYTES once and serve them unmodified (section 5.4). Rebuilding this JSON is the single
+# most common way a node fails its handshake.
 MANIFEST_BYTES = (NODE_DIR / "darci-node.json").read_bytes()
 MANIFEST = json.loads(MANIFEST_BYTES)
 
-NODE_ID          = MANIFEST["node_id"]
+NODE_ID = MANIFEST["node_id"]
 CONTRACT_VERSION = MANIFEST["contract_version"]
-CAPABILITIES     = {c["name"] for c in MANIFEST["capabilities"]}
-SHARED_SECRET    = os.getenv("DARCI_NODE_SHARED_SECRET") or ""
+CAPABILITIES = {c["name"] for c in MANIFEST["capabilities"]}
+SHARED_SECRET = os.getenv("DARCI_NODE_SHARED_SECRET") or ""
 
+# No shared mutable state: /invoke can be called in parallel (section 2.4) and this node is
+# stateless, which is the easiest way to be safe under concurrency.
 app = FastAPI(title=NODE_ID)
 
 
-# -- GET /health --------------------------------------------------------------
 @app.get("/health")
 def health() -> dict[str, str]:
-    """Able to serve, not merely running. Must answer in milliseconds."""
+    """Able to serve, not merely running. Must answer in milliseconds (section 3.4)."""
     return {"status": "ok", "node_id": NODE_ID, "node_version": MANIFEST["node_version"]}
 
 
-# -- GET /manifest ------------------------------------------------------------
 @app.get("/manifest")
 def manifest() -> Response:
     return Response(content=MANIFEST_BYTES, media_type="application/json")
 
 
-# -- POST /invoke -------------------------------------------------------------
 @app.post("/invoke")
 async def invoke(request: Request, x_darci_token: str | None = Header(default=None)) -> Response:
-    # A refusal to START work, not an outcome of it: the one legitimate non-2xx.
-    if not _check_token(x_darci_token):
+    # A refusal to START work, not an outcome of it: the one legitimate non-2xx (section 6.3).
+    if not _token_ok(x_darci_token):
         return JSONResponse(status_code=401, content={"error": "X-Darci-Token missing or incorrect"})
 
     try:
@@ -1284,7 +1510,7 @@ async def invoke(request: Request, x_darci_token: str | None = Header(default=No
     except Exception:
         return JSONResponse(status_code=400, content={"error": "body was not JSON"})
 
-    trace_id   = str(envelope.get("trace_id") or "")
+    trace_id = str(envelope.get("trace_id") or "")
     capability = str(envelope.get("capability") or "")
     payload: dict[str, str] = envelope.get("payload") or {}
 
@@ -1298,36 +1524,38 @@ async def invoke(request: Request, x_darci_token: str | None = Header(default=No
                       "The invocation deadline had already passed when the node received it.",
                       retryable=True)
 
-    return _summarize(trace_id, payload)
+    return _count(trace_id, payload)
 
 
-def _summarize(trace_id: str, payload: dict[str, str]) -> Response:
+def _count(trace_id: str, payload: dict[str, str]) -> Response:
     text = payload.get("text")
-    if not text:
-        # Name the field. This string is what reaches the caller.
-        return _error(trace_id, "INVALID_INPUT", "payload.text is required.", retryable=False)
+    if text is None or text == "":
+        # Name the slot. This string is what reaches the caller in `error` (section 9.6).
+        return _error(trace_id, "INVALID_INPUT", "payload.text is required and must not be empty.",
+                      retryable=False)
 
-    raw = payload.get("max_sentences", "3")
-    try:
-        max_sentences = int(raw)
-    except ValueError:
+    raw = payload.get("ignore_case", "true").strip().lower()
+    if raw not in ("true", "false"):
         return _error(trace_id, "INVALID_INPUT",
-                      f"max_sentences must be a whole number, got '{raw}'.", retryable=False)
-    if max_sentences < 1:
-        return _error(trace_id, "INVALID_INPUT", "max_sentences must be at least 1.", retryable=False)
+                      f"ignore_case must be 'true' or 'false', got '{raw}'.", retryable=False)
+    ignore_case = raw == "true"
 
-    sentences = [s.strip() for s in text.replace("!", ".").replace("?", ".").split(".") if s.strip()]
-    chosen    = sentences[:max_sentences]
+    words = text.split()
+    comparable = [w.lower() for w in words] if ignore_case else words
 
-    # Every value is a STRING. Numbers are decimal strings.
+    # Every value is a STRING; counts are decimal strings (section 7.4).
     return _ok(trace_id, {
-        "summary":        ". ".join(chosen) + ("." if chosen else ""),
-        "sentence_count": str(len(chosen)),
-        "input_sha256":   hashlib.sha256(text.encode("utf-8")).hexdigest(),
+        "words": str(len(words)),
+        "lines": str(len(text.splitlines())),
+        "characters": str(len(text)),
+        "unique_words": str(len(set(comparable))),
+        "longest_word": max(words, key=len) if words else "",
+        "input_sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
     })
 
 
-# -- envelope helpers ---------------------------------------------------------
+# -- envelope helpers (section 8) ---------------------------------------------------------------
+
 def _ok(trace_id: str, payload: dict[str, str]) -> Response:
     return _envelope(trace_id, "ok", payload=payload)
 
@@ -1338,7 +1566,9 @@ def _error(trace_id: str, code: str, message: str, *, retryable: bool) -> Respon
 
 
 def _blocked(trace_id: str, kind: str, detail: str) -> Response:
-    # NOT a failure: bounded work done, the goal now waits on something outside this call.
+    """Unused here - this node has no external dependency - but shown because `blocked` must never
+    be reported as `error` (section 9.4). Kinds are hyphenated: human-decision, missing-environment,
+    pending-outcome."""
     return _envelope(trace_id, "blocked", dependency={"kind": kind, "detail": detail})
 
 
@@ -1347,77 +1577,147 @@ def _envelope(trace_id: str, outcome: str, **extra: Any) -> Response:
         "envelope_version": CONTRACT_VERSION,
         "trace_id": trace_id,                       # echoed unchanged
         "outcome": outcome,
-        # Clean: this node only reads the caller's own text. Reading an external source would
-        # make this "untrusted", and taint can be raised but never lowered.
+        # Clean: this node reads only the caller's own text and no external source, so it introduces
+        # no taint. Fetching anything would make this "untrusted" with the fetched URLs as sources.
         "taint": {"level": "clean", "sources": []},
     }
     body.update(extra)
     return JSONResponse(status_code=200, content=body)
 
 
-def _check_token(token: str | None) -> bool:
+def _token_ok(token: str | None) -> bool:
+    """Verify when a secret is configured; accept when not - otherwise the node is unusable in the
+    default posture rather than secure (section 6.4)."""
     if not SHARED_SECRET:
-        return True        # unconfigured must not mean unusable
+        return True
     return token is not None and hmac.compare_digest(token, SHARED_SECRET)
 
 
 def _deadline_passed(deadline_at: Any) -> bool:
+    """Advisory: the core enforces this too. Fails OPEN on absent or malformed input (section 7.3)."""
     if not isinstance(deadline_at, str) or not deadline_at:
-        return False       # absent is not expired
+        return False
     try:
         parsed = datetime.fromisoformat(deadline_at.replace("Z", "+00:00"))
     except ValueError:
-        return False       # unparseable is not expired
+        return False
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=timezone.utc)
     return datetime.now(timezone.utc) > parsed
 ```
 
-### 14.4 Run it, in this order
+### 15.3 `nodes/acme.wordcount/.gitignore`
+
+```gitignore
+__pycache__/
+.venv/
+output/
+```
+
+### 15.4 Run it
 
 ```bash
-# 1. your node FIRST - the core does not launch it
-DARCI_NODE_SHARED_SECRET=dev-secret \
-  python -m uvicorn node_server:app --host 127.0.0.1 --port 7802
+# install (once)
+python -m venv .venv
+.venv/Scripts/pip install fastapi uvicorn          # POSIX: .venv/bin/pip
 
-# 2. then the core, with the same secret
+# 1. the node FIRST - the core does not launch it (§4.4)
+DARCI_NODE_SHARED_SECRET=dev-secret   .venv/Scripts/python -m uvicorn node_server:app --host 127.0.0.1 --port 7899
+
+# 2. then the core, with the SAME secret (§7.4)
 DARCI_NODE_SHARED_SECRET=dev-secret dotnet run --project DARCI-v4/Darci.Api
 ```
 
-Look for:
+### 15.5 What a verified run looks like
+
+Every block below is real output from running exactly these files.
+
+**Registration**, from the core's boot log:
 
 ```
-Registered OUT-OF-PROCESS node acme.summarize at http://127.0.0.1:7802 serving [acme.summarize].
-Node discovery complete: 3 in-process, 1 out-of-process, 0 skipped.
+Registered node acme.wordcount v1.0.0 (Capability, http://127.0.0.1:7899) serving [acme.wordcount]
+  - manifest sha256 99757EDA964F1446.
+Registered OUT-OF-PROCESS node acme.wordcount at http://127.0.0.1:7899 serving [acme.wordcount].
+Node discovery complete: 0 in-process, 1 out-of-process, 3 skipped.
+Node registry ready: 1 node(s) serving [acme.wordcount].
 ```
 
-### 14.5 Call it
+**End to end through the core:**
 
 ```bash
-curl -X POST http://127.0.0.1:5081/nodes/invoke \
-  -H "Content-Type: application/json" \
-  -d '{"capability":"acme.summarize",
-       "payload":{"text":"One. Two. Three. Four.","max_sentences":"2"},
-       "intent":"why you are asking"}'
+curl -X POST http://127.0.0.1:5081/nodes/invoke   -H "Content-Type: application/json"   -d '{"capability":"acme.wordcount",
+       "payload":{"text":"the quick brown fox
+The lazy dog","ignore_case":"true"},
+       "intent":"verifying the documented example end to end"}'
 ```
 
 ```json
 {
-  "packetId": "…", "correlationId": "…",
-  "state": "Succeeded", "terminal": true, "confidence": null,
-  "payload": { "summary": "One. Two.", "sentence_count": "2", "input_sha256": "…" },
-  "lastDecision": "completed", "error": null
+  "packetId": "0bc1093b656f4d3da9a89f2562c7d613",
+  "correlationId": "09678b7e46474fc7b4980f1ecd5c86ec",
+  "state": "Succeeded",
+  "terminal": true,
+  "confidence": null,
+  "payload": {
+    "text": "the quick brown fox
+The lazy dog",
+    "ignore_case": "true",
+    "words": "7",
+    "lines": "2",
+    "characters": "32",
+    "unique_words": "6",
+    "longest_word": "quick",
+    "input_sha256": "87827fc346d9ad5a19bb950f2b5da1fc5f7e2d1d92788a704865386f45d45432"
+  },
+  "lastDecision": "completed",
+  "error": null
 }
 ```
 
-### 14.6 Testing yours — **[RECOMMENDED]**
+Two things in that response are worth noticing, because neither is obvious:
+
+- **the response `payload` contains the request slots too** (`text`, `ignore_case`). `NodeDispatcher.Fold`
+  merges your output onto the work record's existing slots rather than replacing them, so a caller sees
+  input and output together. Do not name an output slot after an input slot unless you mean to overwrite
+  it.
+- **`confidence` is `null`**, not `0`, because this node omits it — which is correct for a deterministic
+  measurement (§9.2: omit rather than fabricate).
+
+**Concurrency** (§2.4) — eight parallel invocations through the live core, all of which succeeded:
+
+```
+Succeeded 3    Succeeded 3    Succeeded 3    Succeeded 3
+Succeeded 3    Succeeded 3    Succeeded 3    Succeeded 3
+```
+
+**Every negative path**, called directly against the node:
+
+| Request | Response |
+|---|---|
+| missing `payload.text` | `200` · `error` · `INVALID_INPUT` · *"payload.text is required and must not be empty."* |
+| `ignore_case: "maybe"` | `200` · `error` · `INVALID_INPUT` · *"ignore_case must be 'true' or 'false', got 'maybe'."* |
+| `capability: "acme.nope"` | `200` · `error` · `NOT_IMPLEMENTED` |
+| `deadline_at` in 2020 | `200` · `error` · `DEADLINE_EXCEEDED` · `retryable: true` |
+| **no** `deadline_at` | `200` · `ok` — absence is **not** expiry (§8.3) |
+| `X-Darci-Token: wrong` | **`401`** — the one legitimate non-2xx (§7.3) |
+
+And the manifest check that catches gotcha 1:
+
+```bash
+curl -s http://127.0.0.1:7899/manifest > served.json
+cmp served.json nodes/acme.wordcount/darci-node.json && echo IDENTICAL
+# -> IDENTICAL
+```
+
+### 15.6 Testing yours — **[RECOMMENDED]**
 
 Test the **envelope**, not only your logic. The tests that earn their place are the ones that catch a
 contract violation:
 
 - `/health` returns exactly `status == "ok"`;
-- `/manifest` is **byte-identical** to the file on disk (the cheapest guard against §5.4);
-- the manifest validates: contract version supported, capability names valid, `deadline_ms > 0`;
+- `/manifest` is **byte-identical** to the file on disk (the cheapest guard against §6.4);
+- the manifest validates: contract version supported, capability names valid, `deadline_ms > 0`, and
+  `deadline_ms <= 100000` so §2.3 cannot bite you;
 - `trace_id` is echoed unchanged;
 - **every** payload value is a `str`, in every response path;
 - a bad input gives `INVALID_INPUT` with a 200, not a 500;
@@ -1425,22 +1725,24 @@ contract violation:
 - an already-expired `deadline_at` is refused before any work;
 - a missing or malformed `deadline_at` is **not** treated as expired;
 - a wrong token gives 401 when a secret is set, and the call succeeds when none is;
+- two invocations in flight at once do not corrupt each other (§2.4);
 - each guarded nice-to-have degrades without failing the result.
 
-`nodes/darci.modeling/tests/` has all of these if you want a template.
+`nodes/darci.modeling/tests/` has all of these against a more substantial node if you want a template.
 
 ---
 
-## 15. Author checklist
+## 16. Author checklist
 
 Manifest:
 
 - [ ] file is exactly `darci-node.json`, under the nodes directory
 - [ ] `contract_version` is `"0.1.1"` (or `"0.1"`)
 - [ ] `node_id` is namespaced, unique, and will not change between versions
-- [ ] at least one capability, each a valid `domain.action` (§4.1), each unique in the manifest
+- [ ] at least one capability, each a valid `domain.action` (§5.1), each unique in the manifest
 - [ ] capability names namespaced to **your** node so you cannot collide with a first-party verb
-- [ ] every `deadline_ms > 0` and set to a real worst case
+- [ ] every `deadline_ms > 0`, set to a real worst case, and **≤ 100000** so the invisible
+      HttpClient cap of §2.3 cannot truncate it
 - [ ] `endpoint` is loopback; the port is free and nothing else claims it
 - [ ] `input_schema` declares every slot as a **string** and documents the encoding
 - [ ] `output_schema` declares what you return
@@ -1463,57 +1765,70 @@ Envelope:
 - [ ] `trace_id` echoed unchanged
 - [ ] `outcome` is exactly `ok`, `error`, or `blocked`
 - [ ] **every** payload value is a string, on every path
-- [ ] error codes are from the §8.4 list; `retryable` classified honestly
-- [ ] `blocked` used for external dependencies, never `error` (§9.4)
+- [ ] error codes are from the §9.4 list; `retryable` classified honestly
+- [ ] `blocked` used for external dependencies, never `error` (§10.4)
 - [ ] dependency `kind` uses hyphens: `human-decision`, `missing-environment`, `pending-outcome`
-- [ ] `taint` set honestly, and only ever raised
+- [ ] `taint` level set honestly and only ever raised; `sources` names each origin, carries forward
+      anything still relevant from the request, and contains no secrets (§9.6)
 - [ ] `confidence` omitted rather than fabricated
 
 Behaviour:
 
-- [ ] optional sub-features guarded; shortfall reported in the payload, not thrown (§10.2)
+- [ ] **safe for concurrent `/invoke` calls** — no shared mutable state, no fixed output path, any
+      non-reentrant library guarded by your own lock (§2.4)
+- [ ] optional sub-features guarded; shortfall reported in the payload, not thrown (§11.2)
 - [ ] outputs in your own directory, gitignored, absolute paths returned
 - [ ] caller-supplied filenames sanitized
-- [ ] repeated identical invocations are safe (§11.2)
+- [ ] repeated identical invocations are safe (§12.2)
 - [ ] determinism stated either way in the capability description
 
 Operations:
 
-- [ ] node started **before** the core
+- [ ] node started **before** the core; manifest edits need **both** restarted, node first (§4.4)
 - [ ] manifest edited ⇒ node restarted ⇒ core restarted, in that order
 - [ ] `GET /nodes` shows you under `registered` with `"transport": "http"`, and not under `skipped`
 - [ ] a real `POST /nodes/invoke` returns `Succeeded`
-- [ ] tests cover the envelope, not only the logic (§14.6)
+- [ ] tests cover the envelope, not only the logic (§15.6)
 
 ---
 
-## 16. Common mistakes, in the order they actually bit
+## 17. Common mistakes, in the order they actually bit
 
 From building `darci.modeling`, the first external node.
 
 1. **Regenerating the manifest instead of serving the file.** A SHA mismatch and a refused registration.
-   Read the bytes. (§5.4)
+   Read the bytes. (§6.4)
 2. **Forgetting the payload is flat strings.** A nested object silently does not survive the round trip.
-   (§7.4)
+   (§8.4)
 3. **Returning 500 on bad input.** The core can only call that `DEPENDENCY_UNAVAILABLE`; the caller learns
-   nothing about what to fix. (§6.3)
+   nothing about what to fix. (§7.3)
 4. **Changing the manifest without restarting the node.** It still serves the bytes it read at startup.
-   (§5.4)
+   (§6.4)
 5. **Assuming the core will start your process.** It will not — it health-checks an address, once, at its
-   own startup. (§3.4)
+   own startup. (§4.4)
 6. **Treating an optional sub-feature as fatal.** `darci.modeling` cannot render previews headlessly, so it
-   reports `renders: "0/3"` and still returns the model. (§10.2)
+   reports `renders: "0/3"` and still returns the model. (§11.2)
 
 Two more that are not from that list but have each cost a real boot or a real bug:
 
 7. **Parsing the manifest without the string-enum converter.** `"kind": "capability"` fails, and the node
-   is skipped as "unparseable" with no hint why. (§5.4)
+   is skipped as "unparseable" with no hint why. (§6.4)
 8. **Treating `blocked` as a failure.** The core had this bug until an out-of-process node hit it. Do not
-   reintroduce it from your side by reporting `error` when you mean `blocked`. (§9.4)
+   reintroduce it from your side by reporting `error` when you mean `blocked`. (§10.4)
+
+And two that nothing in the repo has hit yet only because no node has been written to provoke them:
+
+9. **Declaring a `deadline_ms` above 100 000.** The core's HTTP client caps every invocation at 100
+   seconds and reports the overrun as `DEADLINE_EXCEEDED`, so the excess is unreachable and the failure
+   looks like your node being slow. `darci.modeling` declares 120 000 and is already subject to it.
+   (§2.3)
+10. **Assuming `/invoke` is called one at a time.** Nothing serializes it. A fixed output path, a
+    module-level cache, or a non-reentrant library will corrupt results under concurrent calls, and the
+    corruption will look like a logic bug. (§2.4)
 
 ---
 
-## 17. Appendix A — environment variables
+## 18. Appendix A — environment variables
 
 | Variable | Read by | Effect |
 |---|---|---|
@@ -1522,7 +1837,16 @@ Two more that are not from that list but have each cost a real boot or a real bu
 | `DARCI_TELEMETRY_DB_PATH` | core | Telemetry database. Default `telemetry.db` beside the main database. |
 | *(your own)* | node | **[RECOMMENDED]** one env var for your output directory, e.g. `DARCI_MODELING_OUTPUT_DIR`. |
 
-## 18. Appendix B — enforcement summary
+And the operational numbers that have **no** environment variable, for completeness — all three are
+hardcoded and a node author cannot change any of them:
+
+| Number | Value | Where it is set |
+|---|---|---|
+| Handshake budget (health + manifest) | 3 s | `Program.cs`, `NodeDiscoveryOptions.HandshakeTimeout` |
+| Per-invocation HTTP cap | 100 s | not set at all — `AddHttpClient("darci-node")` takes the .NET default |
+| Loopback requirement | on | `NodeDiscoveryOptions.RequireLoopback` default, never overridden (§14.1) |
+
+## 19. Appendix B — enforcement summary
 
 What will actually stop you, in the order you will meet it:
 
@@ -1546,12 +1870,13 @@ What will actually stop you, in the order you will meet it:
 | 16 | — *registered* — | | |
 | 17 | Capability name valid on the call | `POST /nodes/invoke` | `400` |
 | 18 | Deadline not already passed | `HttpNodeAdapter.InvokeAsync` | `DEADLINE_EXCEEDED`, node never called |
+| 18b | Response within `min(deadline_ms, 100s)` | `InvokeAsync` + `HttpClient.Timeout` | `DEADLINE_EXCEEDED` (§2.3) |
 | 19 | Response is 2xx | `InvokeAsync` | `DEPENDENCY_UNAVAILABLE` |
 | 20 | Body parseable and non-empty | `InvokeAsync` | `INTERNAL` |
 | 21 | `outcome` recognized | `ParseOutcome` | unknown ⇒ `Error` |
 | 22 | Taint not lowered | `TaintRef.RaisedTo` | silently raised back |
 
-## 19. Appendix C — source map
+## 20. Appendix C — source map
 
 | Topic | File |
 |---|---|
@@ -1567,7 +1892,7 @@ What will actually stop you, in the order you will meet it:
 | State machine, `PacketPayload` | `DARCI-v4/Darci.Nodes/NodePrimitives.cs` |
 | Work record, parking, leases | `DARCI-v4/Darci.Nodes/NodePacket.cs` |
 | Orphan sweep, the parked-packet carve-out | `DARCI-v4/Darci.Nodes/NodeWatchdog.cs` |
-| §14c audit record | `DARCI-v4/Darci.Nodes/Contract/SqliteNodeRegistrationStore.cs` |
+| §15c audit record | `DARCI-v4/Darci.Nodes/Contract/SqliteNodeRegistrationStore.cs` |
 | Capability name validation | `DARCI-v4/Darci.Nodes/Contract/CapabilityKeys.cs` |
 | Wiring, `/nodes`, `/nodes/invoke`, env vars | `DARCI-v4/Darci.Api/Program.cs` |
 | Reference node | `DARCI-v4/nodes/darci.modeling/` |

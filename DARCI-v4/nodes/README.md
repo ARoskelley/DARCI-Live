@@ -20,7 +20,7 @@ Your node serves three endpoints and nothing else:
 |---|---|
 | `GET /health` | `200 {"status":"ok"}` when able to serve. A 200 saying anything else means *up but not ready*, and the core will not register you. |
 | `GET /manifest` | Your `darci-node.json` — serve the **bytes** you read at startup. |
-| `POST /invoke` | One invocation envelope in, one result envelope out. |
+| `POST /invoke` | One invocation envelope in, one result envelope out. **May be called in parallel — be safe for concurrent calls.** |
 
 The core calls nothing else, and **the core never dies because a node died**. If you are absent, slow,
 unreachable, or lying about your manifest, you are skipped with a named reason and DARCI starts anyway.
@@ -90,16 +90,20 @@ def manifest():
     return Response(content=MANIFEST_BYTES, media_type="application/json")
 ```
 
-**Read the bytes. Do not rebuild the JSON.** The core hashes the manifest on disk and the one you serve
-and refuses to register you if they differ — the on-disk manifest is the reviewed capability grant, and a
-node reporting something else is claiming a surface nobody approved.
+**The rule, exactly.** The core parses your `/manifest` body and the file on disk, re-serializes both
+canonically, and SHA-256s the result — so indentation, newlines, the order of top-level keys and unknown
+extra fields are all irrelevant, but **the key order inside `input_schema` and `output_schema` is not**,
+because those are carried as raw JSON documents and round-trip verbatim. Any difference in the hash and
+you are not registered.
 
-What is compared is the *parsed* manifest, re-serialized canonically, so indentation and the order of
-top-level keys do not matter. But `input_schema` and `output_schema` are carried as raw documents, so
-re-emitting the same values with one key inside them reordered **is** a mismatch — which is exactly what
-rebuilding the JSON tends to do. Serving the bytes sidesteps the whole question. (§5.4 of
-[`docs/NODE_REQUIREMENTS.md`](../../docs/NODE_REQUIREMENTS.md) has the precise rule and the test that
-proves it.) The refusal looks like:
+**So: read the bytes. Do not rebuild the JSON.** Rebuilding is what reorders a key inside a schema while
+preserving every value, which is the one difference that still counts. Serving the bytes you read at
+startup sidesteps the question entirely.
+
+Why it is checked at all: the on-disk manifest is the reviewed capability grant, and a node reporting
+something else is claiming a surface nobody approved. (§5.4 of
+[`docs/NODE_REQUIREMENTS.md`](../../docs/NODE_REQUIREMENTS.md) has the full rule and the test that proves
+both halves.) The refusal looks like:
 
 ```
 Node acme.summarize at http://127.0.0.1:7802 did not complete the handshake
@@ -202,6 +206,12 @@ Node discovery complete: 3 in-process, 1 out-of-process, 0 skipped.
 `GET /nodes` shows you with `"transport": "http"`, and — more usefully when something is wrong — a
 `skipped` map saying exactly why you were not registered.
 
+**Discovery runs once, at the core's startup.** So: a new node or a new manifest file needs the **core**
+restarted; a manifest *edit* needs **both** restarted, node first (it serves the bytes it read at its own
+startup); a code change with an unchanged manifest needs only **your node** restarted. There is no file
+watcher and no re-discovery endpoint. Full table in §4.4 of
+[`docs/NODE_REQUIREMENTS.md`](../../docs/NODE_REQUIREMENTS.md).
+
 ## 7. Ask it to do something
 
 ```
@@ -234,3 +244,9 @@ want a template.
 5. **Assuming the core will start your process** — it will not. It health-checks an address.
 6. **Treating an optional sub-feature as fatal** — `darci.modeling` cannot render previews headlessly, so
    it reports `renders: 0/3` and still returns the model. A missing extra must not fail the work.
+7. **Declaring a `deadline_ms` above 100 000** — the core's HTTP client caps every invocation at 100
+   seconds whatever your manifest says, and reports the overrun as `DEADLINE_EXCEEDED`, so the excess is
+   unreachable and the failure looks like slowness. Keep it at or below 100 000.
+8. **Assuming `/invoke` is called one at a time** — nothing serializes it. A fixed output path, a
+   module-level cache, or a non-reentrant library corrupts results under concurrent calls. Be stateless,
+   or lock it yourself.
