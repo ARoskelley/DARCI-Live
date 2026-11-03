@@ -1754,8 +1754,9 @@ contract violation:
 
 - `/health` returns exactly `status == "ok"`;
 - `/manifest` is **byte-identical** to the file on disk (the cheapest guard against §6.4);
-- the manifest validates: contract version supported, capability names valid, `deadline_ms > 0`, and
-  `deadline_ms <= 100000` so §2.3 cannot bite you;
+- the manifest validates: contract version supported, capability names valid, `deadline_ms` **present**
+  and `> 0`, and — for an out-of-process node — `deadline_ms <= 180000`, which is the enforced ceiling:
+  above it the manifest is refused at load rather than clipped at runtime (§2.3);
 - `trace_id` is echoed unchanged;
 - **every** payload value is a `str`, in every response path;
 - a bad input gives `INVALID_INPUT` with a 200, not a 500;
