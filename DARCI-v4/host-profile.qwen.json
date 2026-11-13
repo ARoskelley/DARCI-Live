@@ -1,0 +1,56 @@
+{
+  "profile_id": "tinman-qwen-remote",
+  "description": "REMOTE-HEAVY profile - NOT the committed default. Selected by pointing DARCI_HOST_PROFILE at this file; host-profile.json stays all-local and keyless so a fresh clone boots with no credentials. This profile moves the TWO classes anything actually requests at runtime - chat.balanced (every toolkit, research, innovation and knowledge call) and code.generate - onto the remote OpenAI-compatible proxy, and keeps embeddings and the fast coding path local. No secret lives here: api_key_env names the environment variable and HostProfile.Validate() refuses to start if it is unset.",
+  "WARNING_READ_BEFORE_USE": "coder-120b is a REASONING model and this profile is NOT SAFE until the caller token budgets are raised. Measured against this endpoint on 2026-11-12 with a realistic reasoning-heavy prompt: max_tokens 1024 -> empty, 4096 -> empty, 8192 -> empty, 16384 -> complete (7528 completion tokens). The model spends the whole budget thinking and emits no content, which OpenAiCompatibleModelProvider correctly reports as REMOTE_EMPTY_COMPLETION. A host profile CANNOT fix this: ModelProviderConfig has no max_tokens field, and the callers pass their own - OllamaClient.Generate hardcodes 1024 (Darci.Tools/Ollama/OllamaClient.cs:36) and ModelRouter hardcodes 4096 (Darci.Coding/ModelRouter.cs:23). Both are below the measured floor. Raise those, or add a per-provider max_tokens to ModelProviderConfig, before binding chat.balanced here.",
+  "providers": {
+    "ollama": {
+      "kind": "ollama",
+      "base_url": "http://localhost:11434",
+      "timeout_minutes": 12
+    },
+    "litellm": {
+      "kind": "openai",
+      "base_url": "https://lite.wireframehosting.com/v1",
+      "api_key_env": "DARCI_LITELLM_API_KEY",
+      "timeout_minutes": 10,
+      "note": "Same proxy as host-profile.hybrid.json, verified 2026-11-12: GET /v1/models lists coder-120b among 7 models. The base URL INCLUDES /v1 - the proxy answers on both / and /v1, but /v1 is the canonical OpenAI root that /chat/completions is appended to. A hard prompt takes 35-38s, so timeout_minutes 10 is ample; the latency, not the ceiling, is the thing to watch."
+    }
+  },
+  "classes": {
+    "chat.fast": {
+      "provider": "ollama",
+      "model": "gemma2:9b",
+      "note": "Local. ASPIRATIONAL tier - no genuinely small model is installed, so this is the same 9B as chat.balanced. Nothing in the codebase requests chat.fast today."
+    },
+    "chat.balanced": {
+      "provider": "litellm",
+      "model": "coder-120b",
+      "note": "REMOTE, and this is the lever: every call through OllamaClient.Generate - toolkit, research agents, innovation synthesis, knowledge assessment, critics - asks for this class. It is the highest-volume text class by a wide margin, which is exactly why it is the one worth moving and the one most exposed to the token-budget problem in WARNING_READ_BEFORE_USE. OllamaClient sends max_tokens 1024, which measured EMPTY on this model."
+    },
+    "chat.deep": {
+      "provider": "litellm",
+      "model": "coder-120b",
+      "note": "REMOTE. Bound for completeness; nothing in the codebase requests chat.deep today, so this binding has no runtime effect until something does."
+    },
+    "classify.intent": {
+      "provider": "ollama",
+      "model": "gemma2:9b",
+      "note": "Stays local on purpose: classification is high-volume and latency-sensitive, and a 35s remote round trip per classification would dominate any loop. Nothing requests this class today either."
+    },
+    "embed.text": {
+      "provider": "ollama",
+      "model": "nomic-embed-text",
+      "note": "STAYS LOCAL, and this one is not a preference. The proxy also fronts nomic-embed-text, but the stored vectors must stay comparable: switching the embedding model - or even the same model behind a different server - risks invalidating every embedding already in the knowledge graph and the coding workspaces. Re-embedding everything is the price of changing this."
+    },
+    "code.generate": {
+      "provider": "litellm",
+      "model": "coder-120b",
+      "note": "REMOTE. The 120B coder in place of the local 7B - this is the tier with the most to gain. ModelRouter sends max_tokens 4096, which also measured EMPTY on a reasoning-heavy prompt; see WARNING_READ_BEFORE_USE."
+    },
+    "code.fast": {
+      "provider": "ollama",
+      "model": "qwen2.5-coder:7b",
+      "note": "Stays local on purpose - this is the fast/cheap iteration path, and keeping it local preserves a working coder when the remote is unavailable or slow. Also the fallback worth having while the remote budgets are unresolved."
+    }
+  }
+}
